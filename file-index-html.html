@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minimalerei · Bestseller Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --amber: #E8973A;
+  --teal: #3DBDB5;
+  --navy: #1C2B3A;
+  --gold: #C9A84C;
+  --creme: #F8F4F0;
+  --noir: #2C2C2A;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--creme); font-family: 'Poppins', sans-serif; color: var(--noir); min-height: 100vh; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+.header-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.bar { width: 6px; height: 24px; background: var(--amber); border-radius: 3px; }
+.subtitle { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--noir); opacity: 0.6; font-weight: 500; }
+h1 { font-family: 'Lora', serif; font-size: 38px; font-weight: 700; color: var(--navy); line-height: 1.1; }
+.intro { color: var(--noir); opacity: 0.7; margin-top: 8px; font-size: 15px; }
+.timeframes { display: flex; gap: 8px; flex-wrap: wrap; margin: 32px 0; align-items: center; }
+.timeframe-btn { padding: 10px 18px; border-radius: 999px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; background: white; color: var(--navy); box-shadow: 0 1px 3px rgba(0,0,0,0.06); transition: all 0.2s; font-family: 'Poppins', sans-serif; }
+.timeframe-btn.active { background: var(--navy); color: var(--creme); box-shadow: none; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.tile { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 2px 12px rgba(28,43,58,0.06); border-left: 4px solid var(--amber); }
+.tile-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; opacity: 0.7; margin-bottom: 8px; }
+.tile-value { font-family: 'Lora', serif; font-size: 26px; font-weight: 700; color: var(--navy); line-height: 1.2; }
+.tile-sub { font-size: 12px; opacity: 0.5; margin-top: 4px; }
+.list-card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 2px 12px rgba(28,43,58,0.06); }
+.list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
+.list-title { font-family: 'Lora', serif; font-size: 22px; font-weight: 600; color: var(--navy); display: flex; align-items: center; gap: 10px; }
+.hint { font-size: 12px; opacity: 0.5; }
+.product { display: grid; grid-template-columns: 40px 1fr auto 24px; align-items: center; gap: 16px; padding: 14px 16px; background: var(--creme); border-radius: 12px; position: relative; overflow: hidden; margin-bottom: 10px; cursor: pointer; }
+.product.no-variants { cursor: default; }
+.product.expanded { border-radius: 12px 12px 0 0; margin-bottom: 0; }
+.progress { position: absolute; left: 0; top: 0; bottom: 0; transition: width 0.4s ease; }
+.rank { width: 32px; height: 32px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; z-index: 1; }
+.product-info { z-index: 1; min-width: 0; }
+.product-name { font-family: 'Lora', serif; font-weight: 600; color: var(--navy); font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.product-meta { font-size: 12px; opacity: 0.6; margin-top: 2px; }
+.product-revenue { z-index: 1; text-align: right; font-weight: 600; color: var(--navy); font-size: 16px; }
+.chevron { z-index: 1; opacity: 0.5; display: flex; justify-content: center; transition: transform 0.2s; font-size: 18px; }
+.chevron.rotate { transform: rotate(90deg); }
+.chevron.hidden { opacity: 0; }
+.variants { background: white; border: 1px solid var(--creme); border-top: none; border-radius: 0 0 12px 12px; padding: 12px 16px 14px 56px; margin-bottom: 10px; }
+.variant-row { display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 12px; padding: 6px 0; }
+.variant-dot { width: 10px; height: 10px; border-radius: 50%; }
+.variant-name { font-size: 13px; color: var(--navy); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.variant-bar { margin-top: 4px; height: 3px; border-radius: 2px; opacity: 0.6; transition: width 0.3s; }
+.variant-orders { font-size: 12px; opacity: 0.6; text-align: right; min-width: 70px; }
+.variant-revenue { font-size: 13px; color: var(--navy); font-weight: 600; text-align: right; min-width: 70px; }
+.footer { text-align: center; margin-top: 24px; font-size: 12px; opacity: 0.5; }
+.loading { text-align: center; padding: 60px 20px; color: var(--navy); }
+.spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid var(--creme); border-top-color: var(--amber); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error { background: #FEF2F2; border-radius: 8px; padding: 20px; color: #991B1B; }
+.refresh-btn { background: transparent; border: 1.5px solid var(--navy); color: var(--navy); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; }
+.refresh-btn:disabled { opacity: 0.5; cursor: wait; }
+.month-select { padding: 10px 14px; border-radius: 8px; border: 1.5px solid var(--navy); background: white; color: var(--navy); font-family: 'Poppins', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+    <div>
+      <div class="header-bar"><div class="bar"></div><span class="subtitle">Minimalerei</span></div>
+      <h1>Bestseller Dashboard</h1>
+      <p class="intro">Deine meistverkauften Produkte auf einen Blick.</p>
+    </div>
+    <button class="refresh-btn" id="refresh">↻ Aktualisieren</button>
+  </div>
+
+  <div class="timeframes" id="timeframes">
+    <span style="opacity:0.6;">📅</span>
+    <button class="timeframe-btn" data-tf="7d">Letzte Woche</button>
+    <button class="timeframe-btn active" data-tf="30d">Letzter Monat</button>
+    <button class="timeframe-btn" data-tf="90d">Letztes Quartal</button>
+    <button class="timeframe-btn" data-tf="365d">Letztes Jahr</button>
+    <button class="timeframe-btn" data-tf="all">Alle Zeiten</button>
+    <select class="month-select" id="monthSelect"><option value="">– Monat wählen –</option></select>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="list-card">
+    <div class="list-header">
+      <div class="list-title">👑 <span id="listTitle">Top 10 Bestseller</span></div>
+      <span class="hint">Klick auf ein Produkt für Varianten-Details</span>
+    </div>
+    <div id="productList"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+
+  <p class="footer">Live-Daten aus minimalerei.myshopify.com</p>
+</div>
+
+<script>
+const VARIANT_COLORS = { 'Silber': '#B8B8B8', 'Gold': '#C9A84C', 'Rosé': '#E8B4B8', 'Roségold': '#E8B4B8' };
+const RANK_COLORS = ['#C9A84C', '#B8B8B8', '#CD7F32'];
+const MONTH_NAMES = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+
+let currentTimeframe = '30d';
+let currentData = null;
+let expanded = {};
+
+const fmtEur = (n) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: n >= 1000 ? 0 : 2 }).format(n);
+const fmtEurPrecise = (n) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(n);
+
+function variantColor(name) {
+  if (!name) return '#3DBDB5';
+  for (const k in VARIANT_COLORS) if (name.indexOf(k) !== -1) return VARIANT_COLORS[k];
+  return '#3DBDB5';
+}
+
+function cleanVariant(t) { return (!t || t === 'Default Title') ? 'Standard' : t; }
+
+function buildMonthOptions() {
+  const select = document.getElementById('monthSelect');
+  const now = new Date();
+  for (let i = 0; i < 24; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = 'month:' + d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const label = MONTH_NAMES[d.getMonth()] + ' ' + d.getFullYear();
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    select.appendChild(opt);
+  }
+}
+
+async function loadData(tf) {
+  currentTimeframe = tf;
+  expanded = {};
+  document.getElementById('productList').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  document.getElementById('tiles').innerHTML = '';
+
+  document.querySelectorAll('.timeframe-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tf === tf);
+  });
+  if (tf.indexOf('month:') !== 0) {
+    document.getElementById('monthSelect').value = '';
+  }
+
+  try {
+    const res = await fetch('/api/data?timeframe=' + encodeURIComponent(tf));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    currentData = data;
+    render();
+  } catch (e) {
+    document.getElementById('productList').innerHTML = '<div class="error">Fehler beim Laden: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+function render() {
+  const d = currentData;
+
+  const tiles = [
+    { label: 'Gesamtumsatz Shop', value: fmtEur(d.totalSalesShop), color: 'var(--amber)' },
+    { label: 'Bestellungen Shop', value: d.totalOrdersShop.toLocaleString('de-DE'), color: 'var(--teal)' },
+    { label: 'Ø Warenkorb', value: fmtEurPrecise(d.avgOrderValue), color: 'var(--navy)' },
+    { label: 'Top 10 Anteil', value: Math.round((d.totalRevenue / Math.max(d.totalSalesShop, 1)) * 100) + '%', sub: fmtEur(d.totalRevenue), color: 'var(--gold)' }
+  ];
+  document.getElementById('tiles').innerHTML = tiles.map(function(t) {
+    return '<div class="tile" style="border-left-color: ' + t.color + '">' +
+      '<div class="tile-label" style="color: ' + t.color + '">' + t.label + '</div>' +
+      '<div class="tile-value">' + t.value + '</div>' +
+      (t.sub ? '<div class="tile-sub">' + t.sub + '</div>' : '') +
+      '</div>';
+  }).join('');
+
+  document.getElementById('listTitle').textContent = 'Top 10 Bestseller · ' + d.label;
+
+  const maxRev = Math.max.apply(null, d.products.map(function(p) { return p.revenue; }).concat([1]));
+  const html = d.products.map(function(p, i) {
+    const percent = (p.revenue / maxRev) * 100;
+    const rankColor = i < 3 ? RANK_COLORS[i] : '#1C2B3A';
+    const hasVariants = p.variants && p.variants.length > 0;
+    const isExp = expanded[i];
+    const bgColor = i < 3 ? 'rgba(232, 151, 58, 0.12)' : 'rgba(61, 189, 181, 0.08)';
+
+    let row = '<div class="product ' + (hasVariants ? '' : 'no-variants') + ' ' + (isExp ? 'expanded' : '') + '" data-idx="' + i + '">' +
+      '<div class="progress" style="width: ' + percent + '%; background: ' + bgColor + '"></div>' +
+      '<div class="rank" style="background: ' + rankColor + '">' + (i + 1) + '</div>' +
+      '<div class="product-info">' +
+        '<div class="product-name">' + escapeHtml(p.name) + '</div>' +
+        '<div class="product-meta">' + p.orders + ' ' + (p.orders === 1 ? 'Bestellung' : 'Bestellungen') +
+          (hasVariants ? ' · ' + p.variants.length + ' Variante' + (p.variants.length === 1 ? '' : 'n') : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="product-revenue">' + fmtEur(p.revenue) + '</div>' +
+      '<div class="chevron ' + (!hasVariants ? 'hidden' : '') + ' ' + (isExp ? 'rotate' : '') + '">›</div>' +
+      '</div>';
+
+    if (hasVariants && isExp) {
+      const maxVRev = Math.max.apply(null, p.variants.map(function(v) { return v.revenue; }).concat([1]));
+      row += '<div class="variants">';
+      p.variants.forEach(function(v) {
+        const vPct = (v.revenue / maxVRev) * 100;
+        const col = variantColor(v.variant);
+        const border = v.variant.indexOf('Silber') !== -1 ? 'border: 1px solid rgba(44,44,42,0.2);' : '';
+        row += '<div class="variant-row">' +
+          '<div class="variant-dot" style="background: ' + col + '; ' + border + '"></div>' +
+          '<div>' +
+            '<div class="variant-name">' + escapeHtml(cleanVariant(v.variant)) + '</div>' +
+            '<div class="variant-bar" style="width: ' + vPct + '%; background: ' + col + '"></div>' +
+          '</div>' +
+          '<div class="variant-orders">' + v.orders + ' Best.</div>' +
+          '<div class="variant-revenue">' + fmtEur(v.revenue) + '</div>' +
+          '</div>';
+      });
+      row += '</div>';
+    }
+    return row;
+  }).join('');
+
+  document.getElementById('productList').innerHTML = html;
+
+  document.querySelectorAll('.product').forEach(function(el) {
+    el.addEventListener('click', function() {
+      const idx = parseInt(el.dataset.idx);
+      const p = currentData.products[idx];
+      if (!p.variants || p.variants.length === 0) return;
+      expanded[idx] = !expanded[idx];
+      render();
+    });
+  });
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = String(s);
+  return div.innerHTML;
+}
+
+document.querySelectorAll('.timeframe-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() { loadData(btn.dataset.tf); });
+});
+document.getElementById('monthSelect').addEventListener('change', function(e) {
+  if (e.target.value) {
+    document.querySelectorAll('.timeframe-btn').forEach(function(b) { b.classList.remove('active'); });
+    loadData(e.target.value);
+  }
+});
+document.getElementById('refresh').addEventListener('click', function() { loadData(currentTimeframe); });
+
+buildMonthOptions();
+loadData('30d');
+</script>
+</body>
+</html>
