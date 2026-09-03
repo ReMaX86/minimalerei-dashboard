@@ -62,11 +62,14 @@ export function Trikots() {
   if (error) return <ErrorNote message={error} />;
   if (!state) return <LoadingSpinner />;
 
+  const neededSet = state.nextGame ? benoetigterSatz(state.nextGame) : null;
+  const confirmedForGame = state.nextGame
+    ? state.washLog.find((w) => w.game_id === state.nextGame!.id && w.set_id === neededSet) ?? null
+    : null;
   const suggestion =
-    state.nextGame && state.nextGame.squad_published
+    state.nextGame && state.nextGame.squad_published && !confirmedForGame
       ? naechsterSpieler(state.nextGame, state.players, state.squad, state.lastAssignedPlayerId)
       : null;
-  const neededSet = state.nextGame ? benoetigterSatz(state.nextGame) : null;
   const canConfirm =
     !!suggestion && (role === 'trainer' || (role === 'player' && player?.id === suggestion.id));
 
@@ -110,6 +113,13 @@ export function Trikots() {
           </p>
           {!state.nextGame.squad_published ? (
             <p className="mt-2 text-sm text-tbw-ink/50">Kader für dieses Spiel noch nicht veröffentlicht.</p>
+          ) : confirmedForGame ? (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="pill pill-ok">✓ Bestätigt</span>
+              <p className="text-sm text-tbw-ink/70">
+                {playersById[confirmedForGame.player_id]?.name ?? '?'} hat übernommen.
+              </p>
+            </div>
           ) : suggestion ? (
             <div className="mt-3 flex items-center justify-between">
               <div>
