@@ -116,44 +116,47 @@ export function Trikots() {
           {!state.nextGame.squad_published ? (
             <p className="mt-2 text-sm text-tbw-ink/50">Kader für dieses Spiel noch nicht veröffentlicht.</p>
           ) : confirmedForGame ? (
-            <div className="mt-3 flex items-center gap-2">
-              <span className="pill pill-ok">✓ Bestätigt</span>
-              <p className="text-sm text-tbw-ink/70">
-                {playersById[confirmedForGame.player_id]?.name ?? '?'} hat übernommen.
-              </p>
+            <div className="mt-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-tbw-navy/70">🧺 Trikotwäscher</p>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="pill pill-ok">✓ Bestätigt</span>
+                <p className="text-sm font-semibold text-tbw-navyDark">
+                  {playersById[confirmedForGame.player_id]?.name ?? '?'}
+                </p>
+              </div>
             </div>
           ) : suggestion ? (
             <div className="mt-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-tbw-ink/60">Laut Rotation vorgeschlagen</p>
-                  <p className="font-semibold text-tbw-navyDark">{suggestion.name}</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-tbw-navy/70">
+                🧺 Nächster Trikotwäscher
+              </p>
+              <p className="mt-0.5 text-lg font-bold text-tbw-navyDark">{suggestion.name}</p>
+              <p className="text-xs text-tbw-ink/50">
+                nimmt das Set nach diesem Spiel zum Waschen mit nach Hause
+              </p>
+
+              {canConfirm && !pickingAlternate && (
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => confirmHandover(suggestion.id)}
+                    disabled={confirming}
+                    className="btn-primary flex-1 !bg-status-ok"
+                  >
+                    ✓ Übernimmt
+                  </button>
+                  <button
+                    onClick={() => setPickingAlternate(true)}
+                    disabled={confirming}
+                    className="btn-secondary flex-1 !text-tbw-red !ring-tbw-red/30"
+                  >
+                    ✗ Kann nicht
+                  </button>
                 </div>
-                {canConfirm && !pickingAlternate && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => confirmHandover(suggestion.id)}
-                      disabled={confirming}
-                      title="Übergabe bestätigen"
-                      className="flex h-11 w-11 items-center justify-center rounded-full bg-status-ok text-xl font-bold text-white transition active:scale-95 disabled:opacity-50"
-                    >
-                      ✓
-                    </button>
-                    <button
-                      onClick={() => setPickingAlternate(true)}
-                      disabled={confirming}
-                      title="Kann die Trikots nicht nehmen"
-                      className="flex h-11 w-11 items-center justify-center rounded-full bg-tbw-red text-xl font-bold text-white transition active:scale-95 disabled:opacity-50"
-                    >
-                      ✗
-                    </button>
-                  </div>
-                )}
-              </div>
+              )}
 
               {canConfirm && pickingAlternate && (
                 <div className="mt-3 space-y-2 rounded-xl bg-tbw-bg p-3">
-                  <p className="text-sm text-tbw-ink/70">Wer nimmt die Trikots stattdessen mit?</p>
+                  <p className="text-sm text-tbw-ink/70">Wer nimmt das Set stattdessen mit nach Hause?</p>
                   <select
                     className="input"
                     value={alternateId}
