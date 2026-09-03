@@ -155,7 +155,7 @@ export function Trikots() {
                     {selectedIds.has(p.id) ? 'im Kader' : 'nicht im Kader'}
                   </span>
                 )}
-                <span>{washCount[p.id] ?? 0}× gewaschen</span>
+                <span>{washCount[p.id] ?? 0}×</span>
               </div>
             </li>
           ))}
