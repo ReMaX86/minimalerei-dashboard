@@ -63,6 +63,7 @@ export interface TrikotRotationState {
 export interface OfficiatingGame {
   id: string;
   game_date: string;
+  game_time: string | null;
   opponent_teams: string;
   location: string;
 }

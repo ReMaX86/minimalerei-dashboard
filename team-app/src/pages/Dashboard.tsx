@@ -144,8 +144,11 @@ export function Dashboard() {
                 {OFFICIATING_TASK_LABELS[data.playerNextTask.task_type]}
               </p>
               <p className="text-sm text-tbw-ink/70">
-                {fmtDate(data.playerNextTask.officiating_games.game_date)} ·{' '}
-                {data.playerNextTask.officiating_games.opponent_teams}
+                {fmtDate(data.playerNextTask.officiating_games.game_date)}
+                {data.playerNextTask.officiating_games.game_time
+                  ? ` · ${fmtTime(data.playerNextTask.officiating_games.game_time)} Uhr`
+                  : ''}{' '}
+                · {data.playerNextTask.officiating_games.opponent_teams}
               </p>
             </div>
           ) : (
@@ -155,8 +158,11 @@ export function Dashboard() {
           (data.trainerNextOfficiatingGame ? (
             <div className="mt-2 space-y-2">
               <p className="text-sm font-semibold">
-                {fmtDate(data.trainerNextOfficiatingGame.game_date)} ·{' '}
-                {data.trainerNextOfficiatingGame.opponent_teams}
+                {fmtDate(data.trainerNextOfficiatingGame.game_date)}
+                {data.trainerNextOfficiatingGame.game_time
+                  ? ` · ${fmtTime(data.trainerNextOfficiatingGame.game_time)} Uhr`
+                  : ''}{' '}
+                · {data.trainerNextOfficiatingGame.opponent_teams}
               </p>
               <ul className="space-y-1 text-sm">
                 {data.trainerNextOfficiatingGame.tasks.map((t) => (

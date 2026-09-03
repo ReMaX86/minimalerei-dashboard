@@ -1,6 +1,6 @@
 # TBW Team App
 
-Team-Organisation für TB Wülfrath U16: Trikot-Wäsche-Rotation, Kampfgericht-Einteilung,
+Team-Organisation für die TB Wülfrath Herren-Mannschaft: Trikot-Wäsche-Rotation, Kampfgericht-Einteilung,
 Kader-Verwaltung und Spielplan/Trainingszeiten an einem Ort. PWA-fähig (add-to-homescreen).
 
 Lebt als eigenständiges Projekt in diesem Unterordner, unabhängig vom Minimalerei-Dashboard
@@ -105,6 +105,14 @@ hier die getroffenen Entscheidungen samt Begründung:
   ist, in welchem Format der Verband/das Ligaportal liefert.
 - **Notizfeld bei zukünftigen Spieltagen:** noch nicht umgesetzt (kein Feld im Schema). Ließe
   sich als optionale `note text`-Spalte auf `games` ergänzen.
+- **`officiating_games.game_time`** (Migration `0002`) wurde nachträglich ergänzt — die
+  ursprüngliche Spec (§4) hatte hier nur ein Datum vorgesehen, was sich beim Import echter
+  Kampfgericht-Termine (mehrere pro Tag) als unzureichend erwies.
+- **Kampfgericht-Import Saison 26/27** (`supabase/imports/2026-27_kampfgericht_herren.sql`):
+  enthält nur die Termine, bei denen die Quelltabelle (klubweite Dienstplan-Excel über alle
+  TBW-Mannschaften) "Herren" oder bereits einen Namen bei Anschreiber/Zeit/24Sek eingetragen
+  hatte — andere Mannschaften zugewiesene Slots wurden nicht mit importiert.
+  Spieler-Zuordnung ist bewusst offen (`assigned_player_id = null`).
 
 ## Projektstruktur
 

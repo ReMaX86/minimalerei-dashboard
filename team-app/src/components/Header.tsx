@@ -9,7 +9,7 @@ export function Header({ title }: { title: string }) {
       <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-wider text-tbw-navy/60">
-            TB Wülfrath U16
+            TB Wülfrath Herren
           </div>
           <h1 className="text-lg font-bold text-tbw-navyDark">{title}</h1>
         </div>
