@@ -21,6 +21,8 @@ export function Trikots() {
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [pickingAlternate, setPickingAlternate] = useState(false);
+  const [alternateId, setAlternateId] = useState('');
 
   const load = useCallback(async () => {
     setError(null);
@@ -82,17 +84,19 @@ export function Trikots() {
   const playersById: Record<string, Player> = {};
   state.players.forEach((p) => (playersById[p.id] = p));
 
-  async function confirmHandover() {
-    if (!suggestion || !neededSet) return;
+  async function confirmHandover(playerId: string) {
+    if (!neededSet) return;
     setConfirming(true);
     setError(null);
     try {
       const { error: rpcError } = await supabase.rpc('confirm_trikot_handover', {
         p_set_id: neededSet,
-        p_player_id: suggestion.id,
+        p_player_id: playerId,
         p_game_id: state!.nextGame?.id ?? null
       });
       if (rpcError) throw rpcError;
+      setPickingAlternate(false);
+      setAlternateId('');
       await load();
     } catch (err) {
       setError('Übergabe konnte nicht bestätigt werden.');
@@ -121,15 +125,71 @@ export function Trikots() {
               </p>
             </div>
           ) : suggestion ? (
-            <div className="mt-3 flex items-center justify-between">
-              <div>
-                <p className="text-sm text-tbw-ink/60">Laut Rotation vorgeschlagen</p>
-                <p className="font-semibold text-tbw-navyDark">{suggestion.name}</p>
+            <div className="mt-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-tbw-ink/60">Laut Rotation vorgeschlagen</p>
+                  <p className="font-semibold text-tbw-navyDark">{suggestion.name}</p>
+                </div>
+                {canConfirm && !pickingAlternate && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => confirmHandover(suggestion.id)}
+                      disabled={confirming}
+                      title="Übergabe bestätigen"
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-status-ok text-xl font-bold text-white transition active:scale-95 disabled:opacity-50"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      onClick={() => setPickingAlternate(true)}
+                      disabled={confirming}
+                      title="Kann die Trikots nicht nehmen"
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-tbw-red text-xl font-bold text-white transition active:scale-95 disabled:opacity-50"
+                    >
+                      ✗
+                    </button>
+                  </div>
+                )}
               </div>
-              {canConfirm && (
-                <button onClick={confirmHandover} disabled={confirming} className="btn-primary">
-                  {confirming ? 'Speichere…' : 'Übergabe bestätigen'}
-                </button>
+
+              {canConfirm && pickingAlternate && (
+                <div className="mt-3 space-y-2 rounded-xl bg-tbw-bg p-3">
+                  <p className="text-sm text-tbw-ink/70">Wer nimmt die Trikots stattdessen mit?</p>
+                  <select
+                    className="input"
+                    value={alternateId}
+                    onChange={(e) => setAlternateId(e.target.value)}
+                  >
+                    <option value="">Spieler wählen…</option>
+                    {sortedPlayers
+                      .filter((p) => p.id !== suggestion.id && selectedIds.has(p.id))
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => confirmHandover(alternateId)}
+                      disabled={!alternateId || confirming}
+                      className="btn-primary flex-1"
+                    >
+                      {confirming ? 'Speichere…' : 'Bestätigen'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPickingAlternate(false);
+                        setAlternateId('');
+                      }}
+                      disabled={confirming}
+                      className="btn-secondary flex-1"
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           ) : (
