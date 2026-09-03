@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -17,6 +18,7 @@ import {
 
 interface DashboardData {
   nextGame: Game | null;
+  playerInSquad: boolean | null;
   playerNextTask: (OfficiatingTask & { officiating_games: OfficiatingGame }) | null;
   trainerNextOfficiatingGame: (OfficiatingGame & { tasks: OfficiatingTask[] }) | null;
   trikotSets: TrikotSet[];
@@ -45,6 +47,19 @@ export function Dashboard() {
 
       let playerNextTask: DashboardData['playerNextTask'] = null;
       let trainerNextOfficiatingGame: DashboardData['trainerNextOfficiatingGame'] = null;
+      let playerInSquad: DashboardData['playerInSquad'] = null;
+
+      const nextGame = gameRes.data as Game | null;
+
+      if (role === 'player' && player && nextGame?.squad_published) {
+        const { data: squadRow } = await supabase
+          .from('game_squad')
+          .select('is_selected')
+          .eq('game_id', nextGame.id)
+          .eq('player_id', player.id)
+          .maybeSingle();
+        playerInSquad = squadRow?.is_selected ?? false;
+      }
 
       if (role === 'player' && player) {
         const { data: taskRows } = await supabase
@@ -85,7 +100,8 @@ export function Dashboard() {
       }
 
       setData({
-        nextGame: (gameRes.data as Game) ?? null,
+        nextGame: nextGame ?? null,
+        playerInSquad,
         playerNextTask,
         trainerNextOfficiatingGame,
         trikotSets: (trikotRes.data as TrikotSet[]) ?? [],
@@ -129,6 +145,22 @@ export function Dashboard() {
             <p className="text-xs text-tbw-ink/50">
               Trikot: {benoetigterSatz(data.nextGame) === 'weiss' ? 'Weiß' : 'Schwarz'}
             </p>
+            {role === 'player' && (
+              <div className="mt-3 flex items-center justify-between border-t border-black/5 pt-3">
+                {!data.nextGame.squad_published ? (
+                  <span className="text-sm text-tbw-ink/50">Kader noch nicht veröffentlicht</span>
+                ) : data.playerInSquad ? (
+                  <span className="text-sm font-bold text-status-ok">Du bist dabei!</span>
+                ) : (
+                  <span className="text-sm font-medium text-tbw-ink/50">Nicht im Kader</span>
+                )}
+                {data.nextGame.squad_published && (
+                  <Link to="/kader" className="text-xs font-bold text-tbw-navy">
+                    Kader ansehen →
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <p className="mt-2 text-sm text-tbw-ink/50">Kein Spiel geplant.</p>
