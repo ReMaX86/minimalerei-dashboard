@@ -6,6 +6,8 @@ import { ErrorNote } from '../components/ErrorNote';
 import { fmtDate, fmtTime } from '../lib/format';
 import type { Game, GameSquadRow, Player } from '../types/database';
 
+const MAX_SQUAD_SIZE = 12;
+
 interface State {
   nextGame: Game | null;
   upcomingGames: Game[];
@@ -62,13 +64,18 @@ export function Kader() {
   state.squad.forEach((row) => (selectedByPlayer[row.player_id] = row.is_selected));
 
   async function toggle(playerId: string) {
+    const willSelect = !selectedByPlayer[playerId];
+    // Defensive guard against the max-12 cap; the toggle button for players
+    // not yet selected is already disabled once the cap is reached, so this
+    // should only ever trigger on a race (e.g. two people toggling at once).
+    if (willSelect && selectedCount >= MAX_SQUAD_SIZE) return;
     setTogglingId(playerId);
     setError(null);
     try {
       const { error: upsertError } = await supabase
         .from('game_squad')
         .upsert(
-          { game_id: state!.nextGame!.id, player_id: playerId, is_selected: !selectedByPlayer[playerId] },
+          { game_id: state!.nextGame!.id, player_id: playerId, is_selected: willSelect },
           { onConflict: 'game_id,player_id' }
         );
       if (upsertError) throw upsertError;
@@ -98,6 +105,10 @@ export function Kader() {
   }
 
   const selectedCount = state.squad.filter((s) => s.is_selected).length;
+  const atCap = selectedCount >= MAX_SQUAD_SIZE;
+  const sortedForTrainer = [...state.players].sort(
+    (a, b) => Number(!!selectedByPlayer[b.id]) - Number(!!selectedByPlayer[a.id]) || a.name.localeCompare(b.name, 'de')
+  );
 
   return (
     <div className="space-y-4">
@@ -119,20 +130,23 @@ export function Kader() {
         {role === 'trainer' && (
           <>
             <ul className="mt-3 divide-y divide-black/5">
-              {state.players.map((p) => (
+              {sortedForTrainer.map((p) => (
                 <li key={p.id} className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-tbw-navyDark">{p.name}</span>
                   <button
-                    disabled={togglingId === p.id}
+                    disabled={togglingId === p.id || (atCap && !selectedByPlayer[p.id])}
                     onClick={() => toggle(p.id)}
-                    className={`pill ${selectedByPlayer[p.id] ? 'pill-ok' : 'pill-open'}`}
+                    className={`pill ${selectedByPlayer[p.id] ? 'pill-ok' : 'pill-open'} disabled:opacity-40`}
                   >
                     {selectedByPlayer[p.id] ? 'im Kader' : 'nicht im Kader'}
                   </button>
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-tbw-ink/50">{selectedCount} von {state.players.length} im Kader</p>
+            <p className="mt-2 text-xs text-tbw-ink/50">
+              {selectedCount} von max. {MAX_SQUAD_SIZE} im Kader
+              {atCap && ' · Kader ist voll'}
+            </p>
             <button onClick={togglePublish} disabled={publishing} className="btn-primary mt-3 w-full">
               {publishing
                 ? 'Speichere…'
