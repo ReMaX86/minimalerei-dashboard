@@ -13,19 +13,28 @@
 
 @layer components {
   .card {
-    @apply rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5;
+    @apply rounded-[26px] bg-white p-5 shadow-[0_4px_24px_-4px_rgba(7,22,15,0.1)] ring-1 ring-black/5;
+  }
+  .card-dark {
+    @apply rounded-[26px] bg-tbw-navyDark p-5 text-white shadow-[0_8px_30px_-6px_rgba(7,22,15,0.4)];
+  }
+  .headline {
+    @apply font-display font-normal uppercase leading-[0.95] tracking-tight;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-tbw-navy px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-tbw-navy px-5 py-3 text-sm font-bold text-white transition active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-tbw-navy ring-1 ring-tbw-navy/20 transition active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-tbw-navy ring-1 ring-tbw-navy/15 transition active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100;
+  }
+  .btn-accent {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-tbw-gold px-5 py-3 text-sm font-bold text-tbw-navyDark transition active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100;
   }
   .input {
-    @apply w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-sm text-tbw-ink outline-none focus:border-tbw-navy focus:ring-2 focus:ring-tbw-navy/20;
+    @apply w-full rounded-2xl border border-black/10 bg-white px-3.5 py-2.5 text-sm text-tbw-ink outline-none focus:border-tbw-navy focus:ring-2 focus:ring-tbw-navy/20;
   }
   .pill {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold tracking-wide;
   }
   .pill-ok {
     @apply bg-status-ok/10 text-status-ok;
@@ -34,6 +43,6 @@
     @apply bg-status-warn/10 text-status-warn;
   }
   .pill-open {
-    @apply bg-status-open/10 text-status-open;
+    @apply bg-status-open/15 text-status-open;
   }
 }

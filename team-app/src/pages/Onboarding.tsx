@@ -8,7 +8,7 @@ export function Onboarding() {
   const [step, setStep] = useState<Step>('welcome');
 
   return (
-    <div className="flex min-h-screen flex-col bg-tbw-navy text-white">
+    <div className="flex min-h-screen flex-col bg-gradient-to-b from-tbw-navyDark to-tbw-navy text-white">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-10">
         {step === 'welcome' && <Welcome onTrainer={() => setStep('trainer-login')} onPlayer={() => setStep('player-code')} />}
         {step === 'trainer-login' && <TrainerLogin onBack={() => setStep('welcome')} />}
@@ -21,19 +21,32 @@ export function Onboarding() {
 function Welcome({ onTrainer, onPlayer }: { onTrainer: () => void; onPlayer: () => void }) {
   return (
     <div className="text-center">
-      <img src="/icons/icon.svg" alt="" className="mx-auto mb-6 h-20 w-20 rounded-2xl shadow-lg" />
-      <h1 className="text-2xl font-extrabold">Hey Baller!</h1>
-      <p className="mt-1 text-lg font-semibold text-tbw-gold">Willkommen in der TBW Team App</p>
-      <p className="mt-4 text-sm leading-relaxed text-white/75">
-        Hier findest du auf einen Blick den nächsten Spieltag, wer beim Kampfgericht dran ist
-        und wer gerade die Trikots hat — kein WhatsApp-Chaos mehr.
+      <img src="/icons/icon.svg" alt="" className="mx-auto mb-8 h-20 w-20 rounded-2xl shadow-2xl" />
+      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-tbw-gold">TB Wülfrath Herren</p>
+      <h1 className="headline mt-2 text-[42px] text-white">Team App</h1>
+      <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-white/70">
+        Spielplan, Kampfgericht und Trikot-Rotation an einem Ort — kein WhatsApp-Chaos mehr.
       </p>
+
+      <div className="mt-8 grid grid-cols-3 gap-2 text-center">
+        {[
+          { icon: '👕', label: 'Trikots' },
+          { icon: '📋', label: 'Kampfgericht' },
+          { icon: '🧑‍🤝‍🧑', label: 'Kader' }
+        ].map((f) => (
+          <div key={f.label} className="rounded-2xl bg-white/5 py-4 ring-1 ring-white/10">
+            <div className="text-xl">{f.icon}</div>
+            <div className="mt-1 text-[11px] font-semibold text-white/70">{f.label}</div>
+          </div>
+        ))}
+      </div>
+
       <div className="mt-10 space-y-3">
-        <button className="btn-primary w-full !bg-tbw-gold !text-tbw-navyDark" onClick={onPlayer}>
+        <button className="btn-accent w-full" onClick={onPlayer}>
           Los geht's
         </button>
         <button
-          className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-white/80 ring-1 ring-white/25"
+          className="w-full rounded-full px-4 py-3 text-sm font-bold text-white/80 ring-1 ring-white/20"
           onClick={onTrainer}
         >
           Ich bin Trainer:in
@@ -65,10 +78,10 @@ function TrainerLogin({ onBack }: { onBack: () => void }) {
 
   return (
     <div>
-      <button onClick={onBack} className="mb-6 text-sm text-white/60">
+      <button onClick={onBack} className="mb-6 text-sm font-semibold text-white/60">
         ← Zurück
       </button>
-      <h2 className="text-xl font-bold">Trainer-Login</h2>
+      <h2 className="headline text-3xl text-white">Trainer-Login</h2>
       <form onSubmit={submit} className="mt-6 space-y-3">
         <input
           type="email"
@@ -89,7 +102,7 @@ function TrainerLogin({ onBack }: { onBack: () => void }) {
           className="input"
         />
         {error && <ErrorNote message={error} />}
-        <button type="submit" disabled={busy} className="btn-primary w-full !bg-tbw-gold !text-tbw-navyDark">
+        <button type="submit" disabled={busy} className="btn-accent w-full">
           {busy ? 'Anmelden…' : 'Anmelden'}
         </button>
       </form>
@@ -118,10 +131,10 @@ function PlayerCode({ onBack }: { onBack: () => void }) {
 
   return (
     <div>
-      <button onClick={onBack} className="mb-6 text-sm text-white/60">
+      <button onClick={onBack} className="mb-6 text-sm font-semibold text-white/60">
         ← Zurück
       </button>
-      <h2 className="text-xl font-bold">Dein Zugangscode</h2>
+      <h2 className="headline text-3xl text-white">Dein Code</h2>
       <p className="mt-1 text-sm text-white/70">
         Den Code hast du von deinem Trainer per WhatsApp bekommen, z. B. „FIN82".
       </p>
@@ -137,7 +150,7 @@ function PlayerCode({ onBack }: { onBack: () => void }) {
           maxLength={8}
         />
         {error && <ErrorNote message={error} />}
-        <button type="submit" disabled={busy || !code} className="btn-primary w-full !bg-tbw-gold !text-tbw-navyDark">
+        <button type="submit" disabled={busy || !code} className="btn-accent w-full">
           {busy ? 'Prüfe…' : 'Bestätigen'}
         </button>
       </form>

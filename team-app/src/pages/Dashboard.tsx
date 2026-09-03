@@ -112,7 +112,7 @@ export function Dashboard() {
 
   return (
     <div className="space-y-4">
-      {player && <p className="text-xl font-bold text-tbw-navyDark">Hi {firstName}!</p>}
+      {player && <p className="headline text-3xl text-tbw-navyDark">Hi {firstName}!</p>}
 
       <section className="card">
         <SectionTitle icon="🏀" title="Nächstes Spiel" />

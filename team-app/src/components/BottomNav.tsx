@@ -13,21 +13,27 @@ export function BottomNav() {
   const items = role === 'trainer' ? [...ITEMS, { to: '/admin', label: 'Admin', icon: '⚙️', end: false }] : ITEMS;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-black/5 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
-      <ul className="mx-auto flex max-w-lg justify-around">
+    <nav className="fixed inset-x-0 bottom-0 z-20 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+      <ul className="mx-auto flex max-w-lg justify-around rounded-full bg-tbw-navyDark px-2 py-2 shadow-[0_10px_30px_-8px_rgba(7,22,15,0.5)]">
         {items.map((item) => (
           <li key={item.to} className="flex-1">
             <NavLink
               to={item.to}
               end={item.end}
-              className={({ isActive }) =>
-                `flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${
-                  isActive ? 'text-tbw-navy' : 'text-tbw-ink/45'
-                }`
-              }
+              className="flex flex-col items-center gap-0.5 rounded-full py-2 text-[10px] font-bold text-white/55"
             >
-              <span className="text-lg leading-none">{item.icon}</span>
-              {item.label}
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-base leading-none transition ${
+                      isActive ? 'bg-tbw-gold' : ''
+                    }`}
+                  >
+                    {item.icon}
+                  </span>
+                  <span className={isActive ? 'text-tbw-gold' : ''}>{item.label}</span>
+                </>
+              )}
             </NavLink>
           </li>
         ))}
