@@ -213,12 +213,14 @@ function GameList({
               {tasks.map((task) => (
                 <li key={task.task_type} className="flex items-center justify-between gap-2">
                   <span className="text-sm text-tbw-ink/70">{OFFICIATING_TASK_LABELS[task.task_type]}</span>
-                  {role === 'trainer' ? (
+                  {!task.id ? (
+                    <span className="text-sm text-tbw-ink/30">–</span>
+                  ) : role === 'trainer' ? (
                     <select
                       className="input !w-auto !py-1 text-xs"
                       value={task.assigned_player_id ?? ''}
-                      disabled={!task.id || busyTaskId === task.id}
-                      onChange={(e) => task.id && onAssign(task.id, e.target.value || null)}
+                      disabled={busyTaskId === task.id}
+                      onChange={(e) => onAssign(task.id, e.target.value || null)}
                     >
                       <option value="">offen</option>
                       {players.map((p) => (
@@ -234,8 +236,8 @@ function GameList({
                   ) : currentPlayerId ? (
                     <button
                       className="btn-secondary !px-3 !py-1 text-xs"
-                      disabled={!task.id || busyTaskId === task.id}
-                      onClick={() => task.id && onClaim(task.id)}
+                      disabled={busyTaskId === task.id}
+                      onClick={() => onClaim(task.id)}
                     >
                       Ich übernehme
                     </button>
