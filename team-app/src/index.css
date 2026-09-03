@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-tbw-bg text-tbw-ink antialiased;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-tbw-navy px-4 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-tbw-navy ring-1 ring-tbw-navy/20 transition active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100;
+  }
+  .input {
+    @apply w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-sm text-tbw-ink outline-none focus:border-tbw-navy focus:ring-2 focus:ring-tbw-navy/20;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+  .pill-ok {
+    @apply bg-status-ok/10 text-status-ok;
+  }
+  .pill-warn {
+    @apply bg-status-warn/10 text-status-warn;
+  }
+  .pill-open {
+    @apply bg-status-open/10 text-status-open;
+  }
+}

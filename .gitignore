@@ -15,3 +15,12 @@ node_modules/
 
 # Logs
 *.log
+
+# team-app (Vite)
+team-app/dist/
+team-app/.vercel/
+team-app/.env
+team-app/*.local
+team-app/*.tsbuildinfo
+team-app/vite.config.js
+team-app/vite.config.d.ts
