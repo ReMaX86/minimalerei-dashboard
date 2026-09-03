@@ -54,17 +54,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const { data: linkRow } = await supabase
-      .from('player_auth_links')
-      .select('player_id')
-      .eq('auth_user_id', session.user.id)
-      .maybeSingle();
+    // player_auth_links has no client-facing RLS policy by design (see
+    // migration 0001) — resolve the current player via the security-definer
+    // current_player_id() function instead of querying the table directly.
+    const { data: playerId } = await supabase.rpc('current_player_id');
 
-    if (linkRow) {
+    if (playerId) {
       const { data: playerRow } = await supabase
         .from('players')
         .select('*')
-        .eq('id', linkRow.player_id)
+        .eq('id', playerId)
         .maybeSingle();
       if (playerRow) {
         setPlayer(playerRow as Player);
