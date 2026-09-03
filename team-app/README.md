@@ -92,6 +92,13 @@ hier die getroffenen Entscheidungen samt Begründung:
   der Trainer einen bereits vorgeschlagenen Spieler nachträglich aus dem Kader, verschiebt
   sich der Vorschlag automatisch auf den nächsten verfügbaren Spieler in der Warteschlange —
   bis eine Übergabe tatsächlich bestätigt wurde, passiert nichts Endgültiges.
+- **Trikot-Rotation: Waschzähler statt Zeiger (Migration `0004`).** Ursprünglich lief die
+  Rotation über einen gemeinsamen alphabetischen Zeiger (`trikot_rotation_state`). Auf
+  Wunsch umgebaut auf ein Waschzähler-Modell: vorgeschlagen wird immer, wer im aktuellen
+  Kader am wenigsten oft insgesamt gewaschen hat (Gleichstand → alphabetisch). Vorteil:
+  wird ein Spieler per ✗ übersprungen (jemand anderes bestätigt stattdessen), bleibt sein
+  Zähler unverändert — er landet dadurch von selbst wieder ganz vorne in der Warteschlange,
+  ganz ohne separate Merker-Logik. Die alte Zeiger-Tabelle wurde entfernt.
 - **Push-Benachrichtigungen** sind (noch) nicht umgesetzt — die App zeigt alle relevanten
   Termine/Zuweisungen beim Öffnen an ("Self-Check"). Ließe sich später über die Web Push API
   ergänzen, ohne am Datenmodell etwas zu ändern.

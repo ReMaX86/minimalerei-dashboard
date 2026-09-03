@@ -55,11 +55,6 @@ export interface TrikotWashLogRow {
   created_at: string;
 }
 
-export interface TrikotRotationState {
-  id: number;
-  last_assigned_player_id: string | null;
-}
-
 export interface OfficiatingGame {
   id: string;
   game_date: string;
