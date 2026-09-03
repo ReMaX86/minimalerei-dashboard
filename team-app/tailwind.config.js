@@ -4,24 +4,29 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Platzhalter-Farben – bitte gegen die echten TB-Wülfrath-Vereinsfarben
-        // austauschen, sobald diese vorliegen (siehe README "Design").
+        // Platzhalter-Farben im SpielerPlus/TeamPlus-Stil (dunkles Waldgrün +
+        // knalliges Mint als Akzent) – Tokennamen sind aus der ersten Version
+        // beibehalten (navy/gold), auch wenn die Werte jetzt grün statt
+        // blau/gold sind, um ~100 Verwendungsstellen nicht umbenennen zu
+        // müssen. Gegen echte TB-Wülfrath-Vereinsfarben austauschen, sobald
+        // diese vorliegen (siehe README "Design").
         tbw: {
-          navy: '#0B3D91',
-          navyDark: '#082A66',
-          red: '#D7263D',
-          gold: '#F2A93B',
-          ink: '#1A1D23',
-          bg: '#F5F7FA'
+          navy: '#0F3D2A',
+          navyDark: '#07160F',
+          red: '#E5484D',
+          gold: '#2FE38A',
+          ink: '#101815',
+          bg: '#F3F6F4'
         },
         status: {
-          ok: '#1E9E5A',
-          warn: '#F2A93B',
-          open: '#8A93A3'
+          ok: '#22C55E',
+          warn: '#F5A623',
+          open: '#8A958E'
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif']
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Anton', 'Inter', 'system-ui', 'sans-serif']
       }
     }
   },
