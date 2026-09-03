@@ -10,50 +10,58 @@ const players = [
 
 const published = { squad_published: true };
 
+function squadOf(...ids: string[]) {
+  return players.map((p) => ({ player_id: p.id, is_selected: ids.includes(p.id) }));
+}
+
 describe('naechsterSpieler', () => {
   it('returns null when the squad is not published', () => {
-    const squad = players.map((p) => ({ player_id: p.id, is_selected: true }));
-    expect(naechsterSpieler({ squad_published: false }, players, squad, null)).toBeNull();
+    expect(naechsterSpieler({ squad_published: false }, players, squadOf(...players.map((p) => p.id)), {})).toBeNull();
   });
 
-  it('starts from the top alphabetically when nobody was assigned yet', () => {
-    const squad = players.map((p) => ({ player_id: p.id, is_selected: true }));
-    const result = naechsterSpieler(published, players, squad, null);
+  it('picks alphabetically first when nobody has washed yet', () => {
+    const squad = squadOf('p-anna', 'p-ben', 'p-clara', 'p-david');
+    const result = naechsterSpieler(published, players, squad, {});
     expect(result?.name).toBe('Anna');
   });
 
-  it('picks the next alphabetical player after the last assignee', () => {
-    const squad = players.map((p) => ({ player_id: p.id, is_selected: true }));
-    const result = naechsterSpieler(published, players, squad, 'p-ben');
+  it('picks whoever has washed the fewest times, ignoring alphabet', () => {
+    const squad = squadOf('p-anna', 'p-ben', 'p-clara', 'p-david');
+    const washCounts = { 'p-anna': 2, 'p-ben': 1, 'p-clara': 0, 'p-david': 3 };
+    const result = naechsterSpieler(published, players, squad, washCounts);
     expect(result?.name).toBe('Clara');
   });
 
-  it('wraps around to the start of the alphabet', () => {
-    const squad = players.map((p) => ({ player_id: p.id, is_selected: true }));
-    const result = naechsterSpieler(published, players, squad, 'p-david');
-    expect(result?.name).toBe('Anna');
+  it('breaks ties between equal counts alphabetically', () => {
+    const squad = squadOf('p-anna', 'p-ben', 'p-clara');
+    const washCounts = { 'p-anna': 1, 'p-ben': 0, 'p-clara': 0 };
+    const result = naechsterSpieler(published, players, squad, washCounts);
+    expect(result?.name).toBe('Ben');
   });
 
-  it('skips players who are not in the squad, leaving their place intact', () => {
-    const squad = [
-      { player_id: 'p-anna', is_selected: true },
-      { player_id: 'p-ben', is_selected: false },
-      { player_id: 'p-clara', is_selected: true },
-      { player_id: 'p-david', is_selected: true }
-    ];
-    // last assigned = Anna -> Ben is skipped (not selected) -> Clara
-    const result = naechsterSpieler(published, players, squad, 'p-anna');
-    expect(result?.name).toBe('Clara');
+  it('ignores players who are not in this game squad', () => {
+    const squad = squadOf('p-ben', 'p-clara');
+    const washCounts = { 'p-anna': 0, 'p-ben': 1, 'p-clara': 1 };
+    const result = naechsterSpieler(published, players, squad, washCounts);
+    expect(result?.name).toBe('Ben');
   });
 
   it('returns null when nobody in the squad is selected', () => {
-    const squad = players.map((p) => ({ player_id: p.id, is_selected: false }));
-    expect(naechsterSpieler(published, players, squad, null)).toBeNull();
+    const squad = squadOf();
+    expect(naechsterSpieler(published, players, squad, {})).toBeNull();
   });
 
-  it('falls back to the top of the list if the last assignee is no longer active', () => {
-    const squad = players.map((p) => ({ player_id: p.id, is_selected: true }));
-    const result = naechsterSpieler(published, players, squad, 'p-left-the-team');
+  it('keeps suggesting a declined player until they actually take a turn', () => {
+    const squad = squadOf('p-anna', 'p-ben', 'p-clara', 'p-david');
+    // Anna was suggested but declined; Ben confirmed in her place instead.
+    // Anna's count is untouched, so she should still be the top pick.
+    const washCounts = { 'p-ben': 1 };
+    const result = naechsterSpieler(published, players, squad, washCounts);
     expect(result?.name).toBe('Anna');
+
+    // If Clara fills in for Anna a second time, Anna is still up front.
+    const washCounts2 = { 'p-ben': 1, 'p-clara': 1 };
+    const result2 = naechsterSpieler(published, players, squad, washCounts2);
+    expect(result2?.name).toBe('Anna');
   });
 });

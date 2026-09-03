@@ -12,7 +12,6 @@ interface State {
   squad: GameSquadRow[];
   players: Player[];
   sets: TrikotSet[];
-  lastAssignedPlayerId: string | null;
   washLog: TrikotWashLogRow[];
 }
 
@@ -28,15 +27,14 @@ export function Trikots() {
     setError(null);
     const today = new Date().toISOString().slice(0, 10);
 
-    const [gameRes, playersRes, setsRes, rotationRes, washRes] = await Promise.all([
+    const [gameRes, playersRes, setsRes, washRes] = await Promise.all([
       supabase.from('games').select('*').gte('game_date', today).order('game_date').order('game_time').limit(1).maybeSingle(),
       supabase.from('players').select('*').eq('is_active', true),
       supabase.from('trikot_sets').select('*').order('id'),
-      supabase.from('trikot_rotation_state').select('*').eq('id', 1).maybeSingle(),
       supabase.from('trikot_wash_log').select('*').order('created_at', { ascending: false })
     ]);
 
-    if (gameRes.error || playersRes.error || setsRes.error || rotationRes.error || washRes.error) {
+    if (gameRes.error || playersRes.error || setsRes.error || washRes.error) {
       setError('Fehler beim Laden der Trikot-Daten.');
       return;
     }
@@ -52,7 +50,6 @@ export function Trikots() {
       squad,
       players: (playersRes.data as Player[]) ?? [],
       sets: (setsRes.data as TrikotSet[]) ?? [],
-      lastAssignedPlayerId: (rotationRes.data as { last_assigned_player_id: string | null } | null)?.last_assigned_player_id ?? null,
       washLog: (washRes.data as TrikotWashLogRow[]) ?? []
     });
   }, []);
@@ -64,21 +61,22 @@ export function Trikots() {
   if (error) return <ErrorNote message={error} />;
   if (!state) return <LoadingSpinner />;
 
+  const washCount: Record<string, number> = {};
+  state.washLog.forEach((row) => {
+    washCount[row.player_id] = (washCount[row.player_id] ?? 0) + 1;
+  });
+
   const neededSet = state.nextGame ? benoetigterSatz(state.nextGame) : null;
   const confirmedForGame = state.nextGame
     ? state.washLog.find((w) => w.game_id === state.nextGame!.id && w.set_id === neededSet) ?? null
     : null;
   const suggestion =
     state.nextGame && state.nextGame.squad_published && !confirmedForGame
-      ? naechsterSpieler(state.nextGame, state.players, state.squad, state.lastAssignedPlayerId)
+      ? naechsterSpieler(state.nextGame, state.players, state.squad, washCount)
       : null;
   const canConfirm =
     !!suggestion && (role === 'trainer' || (role === 'player' && player?.id === suggestion.id));
 
-  const washCount: Record<string, number> = {};
-  state.washLog.forEach((row) => {
-    washCount[row.player_id] = (washCount[row.player_id] ?? 0) + 1;
-  });
   const selectedIds = new Set(state.squad.filter((s) => s.is_selected).map((s) => s.player_id));
   const sortedPlayers = [...state.players].sort((a, b) => a.name.localeCompare(b.name, 'de'));
   const playersById: Record<string, Player> = {};
