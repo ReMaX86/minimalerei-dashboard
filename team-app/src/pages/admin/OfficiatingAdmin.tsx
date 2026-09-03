@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
-import { fmtDate } from '../../lib/format';
+import { fmtDate, fmtTime } from '../../lib/format';
 import {
   OFFICIATING_TASK_LABELS,
   type OfficiatingGame,
@@ -12,7 +12,7 @@ import {
 } from '../../types/database';
 
 const TASK_TYPES: OfficiatingTaskType[] = ['uhr', 'anschreiber', 'zeit'];
-const EMPTY_FORM = { game_date: '', opponent_teams: '', location: '' };
+const EMPTY_FORM = { game_date: '', game_time: '', opponent_teams: '', location: '' };
 
 export function OfficiatingAdmin() {
   const [games, setGames] = useState<OfficiatingGame[] | null>(null);
@@ -55,6 +55,7 @@ export function OfficiatingAdmin() {
         .from('officiating_games')
         .insert({
           game_date: form.game_date,
+          game_time: form.game_time || null,
           opponent_teams: form.opponent_teams.trim(),
           location: form.location.trim()
         })
@@ -106,13 +107,21 @@ export function OfficiatingAdmin() {
     <div className="space-y-4">
       <form onSubmit={addGame} className="card space-y-2">
         <p className="text-sm font-bold text-tbw-navyDark">Neuer Kampfgericht-Termin</p>
-        <input
-          type="date"
-          required
-          className="input"
-          value={form.game_date}
-          onChange={(e) => setForm((f) => ({ ...f, game_date: e.target.value }))}
-        />
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="date"
+            required
+            className="input"
+            value={form.game_date}
+            onChange={(e) => setForm((f) => ({ ...f, game_date: e.target.value }))}
+          />
+          <input
+            type="time"
+            className="input"
+            value={form.game_time}
+            onChange={(e) => setForm((f) => ({ ...f, game_time: e.target.value }))}
+          />
+        </div>
         <input
           required
           placeholder="Gegnerische Teams, z. B. DJK Erkrath U16"
@@ -139,7 +148,8 @@ export function OfficiatingAdmin() {
               <div>
                 <p className="font-semibold text-tbw-navyDark">{g.opponent_teams}</p>
                 <p className="text-sm text-tbw-ink/60">
-                  {fmtDate(g.game_date)} · {g.location}
+                  {fmtDate(g.game_date)}
+                  {g.game_time ? ` · ${fmtTime(g.game_time)} Uhr` : ''} · {g.location}
                 </p>
               </div>
               <button className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red" onClick={() => removeGame(g.id)}>
@@ -152,18 +162,22 @@ export function OfficiatingAdmin() {
                 return (
                   <li key={type} className="flex items-center justify-between gap-2">
                     <span className="text-sm text-tbw-ink/70">{OFFICIATING_TASK_LABELS[type]}</span>
-                    <select
-                      className="input !w-auto !py-1 text-xs"
-                      value={task?.assigned_player_id ?? ''}
-                      onChange={(e) => task && assign(task.id, e.target.value || null)}
-                    >
-                      <option value="">offen</option>
-                      {players.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                    {task ? (
+                      <select
+                        className="input !w-auto !py-1 text-xs"
+                        value={task.assigned_player_id ?? ''}
+                        onChange={(e) => assign(task.id, e.target.value || null)}
+                      >
+                        <option value="">offen</option>
+                        {players.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="pill pill-open">nicht unsere Aufgabe</span>
+                    )}
                   </li>
                 );
               })}

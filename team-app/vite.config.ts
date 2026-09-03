@@ -11,7 +11,7 @@ export default defineConfig({
       manifest: {
         name: 'TBW Team App',
         short_name: 'TBW Team',
-        description: 'Team-Organisation für TB Wülfrath U16',
+        description: 'Team-Organisation für TB Wülfrath Herren',
         theme_color: '#0B3D91',
         background_color: '#F5F7FA',
         display: 'standalone',

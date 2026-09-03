@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
-import { fmtDate, isFuture } from '../lib/format';
+import { fmtDate, fmtTime, isFuture } from '../lib/format';
 import {
   OFFICIATING_TASK_LABELS,
   type OfficiatingGame,
@@ -206,7 +206,8 @@ function GameList({
           <div key={game.id} className={flat ? 'rounded-xl bg-tbw-bg p-3' : 'card'}>
             <p className="text-sm font-semibold text-tbw-navyDark">{game.opponent_teams}</p>
             <p className="text-xs text-tbw-ink/50">
-              {fmtDate(game.game_date)} · {game.location}
+              {fmtDate(game.game_date)}
+              {game.game_time ? ` · ${fmtTime(game.game_time)} Uhr` : ''} · {game.location}
             </p>
             <ul className="mt-2 space-y-2">
               {tasks.map((task) => (
