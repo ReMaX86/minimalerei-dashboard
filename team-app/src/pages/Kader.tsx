@@ -145,16 +145,19 @@ export function Kader() {
 
         {role === 'player' &&
           (state.nextGame.squad_published ? (
-            <ul className="mt-3 divide-y divide-black/5">
-              {state.players.map((p) => (
-                <li key={p.id} className="flex items-center justify-between py-2">
-                  <span className="text-sm font-medium text-tbw-navyDark">{p.name}</span>
-                  <span className={`pill ${selectedByPlayer[p.id] ? 'pill-ok' : 'pill-open'}`}>
-                    {selectedByPlayer[p.id] ? 'im Kader' : 'nicht im Kader'}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            state.players.filter((p) => selectedByPlayer[p.id]).length === 0 ? (
+              <p className="mt-3 text-sm text-tbw-ink/50">Niemand im Kader.</p>
+            ) : (
+              <ul className="mt-3 divide-y divide-black/5">
+                {state.players
+                  .filter((p) => selectedByPlayer[p.id])
+                  .map((p) => (
+                    <li key={p.id} className="py-2 text-sm font-medium text-tbw-navyDark">
+                      {p.name}
+                    </li>
+                  ))}
+              </ul>
+            )
           ) : (
             <p className="mt-3 text-sm text-tbw-ink/50">Kader für dieses Spiel noch nicht veröffentlicht.</p>
           ))}
