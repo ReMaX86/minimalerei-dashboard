@@ -1,0 +1,37 @@
+name: Supabase Keep-Alive (TBW Team App)
+
+# Free Supabase projects pause automatically after 7 days without any API
+# activity. This workflow pings the project every 3 days so the TBW Team
+# App stays reachable, including during the summer break.
+#
+# Setup: add two repository secrets under
+# Settings -> Secrets and variables -> Actions:
+#   TBW_SUPABASE_URL       e.g. https://xxxxxxxxxxxx.supabase.co
+#   TBW_SUPABASE_ANON_KEY  the project's anon public key
+
+on:
+  schedule:
+    - cron: '0 6 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST endpoint
+        run: |
+          if [ -z "${TBW_SUPABASE_URL}" ] || [ -z "${TBW_SUPABASE_ANON_KEY}" ]; then
+            echo "TBW_SUPABASE_URL / TBW_SUPABASE_ANON_KEY secrets are not set yet - skipping."
+            exit 0
+          fi
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            "${TBW_SUPABASE_URL}/rest/v1/trainings?select=id&limit=1" \
+            -H "apikey: ${TBW_SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${TBW_SUPABASE_ANON_KEY}")
+          echo "Supabase responded with HTTP ${status}"
+          if [ "${status}" -ge 500 ]; then
+            exit 1
+          fi
+        env:
+          TBW_SUPABASE_URL: ${{ secrets.TBW_SUPABASE_URL }}
+          TBW_SUPABASE_ANON_KEY: ${{ secrets.TBW_SUPABASE_ANON_KEY }}

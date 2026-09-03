@@ -23,3 +23,9 @@ Ein privates Dashboard zur Auswertung der Top-10-Produkte aus dem Minimalerei Sh
 ## Deployment
 
 Automatisch bei jedem Push auf main via Cloudflare Pages.
+
+---
+
+Dieses Repo hostet außerdem, unabhängig vom Dashboard oben, die **TBW Team App** im
+Unterordner [`team-app/`](./team-app) (eigener Vite/React/Supabase-Stack, eigenes
+Vercel-Deployment). Siehe [`team-app/README.md`](./team-app/README.md).
