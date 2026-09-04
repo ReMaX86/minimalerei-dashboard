@@ -14,7 +14,7 @@ import { Admin } from './pages/Admin';
 
 function Shell({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-[calc(5rem+env(safe-area-inset-bottom))]">
       <Header title={title} />
       <main className="mx-auto max-w-lg px-4 py-4">{children}</main>
       <BottomNav />
