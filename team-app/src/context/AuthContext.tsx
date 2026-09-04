@@ -16,6 +16,8 @@ interface AuthState {
   role: Role;
   trainer: Trainer | null;
   player: Player | null;
+  passwordRecovery: boolean;
+  clearPasswordRecovery: () => void;
   loginTrainer: (email: string, password: string) => Promise<void>;
   redeemCode: (code: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -28,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>('loading');
   const [trainer, setTrainer] = useState<Trainer | null>(null);
   const [player, setPlayer] = useState<Player | null>(null);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   const resolveSession = useCallback(async () => {
     const {
@@ -80,11 +83,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     resolveSession();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+    // Supabase fires PASSWORD_RECOVERY when a recovery link's session is picked up
+    // from the URL, regardless of which page it landed on (e.g. if the redirect URL
+    // isn't set up exactly right and it falls back to the site root) — so this is a
+    // more reliable trigger for the reset-password screen than checking the path.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true);
+      }
       resolveSession();
     });
     return () => sub.subscription.unsubscribe();
   }, [resolveSession]);
+
+  const clearPasswordRecovery = useCallback(() => setPasswordRecovery(false), []);
 
   const loginTrainer = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -125,8 +137,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [player]);
 
   const value = useMemo(
-    () => ({ role, trainer, player, loginTrainer, redeemCode, logout, refreshPlayer }),
-    [role, trainer, player, loginTrainer, redeemCode, logout, refreshPlayer]
+    () => ({
+      role,
+      trainer,
+      player,
+      passwordRecovery,
+      clearPasswordRecovery,
+      loginTrainer,
+      redeemCode,
+      logout,
+      refreshPlayer
+    }),
+    [role, trainer, player, passwordRecovery, clearPasswordRecovery, loginTrainer, redeemCode, logout, refreshPlayer]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

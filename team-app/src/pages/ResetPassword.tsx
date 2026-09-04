@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { ErrorNote } from '../components/ErrorNote';
 
 export function ResetPassword() {
+  const { clearPasswordRecovery } = useAuth();
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [busy, setBusy] = useState(false);
@@ -26,6 +28,7 @@ export function ResetPassword() {
     try {
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) throw updateError;
+      clearPasswordRecovery();
       setDone(true);
     } catch (err) {
       setError('Passwort konnte nicht gesetzt werden. Der Link ist evtl. abgelaufen — bitte erneut anfordern.');
