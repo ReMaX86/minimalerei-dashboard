@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import { ErrorNote } from '../components/ErrorNote';
 
-type Step = 'welcome' | 'trainer-login' | 'player-code';
+type Step = 'welcome' | 'trainer-login' | 'trainer-forgot-password' | 'player-code';
 
 export function Onboarding() {
   const [step, setStep] = useState<Step>('welcome');
@@ -11,7 +12,10 @@ export function Onboarding() {
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-tbw-navyDark to-tbw-navy text-white">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-10">
         {step === 'welcome' && <Welcome onTrainer={() => setStep('trainer-login')} onPlayer={() => setStep('player-code')} />}
-        {step === 'trainer-login' && <TrainerLogin onBack={() => setStep('welcome')} />}
+        {step === 'trainer-login' && (
+          <TrainerLogin onBack={() => setStep('welcome')} onForgotPassword={() => setStep('trainer-forgot-password')} />
+        )}
+        {step === 'trainer-forgot-password' && <ForgotPassword onBack={() => setStep('trainer-login')} />}
         {step === 'player-code' && <PlayerCode onBack={() => setStep('welcome')} />}
       </div>
     </div>
@@ -56,7 +60,7 @@ function Welcome({ onTrainer, onPlayer }: { onTrainer: () => void; onPlayer: () 
   );
 }
 
-function TrainerLogin({ onBack }: { onBack: () => void }) {
+function TrainerLogin({ onBack, onForgotPassword }: { onBack: () => void; onForgotPassword: () => void }) {
   const { loginTrainer } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -105,7 +109,74 @@ function TrainerLogin({ onBack }: { onBack: () => void }) {
         <button type="submit" disabled={busy} className="btn-accent w-full">
           {busy ? 'Anmelden…' : 'Anmelden'}
         </button>
+        <button
+          type="button"
+          onClick={onForgotPassword}
+          className="w-full text-center text-xs font-semibold text-white/60"
+        >
+          Passwort vergessen?
+        </button>
       </form>
+    </div>
+  );
+}
+
+function ForgotPassword({ onBack }: { onBack: () => void }) {
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
+      if (resetError) throw resetError;
+      setSent(true);
+    } catch (err) {
+      setError('Link konnte nicht gesendet werden. E-Mail-Adresse prüfen.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <button onClick={onBack} className="mb-6 text-sm font-semibold text-white/60">
+        ← Zurück
+      </button>
+      <h2 className="headline text-3xl text-white">Passwort vergessen</h2>
+      {sent ? (
+        <p className="mt-6 text-sm leading-relaxed text-white/70">
+          Falls ein Trainer-Account mit dieser E-Mail existiert, wurde ein Link zum Zurücksetzen des Passworts
+          verschickt. Bitte E-Mails prüfen (auch Spam-Ordner).
+        </p>
+      ) : (
+        <>
+          <p className="mt-1 text-sm text-white/70">
+            Wir schicken dir einen Link, mit dem du ein neues Passwort setzen kannst.
+          </p>
+          <form onSubmit={submit} className="mt-6 space-y-3">
+            <input
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="E-Mail"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="input"
+            />
+            {error && <ErrorNote message={error} />}
+            <button type="submit" disabled={busy} className="btn-accent w-full">
+              {busy ? 'Sende…' : 'Link senden'}
+            </button>
+          </form>
+        </>
+      )}
     </div>
   );
 }

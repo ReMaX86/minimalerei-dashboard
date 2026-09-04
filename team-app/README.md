@@ -30,6 +30,9 @@ im Repo-Root (eigenes `package.json`, eigenes Vercel-Deployment mit Root Directo
    insert into public.trainers (id, name, email)
    values ('<user-id-aus-auth.users>', 'Vorname Nachname', 'trainer@example.com');
    ```
+6. Unter **Authentication -> URL Configuration -> Redirect URLs** die Produktions-URL der App
+   plus `/reset-password` eintragen (z. B. `https://team-app.vercel.app/reset-password`), sonst
+   funktioniert der "Passwort vergessen"-Link im Trainer-Login nicht.
 
 ### 2. Lokale Entwicklung
 
@@ -120,6 +123,12 @@ hier die getroffenen Entscheidungen samt Begründung:
   TBW-Mannschaften) "Herren" oder bereits einen Namen bei Anschreiber/Zeit/24Sek eingetragen
   hatte — andere Mannschaften zugewiesene Slots wurden nicht mit importiert.
   Spieler-Zuordnung ist bewusst offen (`assigned_player_id = null`).
+- **"Passwort vergessen" für Trainer-Accounts.** War in der Spec nicht explizit erwähnt, fehlte
+  aber komplett (nur reiner E-Mail/Passwort-Login). Ergänzt über Supabase Auth
+  (`resetPasswordForEmail` + `updateUser`) mit eigener `/reset-password`-Route, die unabhängig
+  vom aufgelösten Login-Status erreichbar ist (siehe `App.tsx`), da der Mail-Link bereits eine
+  gültige Recovery-Session mitbringt. Erfordert, dass die Redirect-URL in Supabase unter
+  Authentication -> URL Configuration eingetragen ist (siehe Setup-Schritt 6).
 
 ## Projektstruktur
 
