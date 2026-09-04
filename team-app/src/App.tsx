@@ -23,10 +23,10 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export default function App() {
-  const { role } = useAuth();
+  const { role, passwordRecovery } = useAuth();
   const location = useLocation();
 
-  if (location.pathname === '/reset-password') {
+  if (location.pathname === '/reset-password' || passwordRecovery) {
     return <ResetPassword />;
   }
 
