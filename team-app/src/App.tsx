@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { BottomNav } from './components/BottomNav';
 import { Header } from './components/Header';
 import { Onboarding } from './pages/Onboarding';
+import { ResetPassword } from './pages/ResetPassword';
 import { Dashboard } from './pages/Dashboard';
 import { Trikots } from './pages/Trikots';
 import { Kampfgericht } from './pages/Kampfgericht';
@@ -23,6 +24,11 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
 
 export default function App() {
   const { role } = useAuth();
+  const location = useLocation();
+
+  if (location.pathname === '/reset-password') {
+    return <ResetPassword />;
+  }
 
   if (role === 'loading') {
     return (
