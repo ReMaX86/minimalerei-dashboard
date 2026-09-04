@@ -31,7 +31,9 @@
     @apply inline-flex items-center justify-center gap-2 rounded-full bg-tbw-gold px-5 py-3 text-sm font-bold text-tbw-navyDark transition active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100;
   }
   .input {
-    @apply w-full rounded-2xl border border-black/10 bg-white px-3.5 py-2.5 text-sm text-tbw-ink outline-none focus:border-tbw-navy focus:ring-2 focus:ring-tbw-navy/20;
+    /* text-base (16px), not text-sm: iOS Safari auto-zooms on focus for any
+       input with a font-size below 16px, and doesn't zoom back out after. */
+    @apply w-full rounded-2xl border border-black/10 bg-white px-3.5 py-2.5 text-base text-tbw-ink outline-none focus:border-tbw-navy focus:ring-2 focus:ring-tbw-navy/20;
   }
   .pill {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold tracking-wide;
