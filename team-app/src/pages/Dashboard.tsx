@@ -162,7 +162,10 @@ export function Dashboard() {
       </section>
 
       <section className="card">
-        <SectionTitle icon="📋" title="Kampfgericht" />
+        <SectionTitle
+          icon="📋"
+          title={role === 'player' ? 'Dein nächster Kampfgericht Termin' : 'Nächster Kampfgericht Termin'}
+        />
         {role === 'player' &&
           (data.playerNextTask ? (
             <div className="mt-2 rounded-xl bg-tbw-gold/10 p-3">
@@ -207,7 +210,7 @@ export function Dashboard() {
       </section>
 
       <section className="card">
-        <SectionTitle icon="👕" title="Trikots" />
+        <SectionTitle icon="👕" title="Wer hat die Trikots?" />
         <div className="mt-2 grid grid-cols-2 gap-3">
           {data.trikotSets.map((set) => (
             <div
@@ -226,7 +229,7 @@ export function Dashboard() {
       </section>
 
       <section className="card">
-        <SectionTitle icon="🕒" title="Nächste Trainings" />
+        <SectionTitle icon="🕒" title="Nächste Trainingseinheit" />
         <div className="mt-2">
           <UpcomingTrainings />
         </div>
