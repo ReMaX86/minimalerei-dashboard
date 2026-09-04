@@ -59,14 +59,28 @@ export function Dashboard() {
       }
 
       if (role === 'player' && player) {
-        const { data: taskRows } = await supabase
+        const { data: taskRows, error: taskErr } = await supabase
           .from('officiating_tasks')
-          .select('*, officiating_games!inner(*)')
-          .eq('assigned_player_id', player.id)
-          .gte('officiating_games.game_date', today)
-          .order('game_date', { foreignTable: 'officiating_games', ascending: true })
-          .limit(1);
-        playerNextTask = (taskRows?.[0] as typeof playerNextTask) ?? null;
+          .select('*')
+          .eq('assigned_player_id', player.id);
+        if (taskErr) {
+          console.error('officiating_tasks fetch failed', taskErr);
+        } else if (taskRows && taskRows.length > 0) {
+          const gameIds = [...new Set((taskRows as OfficiatingTask[]).map((t) => t.officiating_game_id))];
+          const { data: gameRows, error: gamesErr } = await supabase
+            .from('officiating_games')
+            .select('*')
+            .in('id', gameIds)
+            .gte('game_date', today)
+            .order('game_date');
+          if (gamesErr) {
+            console.error('officiating_games fetch failed', gamesErr);
+          } else if (gameRows && gameRows.length > 0) {
+            const soonestGame = gameRows[0] as OfficiatingGame;
+            const task = (taskRows as OfficiatingTask[]).find((t) => t.officiating_game_id === soonestGame.id);
+            if (task) playerNextTask = { ...task, officiating_games: soonestGame };
+          }
+        }
       }
 
       if (role === 'trainer') {
