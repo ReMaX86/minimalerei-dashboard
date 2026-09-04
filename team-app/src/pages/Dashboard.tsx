@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { UpcomingTrainings } from '../components/UpcomingTrainings';
 import { fmtDate, fmtTime } from '../lib/format';
-import { weekdayIndex } from '../lib/weekdays';
 import {
   OFFICIATING_TASK_LABELS,
   benoetigterSatz,
@@ -12,7 +12,6 @@ import {
   type OfficiatingGame,
   type OfficiatingTask,
   type Player,
-  type Training,
   type TrikotSet
 } from '../types/database';
 
@@ -22,7 +21,6 @@ interface DashboardData {
   playerNextTask: (OfficiatingTask & { officiating_games: OfficiatingGame }) | null;
   trainerNextOfficiatingGame: (OfficiatingGame & { tasks: OfficiatingTask[] }) | null;
   trikotSets: TrikotSet[];
-  trainings: Training[];
   players: Record<string, Player>;
 }
 
@@ -38,10 +36,9 @@ export function Dashboard() {
       setError(null);
       const today = new Date().toISOString().slice(0, 10);
 
-      const [gameRes, trikotRes, trainingRes, playersRes] = await Promise.all([
+      const [gameRes, trikotRes, playersRes] = await Promise.all([
         supabase.from('games').select('*').gte('game_date', today).order('game_date').order('game_time').limit(1).maybeSingle(),
         supabase.from('trikot_sets').select('*').order('id'),
-        supabase.from('trainings').select('*'),
         supabase.from('players').select('*').eq('is_active', true)
       ]);
 
@@ -94,7 +91,7 @@ export function Dashboard() {
       const playersById: Record<string, Player> = {};
       (playersRes.data as Player[] | null)?.forEach((p) => (playersById[p.id] = p));
 
-      if (gameRes.error || trikotRes.error || trainingRes.error) {
+      if (gameRes.error || trikotRes.error) {
         setError('Fehler beim Laden der Startseite.');
         return;
       }
@@ -105,9 +102,6 @@ export function Dashboard() {
         playerNextTask,
         trainerNextOfficiatingGame,
         trikotSets: (trikotRes.data as TrikotSet[]) ?? [],
-        trainings: [...((trainingRes.data as Training[]) ?? [])].sort(
-          (a, b) => weekdayIndex(a.weekday) - weekdayIndex(b.weekday) || a.start_time.localeCompare(b.start_time)
-        ),
         players: playersById
       });
     }
@@ -232,21 +226,10 @@ export function Dashboard() {
       </section>
 
       <section className="card">
-        <SectionTitle icon="🕒" title="Training" />
-        {data.trainings.length === 0 ? (
-          <p className="mt-2 text-sm text-tbw-ink/50">Keine Trainingszeiten hinterlegt.</p>
-        ) : (
-          <ul className="mt-2 space-y-1 text-sm">
-            {data.trainings.map((t) => (
-              <li key={t.id} className="flex items-center justify-between">
-                <span className="font-medium text-tbw-navyDark">{t.weekday}</span>
-                <span className="text-tbw-ink/70">
-                  {fmtTime(t.start_time)}–{fmtTime(t.end_time)} · {t.location}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <SectionTitle icon="🕒" title="Nächste Trainings" />
+        <div className="mt-2">
+          <UpcomingTrainings />
+        </div>
       </section>
     </div>
   );
