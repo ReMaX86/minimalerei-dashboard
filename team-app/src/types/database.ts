@@ -78,6 +78,14 @@ export interface Training {
   location: string;
 }
 
+export interface TrainingRsvpRow {
+  training_id: string;
+  session_date: string;
+  player_id: string;
+  is_attending: boolean;
+  created_at: string;
+}
+
 export function benoetigterSatz(game: Pick<Game, 'is_home' | 'trikot_override'>): TrikotSetId {
   return game.trikot_override ?? (game.is_home ? 'weiss' : 'schwarz');
 }
