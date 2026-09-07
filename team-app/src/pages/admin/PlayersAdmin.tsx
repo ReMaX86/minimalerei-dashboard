@@ -73,6 +73,20 @@ export function PlayersAdmin() {
     }
   }
 
+  async function toggleAdmin(p: Player) {
+    setError(null);
+    try {
+      const { error: updError } = await supabase
+        .from('players')
+        .update({ is_admin: !p.is_admin })
+        .eq('id', p.id);
+      if (updError) throw updError;
+      await load();
+    } catch {
+      setError('Trainer-Rechte konnten nicht geändert werden.');
+    }
+  }
+
   if (error) return <ErrorNote message={error} />;
   if (!players) return <LoadingSpinner />;
 
@@ -108,15 +122,21 @@ export function PlayersAdmin() {
           <li key={p.id} className={`card ${!p.is_active ? 'opacity-50' : ''}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-semibold text-tbw-navyDark">{p.name}</p>
+                <p className="flex items-center gap-1.5 font-semibold text-tbw-navyDark">
+                  {p.name}
+                  {p.is_admin && <span className="pill pill-warn">Trainer</span>}
+                </p>
                 <p className="text-xs text-tbw-ink/50">Code: {p.access_code}</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap justify-end gap-2">
                 <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => regenerate(p.id, p.name)}>
                   Code neu
                 </button>
                 <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => toggleActive(p)}>
                   {p.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                </button>
+                <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => toggleAdmin(p)}>
+                  {p.is_admin ? 'Trainer-Rechte entziehen' : 'Zu Trainer machen'}
                 </button>
               </div>
             </div>

@@ -23,7 +23,7 @@ interface State {
 }
 
 export function Kampfgericht() {
-  const { role, player } = useAuth();
+  const { role, player, isAdmin } = useAuth();
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
@@ -122,7 +122,7 @@ export function Kampfgericht() {
         tasksByGame={state.tasksByGame}
         playersById={playersById}
         players={state.players}
-        role={role}
+        isAdmin={isAdmin}
         currentPlayerId={player?.id ?? null}
         busyTaskId={busyTaskId}
         onAssign={assign}
@@ -146,7 +146,7 @@ export function Kampfgericht() {
               tasksByGame={state.tasksByGame}
               playersById={playersById}
               players={state.players}
-              role={role}
+              isAdmin={isAdmin}
               currentPlayerId={player?.id ?? null}
               busyTaskId={busyTaskId}
               onAssign={assign}
@@ -167,7 +167,7 @@ function GameList({
   tasksByGame,
   playersById,
   players,
-  role,
+  isAdmin,
   currentPlayerId,
   busyTaskId,
   onAssign,
@@ -180,7 +180,7 @@ function GameList({
   tasksByGame: Record<string, OfficiatingTask[]>;
   playersById: Record<string, Player>;
   players: Player[];
-  role: 'trainer' | 'player' | 'guest' | 'loading';
+  isAdmin: boolean;
   currentPlayerId: string | null;
   busyTaskId: string | null;
   onAssign: (taskId: string, playerId: string | null) => void;
@@ -215,7 +215,7 @@ function GameList({
                   <span className="text-sm text-tbw-ink/70">{OFFICIATING_TASK_LABELS[task.task_type]}</span>
                   {!task.id ? (
                     <span className="text-sm text-tbw-ink/30">–</span>
-                  ) : role === 'trainer' ? (
+                  ) : isAdmin ? (
                     <select
                       className="input !w-auto !py-1 text-xs"
                       value={task.assigned_player_id ?? ''}

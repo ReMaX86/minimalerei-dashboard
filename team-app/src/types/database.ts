@@ -13,6 +13,7 @@ export interface Player {
   access_code: string;
   auth_user_id: string | null;
   is_active: boolean;
+  is_admin: boolean;
   created_at: string;
 }
 

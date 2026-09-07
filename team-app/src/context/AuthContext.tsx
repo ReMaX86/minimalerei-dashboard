@@ -16,6 +16,7 @@ interface AuthState {
   role: Role;
   trainer: Trainer | null;
   player: Player | null;
+  isAdmin: boolean;
   passwordRecovery: boolean;
   clearPasswordRecovery: () => void;
   loginTrainer: (email: string, password: string) => Promise<void>;
@@ -136,11 +137,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data) setPlayer(data as Player);
   }, [player]);
 
+  // A player can be flagged as an admin (e.g. a playing coach) — they keep
+  // the normal player role/home screen, but get trainer-only permissions too.
+  const isAdmin = role === 'trainer' || (role === 'player' && !!player?.is_admin);
+
   const value = useMemo(
     () => ({
       role,
       trainer,
       player,
+      isAdmin,
       passwordRecovery,
       clearPasswordRecovery,
       loginTrainer,
@@ -148,7 +154,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       refreshPlayer
     }),
-    [role, trainer, player, passwordRecovery, clearPasswordRecovery, loginTrainer, redeemCode, logout, refreshPlayer]
+    [
+      role,
+      trainer,
+      player,
+      isAdmin,
+      passwordRecovery,
+      clearPasswordRecovery,
+      loginTrainer,
+      redeemCode,
+      logout,
+      refreshPlayer
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
