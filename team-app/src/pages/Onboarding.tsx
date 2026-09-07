@@ -81,7 +81,7 @@ function Intro({ onDone }: { onDone: () => void }) {
 function Welcome({ onTrainer, onPlayer }: { onTrainer: () => void; onPlayer: () => void }) {
   return (
     <div className="text-center">
-      <img src="/icons/icon.svg" alt="" className="mx-auto mb-8 h-20 w-20 rounded-2xl shadow-2xl" />
+      <img src="/icons/icon-512.png" alt="" className="mx-auto mb-8 h-24 w-24 drop-shadow-xl" />
       <p className="text-sm font-semibold uppercase tracking-[0.2em] text-tbw-gold">TB Wülfrath Herren</p>
       <h1 className="headline mt-2 text-[42px] text-white">Team App</h1>
       <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-white/70">
