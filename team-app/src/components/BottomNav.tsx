@@ -1,24 +1,29 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { IconHome, IconJersey, IconClipboard, IconTeam, IconGear } from './NavIcons';
 
 const ITEMS = [
-  { to: '/', label: 'Start', icon: '🏠', end: true },
-  { to: '/trikots', label: 'Trikots', icon: '👕', end: false },
-  { to: '/kampfgericht', label: 'Kampfgericht', icon: '📋', end: false },
-  { to: '/kader', label: 'Kader', icon: '🧑‍🤝‍🧑', end: false }
+  { to: '/', label: 'Start', Icon: IconHome, end: true },
+  { to: '/trikots', label: 'Trikots', Icon: IconJersey, end: false },
+  { to: '/kampfgericht', label: 'Kampfgericht', Icon: IconClipboard, end: false },
+  { to: '/kader', label: 'Kader', Icon: IconTeam, end: false }
 ];
 
 // Betrachter (z. B. Abteilungsleiter) sehen nur Spielplan + Kampfgericht,
 // kein Kader/Trikots — dafür gibt es keine Spieler-/Trainer-Rechte.
 const VIEWER_ITEMS = [
-  { to: '/', label: 'Start', icon: '🏠', end: true },
-  { to: '/kampfgericht', label: 'Kampfgericht', icon: '📋', end: false }
+  { to: '/', label: 'Start', Icon: IconHome, end: true },
+  { to: '/kampfgericht', label: 'Kampfgericht', Icon: IconClipboard, end: false }
 ];
 
 export function BottomNav() {
   const { role, isAdmin } = useAuth();
   const items =
-    role === 'viewer' ? VIEWER_ITEMS : isAdmin ? [...ITEMS, { to: '/admin', label: 'Admin', icon: '⚙️', end: false }] : ITEMS;
+    role === 'viewer'
+      ? VIEWER_ITEMS
+      : isAdmin
+        ? [...ITEMS, { to: '/admin', label: 'Admin', Icon: IconGear, end: false }]
+        : ITEMS;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
@@ -33,11 +38,11 @@ export function BottomNav() {
               {({ isActive }) => (
                 <>
                   <span
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-base leading-none transition ${
-                      isActive ? 'bg-tbw-gold' : ''
+                    className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
+                      isActive ? 'bg-tbw-gold text-tbw-navyDark' : 'text-white/55'
                     }`}
                   >
-                    {item.icon}
+                    <item.Icon className="h-[18px] w-[18px]" />
                   </span>
                   <span className={isActive ? 'text-tbw-gold' : ''}>{item.label}</span>
                 </>
