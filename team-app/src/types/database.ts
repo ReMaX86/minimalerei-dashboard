@@ -61,7 +61,12 @@ export interface OfficiatingGame {
   game_date: string;
   game_time: string | null;
   opponent_teams: string;
+  opponent: string | null;
   location: string;
+}
+
+export function officiatingGameLabel(game: Pick<OfficiatingGame, 'opponent_teams' | 'opponent'>): string {
+  return game.opponent ? `${game.opponent_teams} vs. ${game.opponent}` : game.opponent_teams;
 }
 
 export interface OfficiatingTeam {

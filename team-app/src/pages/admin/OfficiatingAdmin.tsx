@@ -5,6 +5,7 @@ import { ErrorNote } from '../../components/ErrorNote';
 import { fmtDate, fmtTime } from '../../lib/format';
 import {
   OFFICIATING_TASK_LABELS,
+  officiatingGameLabel,
   type OfficiatingGame,
   type OfficiatingTask,
   type OfficiatingTaskType,
@@ -13,7 +14,7 @@ import {
 } from '../../types/database';
 
 const TASK_TYPES: OfficiatingTaskType[] = ['uhr', 'anschreiber', 'zeit'];
-const EMPTY_FORM = { game_date: '', game_time: '', opponent_teams: '', location: '' };
+const EMPTY_FORM = { game_date: '', game_time: '', opponent_teams: '', opponent: '', location: '' };
 const EMPTY_TASK_SELECTION: Record<OfficiatingTaskType, boolean> = { uhr: false, anschreiber: false, zeit: false };
 
 export function OfficiatingAdmin() {
@@ -27,6 +28,7 @@ export function OfficiatingAdmin() {
   const [busy, setBusy] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
   const [teamBusy, setTeamBusy] = useState(false);
+  const [showTeams, setShowTeams] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -70,6 +72,7 @@ export function OfficiatingAdmin() {
           game_date: form.game_date,
           game_time: form.game_time || null,
           opponent_teams: form.opponent_teams.trim(),
+          opponent: form.opponent.trim() || null,
           location: form.location.trim()
         })
         .select()
@@ -148,35 +151,46 @@ export function OfficiatingAdmin() {
   return (
     <div className="space-y-4">
       <div className="card space-y-2">
-        <p className="text-sm font-bold text-tbw-navyDark">Jahrgänge / Teams</p>
-        <form onSubmit={addTeam} className="flex gap-2">
-          <input
-            className="input"
-            placeholder="z. B. TBW U16"
-            value={newTeamName}
-            onChange={(e) => setNewTeamName(e.target.value)}
-          />
-          <button className="btn-secondary shrink-0" disabled={teamBusy || !newTeamName.trim()}>
-            Hinzufügen
-          </button>
-        </form>
-        {teams.length === 0 ? (
-          <p className="text-sm text-tbw-ink/50">Noch keine Teams eingetragen.</p>
-        ) : (
-          <ul className="divide-y divide-black/5">
-            {teams.map((t) => (
-              <li key={t.id} className="flex items-center justify-between py-1.5 text-sm">
-                <span className="text-tbw-navyDark">{t.name}</span>
-                <button
-                  className="text-xs font-semibold text-tbw-red"
-                  onClick={() => removeTeam(t.id)}
-                  type="button"
-                >
-                  Löschen
-                </button>
-              </li>
-            ))}
-          </ul>
+        <button
+          className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+          onClick={() => setShowTeams((v) => !v)}
+          type="button"
+        >
+          Jahrgänge / Teams
+          <span>{showTeams ? '▲' : '▼'}</span>
+        </button>
+        {showTeams && (
+          <>
+            <form onSubmit={addTeam} className="flex gap-2">
+              <input
+                className="input"
+                placeholder="z. B. TBW U16"
+                value={newTeamName}
+                onChange={(e) => setNewTeamName(e.target.value)}
+              />
+              <button className="btn-secondary shrink-0" disabled={teamBusy || !newTeamName.trim()}>
+                Hinzufügen
+              </button>
+            </form>
+            {teams.length === 0 ? (
+              <p className="text-sm text-tbw-ink/50">Noch keine Teams eingetragen.</p>
+            ) : (
+              <ul className="divide-y divide-black/5">
+                {teams.map((t) => (
+                  <li key={t.id} className="flex items-center justify-between py-1.5 text-sm">
+                    <span className="text-tbw-navyDark">{t.name}</span>
+                    <button
+                      className="text-xs font-semibold text-tbw-red"
+                      onClick={() => removeTeam(t.id)}
+                      type="button"
+                    >
+                      Löschen
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </div>
 
@@ -213,6 +227,12 @@ export function OfficiatingAdmin() {
           ))}
         </select>
         <input
+          placeholder="Gegner (optional), z. B. DJK Erkrath"
+          className="input"
+          value={form.opponent}
+          onChange={(e) => setForm((f) => ({ ...f, opponent: e.target.value }))}
+        />
+        <input
           required
           placeholder="Halle / Adresse"
           className="input"
@@ -246,7 +266,7 @@ export function OfficiatingAdmin() {
           <li key={g.id} className="card">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="font-semibold text-tbw-navyDark">{g.opponent_teams}</p>
+                <p className="font-semibold text-tbw-navyDark">{officiatingGameLabel(g)}</p>
                 <p className="text-sm text-tbw-ink/60">
                   {fmtDate(g.game_date)}
                   {g.game_time ? ` · ${fmtTime(g.game_time)} Uhr` : ''} · {g.location}

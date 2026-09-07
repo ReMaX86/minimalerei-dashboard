@@ -136,6 +136,13 @@ hier die getroffenen Entscheidungen samt Begründung:
   eine reine Text-Spalte (kein Fremdschlüssel) — ein Jahrgang aus der Liste zu löschen wirkt
   sich dadurch nicht auf bereits angelegte Termine aus. Die Migration übernimmt beim Anlegen
   der Tabelle automatisch alle bereits verwendeten Team-Namen aus bestehenden Terminen.
+- **Optionales Gegner-Feld (Migration `0008`).** `officiating_games.opponent_teams` bleibt der
+  eigene Jahrgang (Dropdown, s. o.); ergänzend gibt es jetzt ein nullable `opponent`-Feld für
+  den tatsächlichen gegnerischen Verein, falls bekannt — freiwillig, da er nicht immer feststeht
+  bzw. für die Kampfgericht-Planung selbst nicht relevant ist. Wo der Termin angezeigt wird
+  (Admin, Kampfgericht-Seite, Startseite), zeigt `officiatingGameLabel()` in
+  `src/types/database.ts` "Team vs. Gegner" an, falls ein Gegner hinterlegt ist, sonst nur das
+  Team.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche
