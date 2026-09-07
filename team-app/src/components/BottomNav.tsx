@@ -8,9 +8,17 @@ const ITEMS = [
   { to: '/kader', label: 'Kader', icon: '🧑‍🤝‍🧑', end: false }
 ];
 
+// Betrachter (z. B. Abteilungsleiter) sehen nur Spielplan + Kampfgericht,
+// kein Kader/Trikots — dafür gibt es keine Spieler-/Trainer-Rechte.
+const VIEWER_ITEMS = [
+  { to: '/', label: 'Start', icon: '🏠', end: true },
+  { to: '/kampfgericht', label: 'Kampfgericht', icon: '📋', end: false }
+];
+
 export function BottomNav() {
-  const { isAdmin } = useAuth();
-  const items = isAdmin ? [...ITEMS, { to: '/admin', label: 'Admin', icon: '⚙️', end: false }] : ITEMS;
+  const { role, isAdmin } = useAuth();
+  const items =
+    role === 'viewer' ? VIEWER_ITEMS : isAdmin ? [...ITEMS, { to: '/admin', label: 'Admin', icon: '⚙️', end: false }] : ITEMS;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">

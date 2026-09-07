@@ -119,8 +119,8 @@ hier die getroffenen Entscheidungen samt Begründung:
   Helper-Funktion, die praktisch jede RLS-Policy und trainer-only RPC im Projekt schon nutzt —
   so aus, dass sie auch für admin-geflaggte Spieler `true` liefert; dadurch war keine einzelne
   Policy anzufassen. Im Frontend steuert `AuthContext`'s `isAdmin` (= echter Trainer ODER
-  admin-geflaggter Spieler) den Zugriff, während `role` (`'trainer' | 'player'`) unverändert
-  bestimmt, welche Ansicht (Trainer-Aggregat vs. persönliche Spieler-Sicht) angezeigt wird.
+  admin-geflaggter Spieler) den Zugriff, während `role` bestimmt, welche Ansicht (Trainer-
+  Aggregat vs. persönliche Spieler-Sicht) angezeigt wird.
 - **Push-Benachrichtigungen** sind (noch) nicht umgesetzt — die App zeigt alle relevanten
   Termine/Zuweisungen beim Öffnen an ("Self-Check"). Ließe sich später über die Web Push API
   ergänzen, ohne am Datenmodell etwas zu ändern.
@@ -150,6 +150,19 @@ hier die getroffenen Entscheidungen samt Begründung:
   (Admin, Kampfgericht-Seite, Startseite), zeigt `officiatingGameLabel()` in
   `src/types/database.ts` "Team vs. Gegner" an, falls ein Gegner hinterlegt ist, sonst nur das
   Team.
+- **Read-only "Betrachter"-Rolle (Migration `0009`).** Für jemanden, der weder Spieler noch
+  Trainer ist (z. B. ein Abteilungsleiter), aber Spielplan und Kampfgericht sehen soll — ganz
+  ohne Kader-/Trikot-Zugriff und ohne jede Schreibberechtigung. Nutzt dieselbe
+  Zugangscode-Anmeldung wie Spieler (siehe Design-Notiz #1 in `0001_init.sql`), gespiegelt in
+  parallelen `viewers`/`viewer_auth_links`-Tabellen, damit Betrachter-Accounts komplett getrennt
+  vom Kader/der Trikot-Rotation/Kampfgericht-Zuweisung bleiben. Da praktisch jede
+  Select-Policy im Projekt schon "jeder angemeldete Nutzer" erlaubt, brauchte für den Lesezugriff
+  keine bestehende Policy angefasst zu werden — nur die neuen Tabellen selbst brauchten RLS.
+  `generate_access_code()` prüft jetzt Eindeutigkeit über Spieler- UND Betrachter-Codes hinweg,
+  da beide über dasselbe "Zugangscode"-Feld eingegeben werden (`redeemCode` im `AuthContext`
+  probiert beim Einlösen zuerst `redeem_access_code`, bei `invalid_code` dann
+  `redeem_viewer_code`). Trainer verwalten Betrachter im Admin-Bereich unter dem neuen Reiter
+  "Betrachter" (`src/pages/admin/ViewersAdmin.tsx`, spiegelt `PlayersAdmin.tsx`).
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche

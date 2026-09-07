@@ -2,7 +2,7 @@ import { useAuth } from '../context/AuthContext';
 import { RoleBadge } from './RoleBadge';
 
 export function Header({ title }: { title: string }) {
-  const { role, trainer, player, logout } = useAuth();
+  const { role, trainer, player, viewer, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-10 bg-tbw-bg/90 backdrop-blur">
@@ -19,10 +19,11 @@ export function Header({ title }: { title: string }) {
         <div className="flex items-center gap-2">
           {role === 'trainer' && <RoleBadge role="trainer" />}
           {role === 'player' && <RoleBadge role="player" />}
+          {role === 'viewer' && <RoleBadge role="viewer" />}
           <button
             onClick={logout}
             className="rounded-full px-2.5 py-1 text-xs font-bold text-tbw-ink/50 hover:bg-black/5"
-            title={trainer ? trainer.name : player ? player.name : 'Abmelden'}
+            title={trainer ? trainer.name : player ? player.name : viewer ? viewer.name : 'Abmelden'}
           >
             Abmelden
           </button>
