@@ -6,6 +6,7 @@ import { ErrorNote } from '../components/ErrorNote';
 import { fmtDate, fmtTime, isFuture } from '../lib/format';
 import {
   OFFICIATING_TASK_LABELS,
+  officiatingGameLabel,
   type OfficiatingGame,
   type OfficiatingTask,
   type OfficiatingTaskType,
@@ -255,7 +256,7 @@ function GameList({
           <div key={game.id} className={flat ? 'rounded-xl bg-tbw-bg p-3' : 'card'}>
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-sm font-semibold text-tbw-navyDark">{game.opponent_teams}</p>
+                <p className="text-sm font-semibold text-tbw-navyDark">{officiatingGameLabel(game)}</p>
                 <p className="text-xs text-tbw-ink/50">
                   {fmtDate(game.game_date)}
                   {game.game_time ? ` · ${fmtTime(game.game_time)} Uhr` : ''} · {game.location}

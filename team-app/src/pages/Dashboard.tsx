@@ -8,6 +8,7 @@ import { fmtDate, fmtTime } from '../lib/format';
 import {
   OFFICIATING_TASK_LABELS,
   benoetigterSatz,
+  officiatingGameLabel,
   type Game,
   type OfficiatingGame,
   type OfficiatingTask,
@@ -191,7 +192,7 @@ export function Dashboard() {
                 {data.playerNextTask.officiating_games.game_time
                   ? ` · ${fmtTime(data.playerNextTask.officiating_games.game_time)} Uhr`
                   : ''}{' '}
-                · {data.playerNextTask.officiating_games.opponent_teams}
+                · {officiatingGameLabel(data.playerNextTask.officiating_games)}
               </p>
             </div>
           ) : (
@@ -205,7 +206,7 @@ export function Dashboard() {
                 {data.trainerNextOfficiatingGame.game_time
                   ? ` · ${fmtTime(data.trainerNextOfficiatingGame.game_time)} Uhr`
                   : ''}{' '}
-                · {data.trainerNextOfficiatingGame.opponent_teams}
+                · {officiatingGameLabel(data.trainerNextOfficiatingGame)}
               </p>
               <ul className="space-y-1 text-sm">
                 {data.trainerNextOfficiatingGame.tasks.map((t) => (
