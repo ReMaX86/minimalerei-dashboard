@@ -73,6 +73,10 @@ export function Kampfgericht() {
 
   const upcoming = state.games.filter((g) => isFuture(g.game_date));
   const past = state.games.filter((g) => !isFuture(g.game_date)).reverse();
+  const upcomingOpenCount = upcoming.reduce(
+    (sum, game) => sum + (state.tasksByGame[game.id] ?? []).filter((t) => !t.assigned_player_id).length,
+    0
+  );
 
   async function assign(taskId: string, playerId: string | null) {
     setBusyTaskId(taskId);
@@ -112,6 +116,15 @@ export function Kampfgericht() {
           <p className="text-sm font-semibold text-tbw-navyDark">Deine Einsätze diese Saison</p>
           <span className={ownCount >= SEASON_TARGET_MIN ? 'pill pill-ok' : 'pill pill-warn'}>
             {ownCount} von {SEASON_TARGET_MIN}–{SEASON_TARGET_MAX}
+          </span>
+        </section>
+      )}
+
+      {isAdmin && (
+        <section className="card flex items-center justify-between">
+          <p className="text-sm font-semibold text-tbw-navyDark">Offene Kampfgericht-Positionen</p>
+          <span className={upcomingOpenCount > 0 ? 'pill pill-warn' : 'pill pill-ok'}>
+            {upcomingOpenCount > 0 ? `${upcomingOpenCount} offen` : 'Alles besetzt'}
           </span>
         </section>
       )}
@@ -202,13 +215,23 @@ function GameList({
               assigned_player_id: null
             }
         );
+        const openCount = tasks.filter((t) => t.id && !t.assigned_player_id).length;
         return (
           <div key={game.id} className={flat ? 'rounded-xl bg-tbw-bg p-3' : 'card'}>
-            <p className="text-sm font-semibold text-tbw-navyDark">{game.opponent_teams}</p>
-            <p className="text-xs text-tbw-ink/50">
-              {fmtDate(game.game_date)}
-              {game.game_time ? ` · ${fmtTime(game.game_time)} Uhr` : ''} · {game.location}
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-tbw-navyDark">{game.opponent_teams}</p>
+                <p className="text-xs text-tbw-ink/50">
+                  {fmtDate(game.game_date)}
+                  {game.game_time ? ` · ${fmtTime(game.game_time)} Uhr` : ''} · {game.location}
+                </p>
+              </div>
+              {isAdmin && (
+                <span className={openCount > 0 ? 'pill pill-warn shrink-0' : 'pill pill-ok shrink-0'}>
+                  {openCount > 0 ? `${openCount} offen` : 'komplett'}
+                </span>
+              )}
+            </div>
             <ul className="mt-2 space-y-2">
               {tasks.map((task) => (
                 <li key={task.task_type} className="flex items-center justify-between gap-2">
@@ -217,7 +240,11 @@ function GameList({
                     <span className="text-sm text-tbw-ink/30">–</span>
                   ) : isAdmin ? (
                     <select
-                      className="input !w-auto !py-1 text-xs"
+                      className={`input !w-auto !py-1 text-xs ${
+                        task.assigned_player_id
+                          ? '!border-status-ok/40 !bg-status-ok/10'
+                          : '!border-tbw-red/40 !bg-tbw-red/10'
+                      }`}
                       value={task.assigned_player_id ?? ''}
                       disabled={busyTaskId === task.id}
                       onChange={(e) => onAssign(task.id, e.target.value || null)}
