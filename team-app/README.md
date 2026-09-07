@@ -69,10 +69,17 @@ Dafür in den GitHub-Repo-Settings unter **Secrets and variables -> Actions** an
 
 ## Design
 
-Die Farben in `tailwind.config.js` (`tbw.*`) sind Platzhalter — bitte gegen die echten
-TB-Wülfrath-Vereinsfarben austauschen, sobald diese vorliegen. Ebenso ist
-`public/icons/icon.svg` ein einfacher Platzhalter; für produktive PWA-Installs empfiehlt
-sich zusätzlich ein echtes 512×512-PNG-Icon.
+Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
+TB-Wülfrath-Vereinsfarben austauschen, sobald diese vorliegen.
+
+Das echte Vereinslogo ist seit dem Klub-Upload im Einsatz (`design/tbw-logo.png`, die
+hochauflösende Originaldatei — bewusst außerhalb von `public/`, damit sie nicht mit ins
+PWA-Precache gerät). Daraus generiert: `public/icons/icon-192.png` /
+`icon-512.png` (Manifest, transparenter Hintergrund), `icon-512-maskable.png` (Manifest,
+dunkler Hintergrund, Logo im 70%-Safe-Zone-Kreis für maskierbare Icons), sowie
+`apple-touch-icon.png` (180×180, weißer Hintergrund — iOS stellt Transparenz sonst schwarz
+dar) und `favicon.ico`/`favicon-32.png`. Soll das Logo nochmal angepasst werden (z. B. andere
+Zuschnitte/Skalierung), einfach aus `design/tbw-logo.png` neu generieren.
 
 ## Abweichungen / Entscheidungen gegenüber der Spec
 
