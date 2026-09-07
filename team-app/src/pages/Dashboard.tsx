@@ -26,7 +26,7 @@ interface DashboardData {
 }
 
 export function Dashboard() {
-  const { role, player } = useAuth();
+  const { role, player, isAdmin } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,7 +84,7 @@ export function Dashboard() {
         }
       }
 
-      if (role === 'trainer') {
+      if (isAdmin) {
         const { data: nextOg } = await supabase
           .from('officiating_games')
           .select('*')
@@ -125,7 +125,7 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [role, player]);
+  }, [role, player, isAdmin]);
 
   if (error) return <div className="card text-sm text-tbw-red">{error}</div>;
   if (!data) return <LoadingSpinner />;
@@ -176,13 +176,10 @@ export function Dashboard() {
         )}
       </section>
 
-      <section className="card">
-        <SectionTitle
-          icon="📋"
-          title={role === 'player' ? 'Dein nächster Kampfgericht Termin' : 'Nächster Kampfgericht Termin'}
-        />
-        {role === 'player' &&
-          (data.playerNextTask ? (
+      {role === 'player' && (
+        <section className="card">
+          <SectionTitle icon="📋" title="Dein nächster Kampfgericht Termin" />
+          {data.playerNextTask ? (
             <div className="mt-2 rounded-xl bg-tbw-gold/10 p-3">
               <p className="text-sm font-semibold text-tbw-navyDark">
                 {OFFICIATING_TASK_LABELS[data.playerNextTask.task_type]}
@@ -197,9 +194,14 @@ export function Dashboard() {
             </div>
           ) : (
             <p className="mt-2 text-sm text-tbw-ink/50">Aktuell kein Termin für dich eingeteilt.</p>
-          ))}
-        {role === 'trainer' &&
-          (data.trainerNextOfficiatingGame ? (
+          )}
+        </section>
+      )}
+
+      {isAdmin && (
+        <section className="card">
+          <SectionTitle icon="📋" title="Nächster Kampfgericht Termin" />
+          {data.trainerNextOfficiatingGame ? (
             <div className="mt-2 space-y-2">
               <p className="text-sm font-semibold">
                 {fmtDate(data.trainerNextOfficiatingGame.game_date)}
@@ -221,8 +223,9 @@ export function Dashboard() {
             </div>
           ) : (
             <p className="mt-2 text-sm text-tbw-ink/50">Kein Kampfgericht-Termin geplant.</p>
-          ))}
-      </section>
+          )}
+        </section>
+      )}
 
       <section className="card">
         <SectionTitle icon="👕" title="Wer hat die Trikots?" />
