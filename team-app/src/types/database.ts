@@ -64,6 +64,11 @@ export interface OfficiatingGame {
   location: string;
 }
 
+export interface OfficiatingTeam {
+  id: string;
+  name: string;
+}
+
 export interface OfficiatingTask {
   id: string;
   officiating_game_id: string;
