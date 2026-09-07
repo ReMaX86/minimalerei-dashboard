@@ -86,14 +86,14 @@ export function TrainingsAdmin() {
           <input
             type="time"
             required
-            className="input"
+            className="input min-w-0"
             value={form.start_time}
             onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))}
           />
           <input
             type="time"
             required
-            className="input"
+            className="input min-w-0"
             value={form.end_time}
             onChange={(e) => setForm((f) => ({ ...f, end_time: e.target.value }))}
           />
