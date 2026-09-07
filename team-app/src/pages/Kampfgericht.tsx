@@ -134,14 +134,12 @@ export function Kampfgericht() {
         </section>
       )}
 
-      {isAdmin && (
-        <section className="card flex items-center justify-between">
-          <p className="text-sm font-semibold text-tbw-navyDark">Offene Kampfgericht-Positionen</p>
-          <span className={upcomingOpenCount > 0 ? 'pill pill-warn' : 'pill pill-ok'}>
-            {upcomingOpenCount > 0 ? `${upcomingOpenCount} offen` : 'Alles besetzt'}
-          </span>
-        </section>
-      )}
+      <section className="card flex items-center justify-between">
+        <p className="text-sm font-semibold text-tbw-navyDark">Offene Kampfgericht-Positionen</p>
+        <span className={upcomingOpenCount > 0 ? 'pill pill-warn' : 'pill pill-ok'}>
+          {upcomingOpenCount > 0 ? `${upcomingOpenCount} offen` : 'Alles besetzt'}
+        </span>
+      </section>
 
       <GameList
         title="Kommende Termine"
