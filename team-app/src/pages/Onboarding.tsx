@@ -3,20 +3,76 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { ErrorNote } from '../components/ErrorNote';
 
-type Step = 'welcome' | 'trainer-login' | 'trainer-forgot-password' | 'player-code';
+type Step = 'intro' | 'welcome' | 'trainer-login' | 'trainer-forgot-password' | 'player-code';
+
+const INTRO_SLIDES = [
+  {
+    icon: '📅',
+    title: 'Spielplan & Training',
+    text: 'Alle Termine auf einen Blick — beim Training mit einem Klick zu- oder absagen.'
+  },
+  {
+    icon: '🧑‍🤝‍🧑',
+    title: 'Kader',
+    text: 'Sofort sehen, ob du beim nächsten Spiel dabei bist.'
+  },
+  {
+    icon: '👕',
+    title: 'Trikots & Kampfgericht',
+    text: 'Fair verteilt: wer als nächstes wäscht und wer am Kampfgericht sitzt, immer klar geregelt.'
+  }
+];
 
 export function Onboarding() {
-  const [step, setStep] = useState<Step>('welcome');
+  const [step, setStep] = useState<Step>('intro');
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-tbw-navyDark to-tbw-navy text-white">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-10">
+        {step === 'intro' && <Intro onDone={() => setStep('welcome')} />}
         {step === 'welcome' && <Welcome onTrainer={() => setStep('trainer-login')} onPlayer={() => setStep('player-code')} />}
         {step === 'trainer-login' && (
           <TrainerLogin onBack={() => setStep('welcome')} onForgotPassword={() => setStep('trainer-forgot-password')} />
         )}
         {step === 'trainer-forgot-password' && <ForgotPassword onBack={() => setStep('trainer-login')} />}
         {step === 'player-code' && <PlayerCode onBack={() => setStep('welcome')} />}
+      </div>
+    </div>
+  );
+}
+
+function Intro({ onDone }: { onDone: () => void }) {
+  const [index, setIndex] = useState(0);
+  const slide = INTRO_SLIDES[index];
+  const isLast = index === INTRO_SLIDES.length - 1;
+
+  return (
+    <div className="text-center">
+      <div className="text-6xl">{slide.icon}</div>
+      <h2 className="headline mt-6 text-3xl text-white">{slide.title}</h2>
+      <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-white/70">{slide.text}</p>
+
+      <div className="mt-8 flex justify-center gap-2">
+        {INTRO_SLIDES.map((s, i) => (
+          <span
+            key={s.title}
+            className={`h-1.5 w-1.5 rounded-full ${i === index ? 'bg-tbw-gold' : 'bg-white/20'}`}
+          />
+        ))}
+      </div>
+
+      <div className="mt-10 space-y-3">
+        <button
+          className="btn-accent w-full"
+          onClick={() => (isLast ? onDone() : setIndex((i) => i + 1))}
+        >
+          {isLast ? "Los geht's" : 'Weiter'}
+        </button>
+        {!isLast && (
+          <button className="w-full text-xs font-semibold text-white/50" onClick={onDone}>
+            Überspringen
+          </button>
+        )}
       </div>
     </div>
   );
@@ -53,7 +109,7 @@ function Welcome({ onTrainer, onPlayer }: { onTrainer: () => void; onPlayer: () 
           className="w-full rounded-full px-4 py-3 text-sm font-bold text-white/80 ring-1 ring-white/20"
           onClick={onTrainer}
         >
-          Ich bin Trainer:in
+          Ich bin Admin
         </button>
       </div>
     </div>
@@ -85,7 +141,7 @@ function TrainerLogin({ onBack, onForgotPassword }: { onBack: () => void; onForg
       <button onClick={onBack} className="mb-6 text-sm font-semibold text-white/60">
         ← Zurück
       </button>
-      <h2 className="headline text-3xl text-white">Trainer-Login</h2>
+      <h2 className="headline text-3xl text-white">Admin-Login</h2>
       <form onSubmit={submit} className="mt-6 space-y-3">
         <input
           type="email"
