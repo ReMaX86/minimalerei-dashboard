@@ -8,6 +8,7 @@ import {
   type OfficiatingGame,
   type OfficiatingTask,
   type OfficiatingTaskType,
+  type OfficiatingTeam,
   type Player
 } from '../../types/database';
 
@@ -19,19 +20,23 @@ export function OfficiatingAdmin() {
   const [games, setGames] = useState<OfficiatingGame[] | null>(null);
   const [tasksByGame, setTasksByGame] = useState<Record<string, OfficiatingTask[]>>({});
   const [players, setPlayers] = useState<Player[]>([]);
+  const [teams, setTeams] = useState<OfficiatingTeam[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [taskSelection, setTaskSelection] = useState(EMPTY_TASK_SELECTION);
   const [busy, setBusy] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [teamBusy, setTeamBusy] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
-    const [gamesRes, tasksRes, playersRes] = await Promise.all([
+    const [gamesRes, tasksRes, playersRes, teamsRes] = await Promise.all([
       supabase.from('officiating_games').select('*').order('game_date'),
       supabase.from('officiating_tasks').select('*'),
-      supabase.from('players').select('*').eq('is_active', true).order('name')
+      supabase.from('players').select('*').eq('is_active', true).order('name'),
+      supabase.from('officiating_teams').select('*').order('name')
     ]);
-    if (gamesRes.error || tasksRes.error || playersRes.error) {
+    if (gamesRes.error || tasksRes.error || playersRes.error || teamsRes.error) {
       setError('Fehler beim Laden der Kampfgericht-Termine.');
       return;
     }
@@ -42,6 +47,7 @@ export function OfficiatingAdmin() {
     setGames((gamesRes.data as OfficiatingGame[]) ?? []);
     setTasksByGame(grouped);
     setPlayers((playersRes.data as Player[]) ?? []);
+    setTeams((teamsRes.data as OfficiatingTeam[]) ?? []);
   }, []);
 
   useEffect(() => {
@@ -108,11 +114,72 @@ export function OfficiatingAdmin() {
     }
   }
 
+  async function addTeam(e: FormEvent) {
+    e.preventDefault();
+    if (!newTeamName.trim()) return;
+    setTeamBusy(true);
+    setError(null);
+    try {
+      const { error: insertError } = await supabase.from('officiating_teams').insert({ name: newTeamName.trim() });
+      if (insertError) throw insertError;
+      setNewTeamName('');
+      await load();
+    } catch {
+      setError('Team konnte nicht angelegt werden (existiert es evtl. schon?).');
+    } finally {
+      setTeamBusy(false);
+    }
+  }
+
+  async function removeTeam(id: string) {
+    setError(null);
+    try {
+      const { error: delError } = await supabase.from('officiating_teams').delete().eq('id', id);
+      if (delError) throw delError;
+      await load();
+    } catch {
+      setError('Team konnte nicht gelöscht werden.');
+    }
+  }
+
   if (error) return <ErrorNote message={error} />;
   if (!games) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">
+      <div className="card space-y-2">
+        <p className="text-sm font-bold text-tbw-navyDark">Jahrgänge / Teams</p>
+        <form onSubmit={addTeam} className="flex gap-2">
+          <input
+            className="input"
+            placeholder="z. B. TBW U16"
+            value={newTeamName}
+            onChange={(e) => setNewTeamName(e.target.value)}
+          />
+          <button className="btn-secondary shrink-0" disabled={teamBusy || !newTeamName.trim()}>
+            Hinzufügen
+          </button>
+        </form>
+        {teams.length === 0 ? (
+          <p className="text-sm text-tbw-ink/50">Noch keine Teams eingetragen.</p>
+        ) : (
+          <ul className="divide-y divide-black/5">
+            {teams.map((t) => (
+              <li key={t.id} className="flex items-center justify-between py-1.5 text-sm">
+                <span className="text-tbw-navyDark">{t.name}</span>
+                <button
+                  className="text-xs font-semibold text-tbw-red"
+                  onClick={() => removeTeam(t.id)}
+                  type="button"
+                >
+                  Löschen
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <form onSubmit={addGame} className="card space-y-2">
         <p className="text-sm font-bold text-tbw-navyDark">Neuer Kampfgericht-Termin</p>
         <div className="grid grid-cols-2 gap-2">
@@ -130,13 +197,21 @@ export function OfficiatingAdmin() {
             onChange={(e) => setForm((f) => ({ ...f, game_time: e.target.value }))}
           />
         </div>
-        <input
+        <select
           required
-          placeholder="Team / Jahrgang, z. B. TBW U16"
           className="input"
           value={form.opponent_teams}
           onChange={(e) => setForm((f) => ({ ...f, opponent_teams: e.target.value }))}
-        />
+        >
+          <option value="" disabled>
+            Team wählen…
+          </option>
+          {teams.map((t) => (
+            <option key={t.id} value={t.name}>
+              {t.name}
+            </option>
+          ))}
+        </select>
         <input
           required
           placeholder="Halle / Adresse"

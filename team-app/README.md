@@ -129,6 +129,13 @@ hier die getroffenen Entscheidungen samt Begründung:
   Freitextfeld (`opponent_teams`) ist außerdem von "Gegnerische Teams" auf "Team / Jahrgang"
   umbeschriftet, da es in der Praxis für den eigenen Jahrgang (z. B. "TBW U16") befüllt wird,
   nicht für den tatsächlichen Gegner.
+- **Pflegbare Jahrgangsliste für Kampfgericht (Migration `0007`).** Das Freitextfeld für
+  Team/Jahrgang wurde durch ein Dropdown ersetzt, dessen Optionen aus einer neuen Tabelle
+  `officiating_teams` kommen; im Admin-Bereich unter Kampfgericht gibt es dafür eine eigene
+  Karte zum Anlegen/Löschen von Jahrgängen. `officiating_games.opponent_teams` bleibt bewusst
+  eine reine Text-Spalte (kein Fremdschlüssel) — ein Jahrgang aus der Liste zu löschen wirkt
+  sich dadurch nicht auf bereits angelegte Termine aus. Die Migration übernimmt beim Anlegen
+  der Tabelle automatisch alle bereits verwendeten Team-Namen aus bestehenden Terminen.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche
