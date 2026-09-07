@@ -111,13 +111,13 @@ export function OfficiatingAdmin() {
           <input
             type="date"
             required
-            className="input"
+            className="input min-w-0"
             value={form.game_date}
             onChange={(e) => setForm((f) => ({ ...f, game_date: e.target.value }))}
           />
           <input
             type="time"
-            className="input"
+            className="input min-w-0"
             value={form.game_time}
             onChange={(e) => setForm((f) => ({ ...f, game_time: e.target.value }))}
           />
