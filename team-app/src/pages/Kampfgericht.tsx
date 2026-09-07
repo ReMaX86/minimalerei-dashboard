@@ -27,6 +27,7 @@ export function Kampfgericht() {
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
+  const [showPlayerCounts, setShowPlayerCounts] = useState(false);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -68,11 +69,25 @@ export function Kampfgericht() {
       .filter((t) => t.assigned_player_id === player.id).length;
   }, [state, player]);
 
+  const taskCountByPlayer = useMemo(() => {
+    const counts: Record<string, number> = {};
+    if (!state) return counts;
+    Object.values(state.tasksByGame)
+      .flat()
+      .forEach((t) => {
+        if (t.assigned_player_id) counts[t.assigned_player_id] = (counts[t.assigned_player_id] ?? 0) + 1;
+      });
+    return counts;
+  }, [state]);
+
   if (error) return <ErrorNote message={error} />;
   if (!state) return <LoadingSpinner />;
 
   const upcoming = state.games.filter((g) => isFuture(g.game_date));
   const past = state.games.filter((g) => !isFuture(g.game_date)).reverse();
+  const sortedPlayersByCount = [...state.players].sort(
+    (a, b) => (taskCountByPlayer[a.id] ?? 0) - (taskCountByPlayer[b.id] ?? 0) || a.name.localeCompare(b.name, 'de')
+  );
   const upcomingOpenCount = upcoming.reduce(
     (sum, game) => sum + (state.tasksByGame[game.id] ?? []).filter((t) => !t.assigned_player_id).length,
     0
@@ -114,9 +129,7 @@ export function Kampfgericht() {
       {role === 'player' && (
         <section className="card flex items-center justify-between">
           <p className="text-sm font-semibold text-tbw-navyDark">Deine Einsätze diese Saison</p>
-          <span className={ownCount >= SEASON_TARGET_MIN ? 'pill pill-ok' : 'pill pill-warn'}>
-            {ownCount} von {SEASON_TARGET_MIN}–{SEASON_TARGET_MAX}
-          </span>
+          <span className={ownCount >= SEASON_TARGET_MIN ? 'pill pill-ok' : 'pill pill-warn'}>{ownCount}×</span>
         </section>
       )}
 
@@ -168,6 +181,28 @@ export function Kampfgericht() {
               flat
             />
           </div>
+        )}
+      </section>
+
+      <section className="card">
+        <button
+          className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+          onClick={() => setShowPlayerCounts((v) => !v)}
+        >
+          Einsätze pro Spieler
+          <span>{showPlayerCounts ? '▲' : '▼'}</span>
+        </button>
+        {showPlayerCounts && (
+          <ul className="mt-3 divide-y divide-black/5">
+            {sortedPlayersByCount.map((p) => (
+              <li key={p.id} className="flex items-center justify-between py-2 text-sm">
+                <span className="font-medium text-tbw-navyDark">{p.name}</span>
+                <span className={(taskCountByPlayer[p.id] ?? 0) > 0 ? 'pill pill-ok' : 'pill pill-warn'}>
+                  {taskCountByPlayer[p.id] ?? 0}×
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </div>
