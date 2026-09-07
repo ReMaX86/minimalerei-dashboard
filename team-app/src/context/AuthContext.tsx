@@ -8,14 +8,15 @@ import {
   type ReactNode
 } from 'react';
 import { supabase } from '../lib/supabase';
-import type { Player, Trainer } from '../types/database';
+import type { Player, Trainer, Viewer } from '../types/database';
 
-type Role = 'loading' | 'guest' | 'trainer' | 'player';
+type Role = 'loading' | 'guest' | 'trainer' | 'player' | 'viewer';
 
 interface AuthState {
   role: Role;
   trainer: Trainer | null;
   player: Player | null;
+  viewer: Viewer | null;
   isAdmin: boolean;
   passwordRecovery: boolean;
   clearPasswordRecovery: () => void;
@@ -31,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>('loading');
   const [trainer, setTrainer] = useState<Trainer | null>(null);
   const [player, setPlayer] = useState<Player | null>(null);
+  const [viewer, setViewer] = useState<Viewer | null>(null);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   const resolveSession = useCallback(async () => {
@@ -42,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRole('guest');
       setTrainer(null);
       setPlayer(null);
+      setViewer(null);
       return;
     }
 
@@ -54,13 +57,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (trainerRow) {
       setTrainer(trainerRow as Trainer);
       setPlayer(null);
+      setViewer(null);
       setRole('trainer');
       return;
     }
 
-    // player_auth_links has no client-facing RLS policy by design (see
-    // migration 0001) — resolve the current player via the security-definer
-    // current_player_id() function instead of querying the table directly.
+    // player_auth_links / viewer_auth_links have no client-facing RLS
+    // policy by design (see migration 0001) — resolve via the
+    // security-definer current_player_id()/current_viewer_id() functions
+    // instead of querying the tables directly.
     const { data: playerId } = await supabase.rpc('current_player_id');
 
     if (playerId) {
@@ -72,7 +77,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (playerRow) {
         setPlayer(playerRow as Player);
         setTrainer(null);
+        setViewer(null);
         setRole('player');
+        return;
+      }
+    }
+
+    const { data: viewerId } = await supabase.rpc('current_viewer_id');
+
+    if (viewerId) {
+      const { data: viewerRow } = await supabase
+        .from('viewers')
+        .select('*')
+        .eq('id', viewerId)
+        .maybeSingle();
+      if (viewerRow) {
+        setViewer(viewerRow as Viewer);
+        setTrainer(null);
+        setPlayer(null);
+        setRole('viewer');
         return;
       }
     }
@@ -80,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole('guest');
     setTrainer(null);
     setPlayer(null);
+    setViewer(null);
   }, []);
 
   useEffect(() => {
@@ -114,12 +138,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (anonError) throw anonError;
     }
 
-    const { error } = await supabase.rpc('redeem_access_code', { p_code: code.trim() });
-    if (error) {
-      if (error.message.includes('invalid_code')) {
-        throw new Error('Code nicht erkannt. Bitte beim Trainer nachfragen.');
+    const { error: playerError } = await supabase.rpc('redeem_access_code', { p_code: code.trim() });
+    if (playerError) {
+      if (!playerError.message.includes('invalid_code')) throw playerError;
+
+      // Not a player code — the same "Zugangscode" field also accepts a
+      // read-only viewer code (e.g. for an Abteilungsleiter), so try that
+      // before giving up.
+      const { error: viewerError } = await supabase.rpc('redeem_viewer_code', { p_code: code.trim() });
+      if (viewerError) {
+        if (viewerError.message.includes('invalid_code')) {
+          throw new Error('Code nicht erkannt. Bitte beim Trainer nachfragen.');
+        }
+        throw viewerError;
       }
-      throw error;
     }
     await resolveSession();
   }, [resolveSession]);
@@ -129,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole('guest');
     setTrainer(null);
     setPlayer(null);
+    setViewer(null);
   }, []);
 
   const refreshPlayer = useCallback(async () => {
@@ -146,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role,
       trainer,
       player,
+      viewer,
       isAdmin,
       passwordRecovery,
       clearPasswordRecovery,
@@ -158,6 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role,
       trainer,
       player,
+      viewer,
       isAdmin,
       passwordRecovery,
       clearPasswordRecovery,

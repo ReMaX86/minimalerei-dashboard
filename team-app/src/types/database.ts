@@ -23,6 +23,14 @@ export interface Trainer {
   email: string;
 }
 
+export interface Viewer {
+  id: string;
+  name: string;
+  access_code: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface Game {
   id: string;
   game_date: string;

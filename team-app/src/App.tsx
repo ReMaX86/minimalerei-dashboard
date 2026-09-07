@@ -65,9 +65,13 @@ export default function App() {
       <Route
         path="/trikots"
         element={
-          <Shell title="Trikots">
-            <Trikots />
-          </Shell>
+          role === 'viewer' ? (
+            <Navigate to="/" replace />
+          ) : (
+            <Shell title="Trikots">
+              <Trikots />
+            </Shell>
+          )
         }
       />
       <Route
@@ -81,9 +85,13 @@ export default function App() {
       <Route
         path="/kader"
         element={
-          <Shell title="Kader">
-            <Kader />
-          </Shell>
+          role === 'viewer' ? (
+            <Navigate to="/" replace />
+          ) : (
+            <Shell title="Kader">
+              <Kader />
+            </Shell>
+          )
         }
       />
       <Route

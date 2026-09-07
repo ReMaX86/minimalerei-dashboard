@@ -29,6 +29,10 @@ export function Dashboard() {
   const { role, player, isAdmin } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Trainers/admin-players get the full Kampfgericht overview so they can
+  // plan; a read-only Betrachter (e.g. Abteilungsleiter) gets to see the
+  // same overview, just with no way to assign/edit anything.
+  const showOfficiatingOverview = isAdmin || role === 'viewer';
 
   useEffect(() => {
     let cancelled = false;
@@ -84,7 +88,7 @@ export function Dashboard() {
         }
       }
 
-      if (isAdmin) {
+      if (showOfficiatingOverview) {
         const { data: nextOg } = await supabase
           .from('officiating_games')
           .select('*')
@@ -198,7 +202,7 @@ export function Dashboard() {
         </section>
       )}
 
-      {isAdmin && (
+      {showOfficiatingOverview && (
         <section className="card">
           <SectionTitle icon="📋" title="Nächster Kampfgericht Termin" />
           {data.trainerNextOfficiatingGame ? (

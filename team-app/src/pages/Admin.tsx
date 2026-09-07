@@ -4,13 +4,15 @@ import { GamesAdmin } from './admin/GamesAdmin';
 import { OfficiatingAdmin } from './admin/OfficiatingAdmin';
 import { TrainingsAdmin } from './admin/TrainingsAdmin';
 import { TrikotsAdmin } from './admin/TrikotsAdmin';
+import { ViewersAdmin } from './admin/ViewersAdmin';
 
 const TABS = [
   { id: 'players', label: 'Spieler' },
   { id: 'games', label: 'Spiele' },
   { id: 'officiating', label: 'Kampfgericht' },
   { id: 'trainings', label: 'Training' },
-  { id: 'trikots', label: 'Trikots' }
+  { id: 'trikots', label: 'Trikots' },
+  { id: 'viewers', label: 'Betrachter' }
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -39,6 +41,7 @@ export function Admin() {
       {tab === 'officiating' && <OfficiatingAdmin />}
       {tab === 'trainings' && <TrainingsAdmin />}
       {tab === 'trikots' && <TrikotsAdmin />}
+      {tab === 'viewers' && <ViewersAdmin />}
     </div>
   );
 }
