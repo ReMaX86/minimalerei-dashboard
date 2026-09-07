@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { LoadingSpinner } from './components/LoadingSpinner';
@@ -25,6 +25,16 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
 export default function App() {
   const { role, isAdmin, passwordRecovery } = useAuth();
   const location = useLocation();
+
+  // On mobile, logging in from the Onboarding form can leave the page
+  // scrolled down (the on-screen keyboard shifted the viewport while the
+  // form was focused) — reset to the top once we switch into the app so the
+  // dashboard's greeting isn't hidden above the fold.
+  useEffect(() => {
+    if (role === 'trainer' || role === 'player') {
+      window.scrollTo(0, 0);
+    }
+  }, [role]);
 
   if (location.pathname === '/reset-password' || passwordRecovery) {
     return <ResetPassword />;
