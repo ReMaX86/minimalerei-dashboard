@@ -120,6 +120,15 @@ hier die getroffenen Entscheidungen samt Begründung:
 - **Warnschwelle Kampfgericht:** aktuell fest bei < 2 Einsätzen (Saison-Soll 2–3) über
   `SEASON_TARGET_MIN`/`SEASON_TARGET_MAX` in `src/pages/Kampfgericht.tsx`. Bei Bedarf mit dem
   Trainer final abstimmen und dort anpassen.
+- **Kampfgericht-Aufgabenauswahl beim manuellen Anlegen.** Ursprünglich wurden beim Anlegen
+  eines Kampfgericht-Termins im Admin-Bereich immer automatisch alle drei Aufgaben
+  (24-Sekunden-Uhr, Anschreiben, Zeit & Punkte) angelegt — "nicht unsere Aufgabe" konnte
+  dadurch faktisch nur über den SQL-Import entstehen, nicht über die App selbst. Das Formular
+  hat jetzt Checkboxen, mit denen ausgewählt wird, welche der drei Aufgaben die Herren für
+  diesen Termin tatsächlich stellen müssen; nur dafür werden Task-Zeilen angelegt. Das
+  Freitextfeld (`opponent_teams`) ist außerdem von "Gegnerische Teams" auf "Team / Jahrgang"
+  umbeschriftet, da es in der Praxis für den eigenen Jahrgang (z. B. "TBW U16") befüllt wird,
+  nicht für den tatsächlichen Gegner.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche

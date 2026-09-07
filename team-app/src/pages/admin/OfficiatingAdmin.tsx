@@ -13,6 +13,7 @@ import {
 
 const TASK_TYPES: OfficiatingTaskType[] = ['uhr', 'anschreiber', 'zeit'];
 const EMPTY_FORM = { game_date: '', game_time: '', opponent_teams: '', location: '' };
+const EMPTY_TASK_SELECTION: Record<OfficiatingTaskType, boolean> = { uhr: false, anschreiber: false, zeit: false };
 
 export function OfficiatingAdmin() {
   const [games, setGames] = useState<OfficiatingGame[] | null>(null);
@@ -20,6 +21,7 @@ export function OfficiatingAdmin() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [taskSelection, setTaskSelection] = useState(EMPTY_TASK_SELECTION);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -48,6 +50,11 @@ export function OfficiatingAdmin() {
 
   async function addGame(e: FormEvent) {
     e.preventDefault();
+    const selectedTypes = TASK_TYPES.filter((type) => taskSelection[type]);
+    if (selectedTypes.length === 0) {
+      setError('Bitte mindestens eine Aufgabe auswählen, die wir stellen müssen.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -64,9 +71,10 @@ export function OfficiatingAdmin() {
       if (insertError) throw insertError;
       const { error: tasksError } = await supabase
         .from('officiating_tasks')
-        .insert(TASK_TYPES.map((task_type) => ({ officiating_game_id: inserted.id, task_type })));
+        .insert(selectedTypes.map((task_type) => ({ officiating_game_id: inserted.id, task_type })));
       if (tasksError) throw tasksError;
       setForm(EMPTY_FORM);
+      setTaskSelection(EMPTY_TASK_SELECTION);
       await load();
     } catch {
       setError('Termin konnte nicht angelegt werden.');
@@ -124,7 +132,7 @@ export function OfficiatingAdmin() {
         </div>
         <input
           required
-          placeholder="Gegnerische Teams, z. B. DJK Erkrath U16"
+          placeholder="Team / Jahrgang, z. B. TBW U16"
           className="input"
           value={form.opponent_teams}
           onChange={(e) => setForm((f) => ({ ...f, opponent_teams: e.target.value }))}
@@ -136,6 +144,23 @@ export function OfficiatingAdmin() {
           value={form.location}
           onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
         />
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
+            Welche Aufgaben müssen wir stellen?
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {TASK_TYPES.map((type) => (
+              <label key={type} className="flex items-center gap-1.5 text-sm text-tbw-ink/80">
+                <input
+                  type="checkbox"
+                  checked={taskSelection[type]}
+                  onChange={(e) => setTaskSelection((s) => ({ ...s, [type]: e.target.checked }))}
+                />
+                {OFFICIATING_TASK_LABELS[type]}
+              </label>
+            ))}
+          </div>
+        </div>
         <button className="btn-primary w-full" disabled={busy}>
           Anlegen
         </button>
