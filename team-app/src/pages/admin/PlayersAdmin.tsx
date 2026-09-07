@@ -119,26 +119,24 @@ export function PlayersAdmin() {
 
       <ul className="space-y-2">
         {players.map((p) => (
-          <li key={p.id} className={`card ${!p.is_active ? 'opacity-50' : ''}`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="flex items-center gap-1.5 font-semibold text-tbw-navyDark">
-                  {p.name}
-                  {p.is_admin && <span className="pill pill-warn">Trainer</span>}
-                </p>
-                <p className="text-xs text-tbw-ink/50">Code: {p.access_code}</p>
-              </div>
-              <div className="flex flex-wrap justify-end gap-2">
-                <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => regenerate(p.id, p.name)}>
-                  Code neu
-                </button>
-                <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => toggleActive(p)}>
-                  {p.is_active ? 'Deaktivieren' : 'Aktivieren'}
-                </button>
-                <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => toggleAdmin(p)}>
-                  {p.is_admin ? 'Trainer-Rechte entziehen' : 'Zu Trainer machen'}
-                </button>
-              </div>
+          <li key={p.id} className={`card space-y-3 ${!p.is_active ? 'opacity-50' : ''}`}>
+            <div>
+              <p className="flex flex-wrap items-center gap-1.5 font-semibold text-tbw-navyDark">
+                {p.name}
+                {p.is_admin && <span className="pill pill-warn">Trainer</span>}
+              </p>
+              <p className="text-xs text-tbw-ink/50">Code: {p.access_code}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => regenerate(p.id, p.name)}>
+                Code neu
+              </button>
+              <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => toggleActive(p)}>
+                {p.is_active ? 'Deaktivieren' : 'Aktivieren'}
+              </button>
+              <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => toggleAdmin(p)}>
+                {p.is_admin ? 'Trainer-Rechte entziehen' : 'Zu Trainer machen'}
+              </button>
             </div>
           </li>
         ))}
