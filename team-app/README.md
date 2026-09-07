@@ -102,6 +102,18 @@ hier die getroffenen Entscheidungen samt Begründung:
   wird ein Spieler per ✗ übersprungen (jemand anderes bestätigt stattdessen), bleibt sein
   Zähler unverändert — er landet dadurch von selbst wieder ganz vorne in der Warteschlange,
   ganz ohne separate Merker-Logik. Die alte Zeiger-Tabelle wurde entfernt.
+- **Spieler mit Trainer-/Admin-Rechten (Migration `0006`).** Für Spieler, die gleichzeitig
+  Trainer sind (z. B. ein spielender Co-Trainer): statt eines zweiten Logins gibt es ein
+  `is_admin`-Flag auf `players`, das ein Trainer im Admin-Bereich unter "Spieler" per Button
+  ("Zu Trainer machen") setzt. Die Person bleibt mit ihrem normalen Zugangscode als Spieler
+  eingeloggt und sieht auf der Startseite weiterhin ihre persönlichen Infos, bekommt aber
+  zusätzlich den Admin-Reiter und alle Trainer-Rechte (Kader festlegen, Kampfgericht zuordnen,
+  Trikots zurücksetzen etc.). Technisch weitet die Migration `is_trainer()` — die eine
+  Helper-Funktion, die praktisch jede RLS-Policy und trainer-only RPC im Projekt schon nutzt —
+  so aus, dass sie auch für admin-geflaggte Spieler `true` liefert; dadurch war keine einzelne
+  Policy anzufassen. Im Frontend steuert `AuthContext`'s `isAdmin` (= echter Trainer ODER
+  admin-geflaggter Spieler) den Zugriff, während `role` (`'trainer' | 'player'`) unverändert
+  bestimmt, welche Ansicht (Trainer-Aggregat vs. persönliche Spieler-Sicht) angezeigt wird.
 - **Push-Benachrichtigungen** sind (noch) nicht umgesetzt — die App zeigt alle relevanten
   Termine/Zuweisungen beim Öffnen an ("Self-Check"). Ließe sich später über die Web Push API
   ergänzen, ohne am Datenmodell etwas zu ändern.

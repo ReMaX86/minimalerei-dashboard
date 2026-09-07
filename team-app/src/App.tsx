@@ -23,7 +23,7 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export default function App() {
-  const { role, passwordRecovery } = useAuth();
+  const { role, isAdmin, passwordRecovery } = useAuth();
   const location = useLocation();
 
   if (location.pathname === '/reset-password' || passwordRecovery) {
@@ -79,7 +79,7 @@ export default function App() {
       <Route
         path="/admin"
         element={
-          role === 'trainer' ? (
+          isAdmin ? (
             <Shell title="Admin">
               <Admin />
             </Shell>

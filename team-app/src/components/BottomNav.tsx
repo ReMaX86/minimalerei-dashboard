@@ -9,8 +9,8 @@ const ITEMS = [
 ];
 
 export function BottomNav() {
-  const { role } = useAuth();
-  const items = role === 'trainer' ? [...ITEMS, { to: '/admin', label: 'Admin', icon: '⚙️', end: false }] : ITEMS;
+  const { isAdmin } = useAuth();
+  const items = isAdmin ? [...ITEMS, { to: '/admin', label: 'Admin', icon: '⚙️', end: false }] : ITEMS;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">

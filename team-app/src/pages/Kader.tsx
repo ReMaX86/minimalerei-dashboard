@@ -16,7 +16,7 @@ interface State {
 }
 
 export function Kader() {
-  const { role } = useAuth();
+  const { role, isAdmin } = useAuth();
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
@@ -127,7 +127,7 @@ export function Kader() {
           </span>
         </div>
 
-        {role === 'trainer' && (
+        {isAdmin && (
           <>
             <ul className="mt-3 divide-y divide-black/5">
               {sortedForTrainer.map((p) => (
@@ -158,6 +158,7 @@ export function Kader() {
         )}
 
         {role === 'player' &&
+          !isAdmin &&
           (state.nextGame.squad_published ? (
             state.players.filter((p) => selectedByPlayer[p.id]).length === 0 ? (
               <p className="mt-3 text-sm text-tbw-ink/50">Niemand im Kader.</p>

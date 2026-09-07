@@ -16,7 +16,7 @@ interface State {
 }
 
 export function Trikots() {
-  const { role, player } = useAuth();
+  const { player, isAdmin } = useAuth();
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -74,8 +74,7 @@ export function Trikots() {
     state.nextGame && state.nextGame.squad_published && !confirmedForGame
       ? naechsterSpieler(state.nextGame, state.players, state.squad, washCount)
       : null;
-  const canConfirm =
-    !!suggestion && (role === 'trainer' || (role === 'player' && player?.id === suggestion.id));
+  const canConfirm = !!suggestion && (isAdmin || player?.id === suggestion.id);
 
   const selectedIds = new Set(state.squad.filter((s) => s.is_selected).map((s) => s.player_id));
   const sortedPlayers = [...state.players].sort((a, b) => a.name.localeCompare(b.name, 'de'));
