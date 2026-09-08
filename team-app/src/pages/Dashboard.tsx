@@ -46,6 +46,7 @@ export function Dashboard() {
   const { flags } = useFeatureFlags();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [absenceVersion, setAbsenceVersion] = useState(0);
   // Trainers/admin-players get the full Kampfgericht overview so they can
   // plan; a read-only Betrachter (e.g. Abteilungsleiter) gets to see the
   // same overview, just with no way to assign/edit anything. Captains/
@@ -211,7 +212,7 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [role, player, isAdmin, flags.announcements, flags.carpool, flags.absences, flags.stats]);
+  }, [role, player, isAdmin, flags.announcements, flags.carpool, flags.absences, flags.stats, absenceVersion]);
 
   if (error) return <div className="card text-sm text-tbw-red">{error}</div>;
   if (!data) return <LoadingSpinner />;
@@ -377,7 +378,9 @@ export function Dashboard() {
         </section>
       )}
 
-      {flags.absences && role === 'player' && <AbsenceSection />}
+      {flags.absences && role === 'player' && (
+        <AbsenceSection onChange={() => setAbsenceVersion((v) => v + 1)} />
+      )}
 
       <p className="pt-1 text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Teaminformationen</p>
 
@@ -448,7 +451,7 @@ export function Dashboard() {
       <section className="card">
         <SectionTitle icon="🕒" title="Nächste Trainingseinheit" />
         <div className="mt-2">
-          <UpcomingTrainings />
+          <UpcomingTrainings refreshKey={absenceVersion} />
         </div>
       </section>
     </div>

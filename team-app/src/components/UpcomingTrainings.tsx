@@ -17,7 +17,7 @@ interface State {
   absences: PlayerAbsence[];
 }
 
-export function UpcomingTrainings() {
+export function UpcomingTrainings({ refreshKey }: { refreshKey?: number } = {}) {
   const { role, player } = useAuth();
   const { flags } = useFeatureFlags();
   const [state, setState] = useState<State | null>(null);
@@ -66,7 +66,10 @@ export function UpcomingTrainings() {
       players: (playersRes.data as Player[]) ?? [],
       absences: (absencesRes.data as PlayerAbsence[]) ?? []
     });
-  }, [flags.absences]);
+    // refreshKey isn't read inside load() — it's only here to force a
+    // refetch when AbsenceSection (a sibling on the dashboard) changes an
+    // absence, since that's stored in this component's own state.
+  }, [flags.absences, refreshKey]);
 
   useEffect(() => {
     load().catch(() => setError('Fehler beim Laden der Trainingszeiten.'));
