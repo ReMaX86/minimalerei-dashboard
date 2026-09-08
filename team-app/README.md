@@ -303,6 +303,18 @@ hier die getroffenen Entscheidungen samt Begründung:
   das der bestehende Trainer-Upload-Pfad in `PlayersAdmin.tsx` schon verwendet) und ersetzt die
   offene Testpolicy wieder durch eine auf die eigene Datei beschränkte (`name like auth.uid()::text
   || '-%'`).
+- **Fix Teil 3: Foto-Upload schlug auch mit flachem Dateinamen fehl (Migration `0022`,
+  laufende Diagnose).** Auch nach Migration `0021` (flacher Dateiname statt Ordnerpfad) derselbe
+  `new row violates row-level security policy`-Fehler. Gemeinsamer Nenner aller bisher
+  gescheiterten Varianten (`0018`–`0021`): jede enthielt `auth.uid() is not null`, entweder direkt
+  oder über eine Funktion. Verdacht: `auth.uid()` liefert innerhalb der Storage-RLS-Auswertung für
+  dieses Projekt grundsätzlich `NULL`, unabhängig von Namens-/Ordnerlogik. Migration `0022` ist ein
+  reiner Diagnose-Schritt: eine Policy ganz ohne Auth-Bezug, nur auf den Bucket beschränkt
+  (`bucket_id = 'player-photos'`) — **bewusst offen für jeden, auch nicht angemeldete Nutzer,
+  temporär und nur zur Eingrenzung, danach sofort wieder einschränken.** Zusätzlich zeigt
+  `MyProfileModal.tsx` jetzt den Schritt (Foto-Upload vs. Profil-RPC) und mehr Fehlerdetails
+  (`statusCode`/`error`/`code` aus dem Supabase-Fehlerobjekt, nicht nur `message`) an, falls auch
+  das noch fehlschlägt.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche

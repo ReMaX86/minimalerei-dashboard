@@ -5,6 +5,15 @@ import { useAuth } from '../context/AuthContext';
 import { Avatar } from './Avatar';
 import { ErrorNote } from './ErrorNote';
 
+function describeError(err: unknown): string {
+  if (!err || typeof err !== 'object') return String(err);
+  const obj = err as Record<string, unknown>;
+  const parts = [obj.message, obj.statusCode, obj.error, obj.code]
+    .filter((v) => v !== undefined && v !== null && v !== '')
+    .map(String);
+  return parts.length ? parts.join(' · ') : JSON.stringify(err);
+}
+
 export function MyProfileModal({ onClose }: { onClose: () => void }) {
   const { player, refreshPlayer } = useAuth();
   const [heightCm, setHeightCm] = useState(player?.height_cm?.toString() ?? '');
@@ -19,6 +28,7 @@ export function MyProfileModal({ onClose }: { onClose: () => void }) {
     if (!player) return;
     setSaving(true);
     setError(null);
+    let step = 'upload';
     try {
       let photo_url = player.photo_url;
       if (photoFile) {
@@ -34,6 +44,7 @@ export function MyProfileModal({ onClose }: { onClose: () => void }) {
         if (uploadError) throw uploadError;
         photo_url = supabase.storage.from('player-photos').getPublicUrl(path).data.publicUrl;
       }
+      step = 'rpc';
       const { error: rpcError } = await supabase.rpc('update_my_profile', {
         p_height_cm: heightCm ? Number(heightCm) : null,
         p_birth_date: birthDate || null,
@@ -43,8 +54,7 @@ export function MyProfileModal({ onClose }: { onClose: () => void }) {
       await refreshPlayer();
       onClose();
     } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
-      setError(`Profil konnte nicht gespeichert werden. (${detail})`);
+      setError(`Profil konnte nicht gespeichert werden. (${step}: ${describeError(err)})`);
     } finally {
       setSaving(false);
     }
