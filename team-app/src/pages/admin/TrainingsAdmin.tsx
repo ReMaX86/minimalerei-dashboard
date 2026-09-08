@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
+import { TimeField } from '../../components/DateTimeField';
 import { fmtTime } from '../../lib/format';
 import { weekdayIndex, WEEKDAY_ORDER } from '../../lib/weekdays';
 import type { Training } from '../../types/database';
@@ -83,26 +84,18 @@ export function TrainingsAdmin() {
           ))}
         </select>
         <div className="space-y-2">
-          <label className="block text-xs">
-            <span className="font-semibold text-tbw-ink/50">Beginn</span>
-            <input
-              type="time"
-              required
-              className="input mt-1"
-              value={form.start_time}
-              onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))}
-            />
-          </label>
-          <label className="block text-xs">
-            <span className="font-semibold text-tbw-ink/50">Ende</span>
-            <input
-              type="time"
-              required
-              className="input mt-1"
-              value={form.end_time}
-              onChange={(e) => setForm((f) => ({ ...f, end_time: e.target.value }))}
-            />
-          </label>
+          <TimeField
+            label="Beginn"
+            required
+            value={form.start_time}
+            onChange={(v) => setForm((f) => ({ ...f, start_time: v }))}
+          />
+          <TimeField
+            label="Ende"
+            required
+            value={form.end_time}
+            onChange={(v) => setForm((f) => ({ ...f, end_time: v }))}
+          />
         </div>
         <input
           required

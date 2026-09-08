@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
+import { DateField, TimeField } from '../../components/DateTimeField';
 import { fmtDate, fmtTime } from '../../lib/format';
 import {
   OFFICIATING_TASK_LABELS,
@@ -197,25 +198,13 @@ export function OfficiatingAdmin() {
       <form onSubmit={addGame} className="card space-y-2">
         <p className="text-sm font-bold text-tbw-navyDark">Neuer Kampfgericht-Termin</p>
         <div className="space-y-2">
-          <label className="block text-xs">
-            <span className="font-semibold text-tbw-ink/50">Datum</span>
-            <input
-              type="date"
-              required
-              className="input mt-1"
-              value={form.game_date}
-              onChange={(e) => setForm((f) => ({ ...f, game_date: e.target.value }))}
-            />
-          </label>
-          <label className="block text-xs">
-            <span className="font-semibold text-tbw-ink/50">Uhrzeit</span>
-            <input
-              type="time"
-              className="input mt-1"
-              value={form.game_time}
-              onChange={(e) => setForm((f) => ({ ...f, game_time: e.target.value }))}
-            />
-          </label>
+          <DateField
+            label="Datum"
+            required
+            value={form.game_date}
+            onChange={(v) => setForm((f) => ({ ...f, game_date: v }))}
+          />
+          <TimeField label="Uhrzeit" value={form.game_time} onChange={(v) => setForm((f) => ({ ...f, game_time: v }))} />
         </div>
         <select
           required
