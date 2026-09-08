@@ -7,11 +7,16 @@ import { ErrorNote } from './ErrorNote';
 
 function describeError(err: unknown): string {
   if (!err || typeof err !== 'object') return String(err);
-  const obj = err as Record<string, unknown>;
-  const parts = [obj.message, obj.statusCode, obj.error, obj.code]
-    .filter((v) => v !== undefined && v !== null && v !== '')
-    .map(String);
-  return parts.length ? parts.join(' · ') : JSON.stringify(err);
+  console.error('MyProfileModal error', err);
+  try {
+    return JSON.stringify(err, Object.getOwnPropertyNames(err));
+  } catch {
+    const obj = err as Record<string, unknown>;
+    const parts = [obj.message, obj.statusCode, obj.error, obj.code]
+      .filter((v) => v !== undefined && v !== null && v !== '')
+      .map(String);
+    return parts.length ? parts.join(' · ') : String(err);
+  }
 }
 
 export function MyProfileModal({ onClose }: { onClose: () => void }) {
@@ -41,7 +46,10 @@ export function MyProfileModal({ onClose }: { onClose: () => void }) {
         const { error: uploadError } = await supabase.storage
           .from('player-photos')
           .upload(path, photoFile, { upsert: true });
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          step = `upload path=${path}`;
+          throw uploadError;
+        }
         photo_url = supabase.storage.from('player-photos').getPublicUrl(path).data.publicUrl;
       }
       step = 'rpc';
