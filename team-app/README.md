@@ -382,6 +382,17 @@ hier die getroffenen Entscheidungen samt Begründung:
   `MeetingPointFields.tsx`, `GamesAdmin.tsx`, `OfficiatingAdmin.tsx` und `TrainingsAdmin.tsx`
   von `grid grid-cols-2` auf `space-y-2` (untereinander statt nebeneinander) umgestellt — kein
   Feld konkurriert mehr um Breite mit einem anderen Datum-/Uhrzeit-Feld.
+  **Zweiter Nachtrag:** selbst einzeln (volle Kartenbreite, kein Nachbarfeld) liefen leere
+  Datum-/Uhrzeit-Felder auf dem iPhone noch über den Kartenrand hinaus. Ursache: das native
+  Steuerelement rendert seinen Inhalt (Platzhalter-Segmente + Icon) über das Shadow-DOM, das
+  Safari nicht zuverlässig auf die per CSS gesetzte `width` des `<input>` selbst begrenzt — das
+  Feld kann dadurch breiter erscheinen, als seine eigene Box vorgibt, unabhängig von jeglichem
+  `width`/`min-width` auf Eltern-Ebene. In `src/index.css` `overflow: hidden` + `max-width: 100%`
+  direkt auf `input[type="date"]`/`input[type="time"]` ergänzt, damit der Inhalt bei Bedarf
+  innerhalb der eigenen Box abgeschnitten statt überlaufen wird. **Hinweis:** dieses
+  Safari-spezifische Rendering-Verhalten lässt sich mit dem hier verfügbaren
+  Chromium-Test-Browser nicht nachstellen — dieser Fix ist unverifiziert und braucht eine
+  Rückmeldung vom echten iPhone.
 - **5er-Positionssystem statt vereinfachter 3er-Einteilung (Migration `0026`).** Auf Wunsch von
   der vereinfachten Aufbau/Flügel/Center-Einteilung auf die klassischen fünf Basketball-Positionen
   mit englischen Kürzeln umgestellt: Point Guard (PG), Shooting Guard (SG), Small Forward (SF),
