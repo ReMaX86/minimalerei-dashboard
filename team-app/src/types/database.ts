@@ -78,6 +78,8 @@ export interface Player {
   auth_user_id: string | null;
   is_active: boolean;
   is_admin: boolean;
+  is_captain: boolean;
+  is_co_captain: boolean;
   position: PlayerPosition | null;
   height_cm: number | null;
   birth_date: string | null;

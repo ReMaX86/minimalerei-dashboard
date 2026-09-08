@@ -74,7 +74,8 @@ export function Trikots() {
     state.nextGame && state.nextGame.squad_published && !confirmedForGame
       ? naechsterSpieler(state.nextGame, state.players, state.squad, washCount)
       : null;
-  const canConfirm = !!suggestion && (isAdmin || player?.id === suggestion.id);
+  const canConfirm =
+    !!suggestion && (isAdmin || player?.id === suggestion.id || player?.is_captain || player?.is_co_captain);
 
   const selectedIds = new Set(state.squad.filter((s) => s.is_selected).map((s) => s.player_id));
   const sortedPlayers = [...state.players].sort((a, b) => a.name.localeCompare(b.name, 'de'));
