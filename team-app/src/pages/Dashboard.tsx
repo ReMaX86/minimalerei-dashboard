@@ -51,6 +51,10 @@ export function Dashboard() {
   // same overview, just with no way to assign/edit anything. Captains/
   // Co-Captains get it too so they can remind teammates who's up next.
   const showOfficiatingOverview = isAdmin || role === 'viewer' || !!player?.is_captain || !!player?.is_co_captain;
+  // Same audience as the Kampfgericht overview minus Betrachter — knowing
+  // who's away is squad-planning info, which is outside a Betrachter's
+  // original spielplan/Kampfgericht-only scope.
+  const showAbsencesOverview = (isAdmin || !!player?.is_captain || !!player?.is_co_captain) && flags.absences;
 
   useEffect(() => {
     let cancelled = false;
@@ -126,7 +130,7 @@ export function Dashboard() {
       }
 
       let absencesOverview: PlayerAbsence[] = [];
-      if (isAdmin && flags.absences) {
+      if (showAbsencesOverview) {
         const { data: absenceRows } = await supabase
           .from('player_absences')
           .select('*')
@@ -373,6 +377,10 @@ export function Dashboard() {
         </section>
       )}
 
+      {flags.absences && role === 'player' && <AbsenceSection />}
+
+      <p className="pt-1 text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Teaminformationen</p>
+
       {showOfficiatingOverview && (
         <section className="card">
           <SectionTitle icon="📋" title="Nächster Kampfgericht Termin" />
@@ -402,7 +410,7 @@ export function Dashboard() {
         </section>
       )}
 
-      {isAdmin && flags.absences && data.absencesOverview.length > 0 && (
+      {showAbsencesOverview && data.absencesOverview.length > 0 && (
         <section className="card">
           <SectionTitle icon="🌴" title="Aktuell abwesend" />
           <ul className="mt-2 space-y-1">
@@ -417,8 +425,6 @@ export function Dashboard() {
           </ul>
         </section>
       )}
-
-      {flags.absences && role === 'player' && <AbsenceSection />}
 
       <section className="card">
         <SectionTitle icon="👕" title="Wer hat die Trikots?" />
