@@ -13,6 +13,7 @@ import { Kampfgericht } from './pages/Kampfgericht';
 import { Kader } from './pages/Kader';
 import { Admin } from './pages/Admin';
 import { PlayerProfiles } from './pages/PlayerProfiles';
+import { GameStatsTracker } from './pages/GameStatsTracker';
 
 function Shell({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -127,6 +128,10 @@ export default function App() {
             <Navigate to="/" replace />
           )
         }
+      />
+      <Route
+        path="/stats/:gameId"
+        element={role === 'viewer' ? <Navigate to="/" replace /> : <GameStatsTracker />}
       />
       <Route
         path="/admin"
