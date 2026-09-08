@@ -254,6 +254,15 @@ hier die getroffenen Entscheidungen samt Begründung:
   der Buttons wäre nicht ausreichend); (2) auf der Startseite dieselbe Kampfgericht-Team-Übersicht
   wie Trainer/Betrachter sehen (`showOfficiatingOverview`), um Mitspieler an offene Termine erinnern
   zu können — zusätzlich zur eigenen persönlichen Kampfgericht-Karte, nicht statt ihr.
+- **Startseite: Trennung persönliche Infos / Teaminformationen (kein neues Migration nötig,
+  reiner Frontend-Umbau von `Dashboard.tsx`).** Captains/Co-Captains sehen jetzt zusätzlich auch
+  die Urlaubs-Übersicht (`showAbsencesOverview`, bisher nur Trainer/Admin) — gleiche Begründung wie
+  bei der Kampfgericht-Übersicht: Kader-Planungsinfo, kein Betrachter-Recht. Die Startseite ist nun
+  in zwei Zonen gegliedert: oben die persönlichen Karten (nächstes Spiel, eigener
+  Kampfgericht-Termin, eigene Urlaubseinträge via `AbsenceSection`), darunter ein Bereich mit der
+  Überschrift „Teaminformationen“ mit der Kampfgericht-Team-Übersicht, der Urlaubs-Übersicht und dem
+  Trikot-Status (`Wer hat die Trikots?`, wie zuvor für alle sichtbar). „Nächste Trainingseinheit“
+  bleibt unverändert ganz unten, außerhalb beider Zonen.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche
