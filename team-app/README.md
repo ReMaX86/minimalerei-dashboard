@@ -635,6 +635,22 @@ hier die getroffenen Entscheidungen samt Begründung:
   Editier-Liste bzw. das `MeetingPointFields`-Formular erst bei Klick
   einblenden — der Fokus liegt dadurch zuerst auf der Spielübersicht,
   nicht mehr auf der Namensliste.
+  - **Nachtrag (Buttons ändern Beschriftung nach dem Speichern):** die
+    beiden Trainer/Admin-Buttons schließen ihr Panel jetzt automatisch,
+    sobald die jeweilige Aktion erfolgreich gespeichert wurde — bei
+    "Kader festlegen" ist das der Klick auf "Veröffentlichen"/
+    "Zurückziehen" (`togglePublish`), bei "Treffpunkt hinterlegen" der
+    Klick auf "Treffpunkt speichern" (`saveMeetingPoint`). Der Button-Text
+    selbst richtet sich danach, ob für das nächste Spiel bereits etwas
+    hinterlegt ist, nicht nach der Panel-Historie: "Kader festlegen" wird
+    zu "Kader ansehen", sobald `squad_published` true ist; "Treffpunkt
+    hinterlegen" wird zu "Treffpunkt bearbeiten", sobald `meetingPoints()`
+    für das Spiel mindestens einen Eintrag liefert. Beide Buttons öffnen
+    unter ihrem neuen Namen weiterhin dasselbe (voll editierbare) Panel —
+    nur die Beschriftung ändert sich. Die bisherige separate
+    "Gespeichert"-Bestätigung neben dem Treffpunkt-Speichern-Button ist
+    dadurch redundant geworden (das Panel schließt sich ja direkt) und
+    wurde entfernt.
 
 ## Projektstruktur
 
