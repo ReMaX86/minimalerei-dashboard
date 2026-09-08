@@ -163,6 +163,19 @@ hier die getroffenen Entscheidungen samt Begründung:
   probiert beim Einlösen zuerst `redeem_access_code`, bei `invalid_code` dann
   `redeem_viewer_code`). Trainer verwalten Betrachter im Admin-Bereich unter dem neuen Reiter
   "Betrachter" (`src/pages/admin/ViewersAdmin.tsx`, spiegelt `PlayersAdmin.tsx`).
+- **Treffpunkt-Infos pro Spiel (Migration `0010`).** Auf Wunsch ergänzt: der Trainer kann pro
+  Spiel hinterlegen, wann/wo man sich trifft. Heimspiele haben nur einen Treffpunkt (Zeit in
+  der Halle, `meeting_time_hall`); Auswärtsspiele können zusätzlich einen
+  Fahrgemeinschaft-Treffpunkt haben (`meeting_time_carpool` + `meeting_point_carpool`, z. B.
+  ein Parkplatz) für alle, die nicht direkt zur gegnerischen Halle fahren —
+  `meeting_time_hall` bedeutet dann "direkt an der Halle". Alle drei Felder sind nullable,
+  ein Spiel ohne hinterlegten Treffpunkt zeigt einfach nichts an. Editierbar ist das an zwei
+  Stellen mit derselben `MeetingPointFields`-Komponente: kompakt direkt auf der Kader-Seite
+  beim nächsten Spieltag (dort, wo der Trainer ohnehin den Kader zusammenstellt und
+  veröffentlicht), und vollständig im Formular unter Admin -> Spiele für beliebige/zukünftige
+  Spiele. Angezeigt wird der Treffpunkt überall, wo auch Datum/Ort des Spiels stehen
+  (Startseite, Kader-Seite, Admin-Spieleliste) über den gemeinsamen Helper `meetingPoints()`
+  in `src/types/database.ts`.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche

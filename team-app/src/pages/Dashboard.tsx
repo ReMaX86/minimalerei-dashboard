@@ -8,6 +8,7 @@ import { fmtDate, fmtTime } from '../lib/format';
 import {
   OFFICIATING_TASK_LABELS,
   benoetigterSatz,
+  meetingPoints,
   officiatingGameLabel,
   type Game,
   type OfficiatingGame,
@@ -155,6 +156,12 @@ export function Dashboard() {
               {fmtDate(data.nextGame.game_date)} · {fmtTime(data.nextGame.game_time)} Uhr
             </p>
             <p className="text-sm text-tbw-ink/70">{data.nextGame.location}</p>
+            {meetingPoints(data.nextGame).map((m) => (
+              <p key={m.label} className="text-xs text-tbw-ink/50">
+                Treffpunkt {m.label}: {m.time ? `${fmtTime(m.time)} Uhr` : ''}
+                {m.place ? `${m.time ? ', ' : ''}${m.place}` : ''}
+              </p>
+            ))}
             <p className="text-xs text-tbw-ink/50">
               Trikot: {benoetigterSatz(data.nextGame) === 'weiss' ? 'Weiß' : 'Schwarz'}
             </p>
