@@ -685,6 +685,13 @@ hier die getroffenen Entscheidungen samt Begründung:
     `block`-Span) auch im eigenständigen Trikots-Reiter (`Trikots.tsx`)
     ergänzt — dort liegt dieselbe zweispaltige Kachel-Ansicht vor, war
     aber beim ersten Fix übersehen worden.
+- **"Kader ansehen"-Link auf dem Dashboard öffnete den Kader auf der
+  Spiele-Seite nicht automatisch mit** (`Dashboard.tsx` → `Spiele.tsx`).
+  Der Link führt jetzt auf `/spiele?kader=1`; `Spiele.tsx` liest den
+  Query-Parameter per `useSearchParams` und öffnet beim Laden automatisch
+  das passende Panel — `squadOpen` für Spieler, `squadEditorOpen` für
+  Trainer/Admin (relevant für einen spielenden Trainer mit `isAdmin`,
+  der trotzdem über den Spieler-Dashboard-Link kommt).
 
 ## Projektstruktur
 

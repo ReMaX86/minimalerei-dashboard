@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
@@ -36,6 +37,7 @@ function GameListItem({ game }: { game: Game }) {
 export function Spiele() {
   const { role, isAdmin } = useAuth();
   const { flags } = useFeatureFlags();
+  const [searchParams] = useSearchParams();
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [squadOpen, setSquadOpen] = useState(false);
@@ -86,6 +88,12 @@ export function Spiele() {
   useEffect(() => {
     load().catch(() => setError('Fehler beim Laden der Spiele.'));
   }, [load]);
+
+  useEffect(() => {
+    if (searchParams.get('kader') !== '1') return;
+    if (isAdmin) setSquadEditorOpen(true);
+    else setSquadOpen(true);
+  }, [searchParams, isAdmin]);
 
   useEffect(() => {
     const g = state?.nextGame;
