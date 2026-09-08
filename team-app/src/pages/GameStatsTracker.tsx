@@ -27,6 +27,11 @@ const SCORING_BUTTONS: { made: StatType; miss: StatType; label: string }[] = [
 
 const OTHER_STATS: StatType[] = ['rebound', 'assist', 'steal', 'block', 'turnover', 'foul'];
 
+// Für den Gegner wird laut Schema (Migration 0028) nur der Punktestand
+// getrackt — kein Fehlwurf, kein Box-Score. Nur bei diesen drei Aktionen
+// taucht die "Gegner"-Kachel im "Wer?"-Picker auf.
+const OPPONENT_ELIGIBLE = new Set<StatType>(['fg2_made', 'fg3_made', 'ft_made']);
+
 // Kurzform für die kleineren Aktions-Kreise — die vollen Bezeichnungen aus
 // STAT_TYPE_LABELS (z. B. "Ballverlust") sind für einen Kreis zu lang,
 // werden aber weiterhin im "Zuletzt"-Log und der Box-Score-Kopfzeile genutzt.
@@ -69,6 +74,22 @@ function PlayerTile({
     >
       <Avatar player={player} size="sm" />
       <span className="text-xs font-semibold leading-tight text-tbw-navyDark">{shortPlayerName(player.name)}</span>
+    </button>
+  );
+}
+
+// Optisch bewusst abgesetzt von den Spieler-Kacheln (gestrichelter Rand,
+// gedeckte statt navy/grüne Farben) — ist kein Mitspieler, sondern der
+// Punktestand des Gegners.
+function OpponentTile({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      className="flex flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed border-tbw-ink/25 bg-transparent p-2 text-center disabled:opacity-30"
+    >
+      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-tbw-ink/10 text-xl">🆚</span>
+      <span className="text-xs font-semibold leading-tight text-tbw-ink/60">Gegner</span>
     </button>
   );
 }
@@ -489,21 +510,6 @@ export function GameStatsTracker() {
               </div>
             </div>
 
-            <div className="card mt-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Gegner</p>
-              <div className="mt-2 flex gap-2">
-                <button className="btn-secondary flex-1" disabled={busy} onClick={() => addStat('opponent', 'fg2_made', null)}>
-                  +2
-                </button>
-                <button className="btn-secondary flex-1" disabled={busy} onClick={() => addStat('opponent', 'fg3_made', null)}>
-                  +3
-                </button>
-                <button className="btn-secondary flex-1" disabled={busy} onClick={() => addStat('opponent', 'ft_made', null)}>
-                  +1
-                </button>
-              </div>
-            </div>
-
             {trackablePlayers.length === 0 && (
               <div className="card mt-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Spieler</p>
@@ -570,6 +576,9 @@ export function GameStatsTracker() {
                     {(useCourtSplit ? onCourtPlayers : trackablePlayers).map((p) => (
                       <PlayerTile key={p.id} player={p} disabled={busy} onClick={() => addStat('us', pendingAction, p.id)} />
                     ))}
+                    {OPPONENT_ELIGIBLE.has(pendingAction) && (
+                      <OpponentTile disabled={busy} onClick={() => addStat('opponent', pendingAction, null)} />
+                    )}
                   </div>
                 </div>
               )}
