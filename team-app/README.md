@@ -509,9 +509,33 @@ hier die getroffenen Entscheidungen samt Begründung:
     hinterlegt ist, damit das Tracken nicht blockiert. Der Ablauf ist jetzt
     zweistufig: Spieler-Raster wird nach der Auswahl ausgeblendet und durch
     das Aktions-Panel für genau diesen Spieler ersetzt (mit "Spieler
-    wechseln"-Rücksprung), statt beides gleichzeitig anzuzeigen — die
-    Auswahl bleibt zwischen mehreren Aktionen desselben Spielers bestehen,
-    für schnelle Serien (z. B. zwei Körbe hintereinander).
+    wechseln"-Rücksprung), statt beides gleichzeitig anzuzeigen.
+  - **Zweiter Nachtrag (Feedback nach dem ersten echten Testlauf, "kann
+    hektisch werden — muss einfach und schnell bedienbar sein"):** drei
+    Anpassungen. (1) Neue Unterscheidung "Auf dem Feld" (genau 5 Spieler)
+    vs. "Bank" (Rest des Kaders) statt aller Kader-Spieler gleichrangig in
+    einem Raster — nur die 5 aktuell spielenden sind als große Buttons
+    antippbar, die Bank wird klein/ausgegraut nur zur Information darunter
+    gezeigt. Neue Tabelle `game_court_state` (Migration `0029`) hält die
+    aktuelle Aufstellung als Spieler-ID-Array, bewusst getrennt von
+    `game_squad` (das ist der Kader *vor* dem Spiel, "auf dem Feld" ändert
+    sich ständig währenddessen durch Wechsel) und getrennt vom
+    Tracking-Lock (`game_stat_sessions`) selbst, damit eine Übernahme durch
+    einen anderen Tracker mitten im Spiel (siehe oben) die Aufstellung
+    nicht verliert. Beim ersten Öffnen ohne gespeicherte Aufstellung startet
+    eine "Startaufstellung"-Auswahl (Kader antippen, bis genau 5 gewählt
+    sind); danach ein "🔄 Auswechseln"-Button mit zweistufigem Ablauf (erst
+    antippen wer raus geht, dann wer von der Bank reinkommt) statt einer
+    freien Mehrfachauswahl — weniger Fehlbedienung unter Zeitdruck. Bei
+    einem Kader mit 5 oder weniger Spielern (z. B. beim Testen) entfällt
+    die ganze Unterscheidung, dann sind einfach alle direkt antippbar.
+    (2) Spieler-Buttons zeigen nur noch Vorname + Anfangsbuchstabe
+    Nachname (`shortPlayerName()` in `src/lib/format.ts`, z. B. "Marc R."),
+    voller Name war auf den großen Buttons unnötig breit. (3) Nach einer
+    erfassten Aktion springt die Ansicht automatisch zurück zur
+    Spielerauswahl (vorher blieb der zuletzt gewählte Spieler aktiv) — der
+    Trainer wollte laut eigener Aussage lieber jedes Mal neu antippen, als
+    sich merken zu müssen, ob noch der richtige Spieler ausgewählt ist.
 
 ## Projektstruktur
 
