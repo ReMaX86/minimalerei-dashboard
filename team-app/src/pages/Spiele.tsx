@@ -35,7 +35,7 @@ function GameListItem({ game }: { game: Game }) {
 }
 
 export function Spiele() {
-  const { role, isAdmin } = useAuth();
+  const { role, isAdmin, player } = useAuth();
   const { flags } = useFeatureFlags();
   const [searchParams] = useSearchParams();
   const [state, setState] = useState<State | null>(null);
@@ -48,6 +48,7 @@ export function Spiele() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [meetingForm, setMeetingForm] = useState<MeetingPointFormValue>(EMPTY_MEETING_POINT);
   const [savingMeeting, setSavingMeeting] = useState(false);
+  const [responding, setResponding] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -95,6 +96,25 @@ export function Spiele() {
     else setSquadOpen(true);
   }, [searchParams, isAdmin]);
 
+  // Öffnet der Trainer die Kader-Bearbeitung, gilt eine offene
+  // Absage-Meldung als gesehen — unabhängig davon, ob er anschließend den
+  // betroffenen Spieler tatsächlich anfasst.
+  useEffect(() => {
+    if (!squadEditorOpen || !state?.nextGame?.squad_decline_pending) return;
+    const gameId = state.nextGame.id;
+    supabase
+      .from('games')
+      .update({ squad_decline_pending: false })
+      .eq('id', gameId)
+      .then(() => {
+        setState((prev) =>
+          prev && prev.nextGame && prev.nextGame.id === gameId
+            ? { ...prev, nextGame: { ...prev.nextGame, squad_decline_pending: false } }
+            : prev
+        );
+      });
+  }, [squadEditorOpen, state?.nextGame?.id, state?.nextGame?.squad_decline_pending]);
+
   useEffect(() => {
     const g = state?.nextGame;
     setMeetingForm({
@@ -112,7 +132,11 @@ export function Spiele() {
   }
 
   const selectedByPlayer: Record<string, boolean> = {};
-  state.squad.forEach((row) => (selectedByPlayer[row.player_id] = row.is_selected));
+  const confirmationByPlayer: Record<string, GameSquadRow['confirmation']> = {};
+  state.squad.forEach((row) => {
+    selectedByPlayer[row.player_id] = row.is_selected;
+    confirmationByPlayer[row.player_id] = row.confirmation;
+  });
 
   async function toggle(playerId: string) {
     const willSelect = !selectedByPlayer[playerId];
@@ -125,8 +149,12 @@ export function Spiele() {
     try {
       const { error: upsertError } = await supabase
         .from('game_squad')
+        // confirmation immer zurück auf 'pending': ein manueller Eingriff
+        // des Trainers (egal ob rein oder raus) ist keine eigene Zu-/Absage
+        // des Spielers mehr und soll bei erneuter Aufnahme frisch abgefragt
+        // werden.
         .upsert(
-          { game_id: state!.nextGame!.id, player_id: playerId, is_selected: willSelect },
+          { game_id: state!.nextGame!.id, player_id: playerId, is_selected: willSelect, confirmation: 'pending' },
           { onConflict: 'game_id,player_id' }
         );
       if (upsertError) throw upsertError;
@@ -135,6 +163,23 @@ export function Spiele() {
       setError('Änderung konnte nicht gespeichert werden.');
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function respond(confirmed: boolean) {
+    setResponding(true);
+    setError(null);
+    try {
+      const { error: rpcError } = await supabase.rpc('respond_to_squad', {
+        p_game_id: state!.nextGame!.id,
+        p_confirmed: confirmed
+      });
+      if (rpcError) throw rpcError;
+      await load();
+    } catch {
+      setError('Rückmeldung konnte nicht gespeichert werden.');
+    } finally {
+      setResponding(false);
     }
   }
 
@@ -277,25 +322,30 @@ export function Spiele() {
             {squadEditorOpen && (
               <div className="mt-3 border-t border-black/5 pt-3">
                 <ul className="divide-y divide-black/5">
-                  {sortedForTrainer.map((p) => (
-                    <li key={p.id} className="flex items-center justify-between py-2">
-                      <span className="flex items-center gap-1.5 text-sm font-medium text-tbw-navyDark">
-                        {p.name}
-                        {flags.absences && playerAbsenceOn(state.absences, p.id, state.nextGame!.game_date) && (
-                          <span className="pill pill-warn" title="Im Urlaub eingetragen">
-                            🌴
-                          </span>
-                        )}
-                      </span>
-                      <button
-                        disabled={togglingId === p.id || (atCap && !selectedByPlayer[p.id])}
-                        onClick={() => toggle(p.id)}
-                        className={`pill ${selectedByPlayer[p.id] ? 'pill-ok' : 'pill-open'} disabled:opacity-40`}
-                      >
-                        {selectedByPlayer[p.id] ? 'im Kader' : 'nicht im Kader'}
-                      </button>
-                    </li>
-                  ))}
+                  {sortedForTrainer.map((p) => {
+                    const declined = !selectedByPlayer[p.id] && confirmationByPlayer[p.id] === 'declined';
+                    return (
+                      <li key={p.id} className="flex items-center justify-between py-2">
+                        <span className="flex items-center gap-1.5 text-sm font-medium text-tbw-navyDark">
+                          {p.name}
+                          {flags.absences && playerAbsenceOn(state.absences, p.id, state.nextGame!.game_date) && (
+                            <span className="pill pill-warn" title="Im Urlaub eingetragen">
+                              🌴
+                            </span>
+                          )}
+                        </span>
+                        <button
+                          disabled={togglingId === p.id || (atCap && !selectedByPlayer[p.id])}
+                          onClick={() => toggle(p.id)}
+                          className={`pill ${
+                            selectedByPlayer[p.id] ? 'pill-ok' : declined ? 'pill-warn' : 'pill-open'
+                          } disabled:opacity-40`}
+                        >
+                          {selectedByPlayer[p.id] ? 'im Kader' : declined ? 'abgesagt' : 'nicht im Kader'}
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
                 <p className="mt-2 text-xs text-tbw-ink/50">
                   {selectedCount} von max. {MAX_SQUAD_SIZE} im Kader
@@ -332,11 +382,51 @@ export function Spiele() {
                   <ul className="mt-3 divide-y divide-black/5">
                     {state.players
                       .filter((p) => selectedByPlayer[p.id])
-                      .map((p) => (
-                        <li key={p.id} className="py-2 text-sm font-medium text-tbw-navyDark">
-                          {p.name}
-                        </li>
-                      ))}
+                      .map((p) => {
+                        const isMe = player?.id === p.id;
+                        const confirmed = isMe && confirmationByPlayer[p.id] === 'confirmed';
+                        return (
+                          <li key={p.id} className="flex items-center justify-between py-2 text-sm">
+                            <span className={isMe ? 'font-bold text-tbw-navyDark' : 'font-medium text-tbw-navyDark'}>
+                              {p.name}
+                              {isMe && ' (Du)'}
+                            </span>
+                            {isMe &&
+                              (confirmed ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="pill pill-ok">✓ Zugesagt</span>
+                                  <button
+                                    type="button"
+                                    disabled={responding}
+                                    onClick={() => respond(false)}
+                                    className="text-xs font-semibold text-tbw-ink/40 underline disabled:opacity-40"
+                                  >
+                                    Doch nicht?
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={responding}
+                                    onClick={() => respond(true)}
+                                    className="pill pill-ok disabled:opacity-40"
+                                  >
+                                    ✓ Kann
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={responding}
+                                    onClick={() => respond(false)}
+                                    className="pill pill-open disabled:opacity-40"
+                                  >
+                                    ✗ Kann nicht
+                                  </button>
+                                </div>
+                              ))}
+                          </li>
+                        );
+                      })}
                   </ul>
                 ))}
             </div>

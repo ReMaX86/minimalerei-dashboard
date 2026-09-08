@@ -145,13 +145,17 @@ export interface Game {
   final_score_us: number | null;
   final_score_opponent: number | null;
   stats_finalized_at: string | null;
+  squad_decline_pending: boolean;
   created_at: string;
 }
+
+export type SquadConfirmation = 'pending' | 'confirmed' | 'declined';
 
 export interface GameSquadRow {
   game_id: string;
   player_id: string;
   is_selected: boolean;
+  confirmation: SquadConfirmation;
 }
 
 export interface TrikotSet {
