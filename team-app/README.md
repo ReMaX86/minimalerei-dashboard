@@ -263,6 +263,21 @@ hier die getroffenen Entscheidungen samt Begründung:
   Überschrift „Teaminformationen“ mit der Kampfgericht-Team-Übersicht, der Urlaubs-Übersicht und dem
   Trikot-Status (`Wer hat die Trikots?`, wie zuvor für alle sichtbar). „Nächste Trainingseinheit“
   bleibt unverändert ganz unten, außerhalb beider Zonen.
+- **Spieler pflegen ihr eigenes Profilfoto/Größe/Geburtsdatum selbst (Migration `0018`).**
+  Bisher ging das nur über Admin -> Spieler (Trainer). Einstieg bewusst nicht als eigener Reiter in
+  der Bottom-Nav (zu wertvoller Platz für ein Randfeature), sondern über den Rollen-Pill oben rechts
+  im Header: für Spieler zeigt der bisherige reine „Spieler“-Text-Pill jetzt zusätzlich den eigenen
+  Avatar (Foto oder Initialen) und ist antippbar, öffnet dann ein Bottom-Sheet („Mein Profil“) mit
+  Foto-Upload, Größe und Geburtsdatum — Position/Stärken bleiben bewusst Trainer-Sache. Nur sichtbar,
+  wenn das `player_profiles`-Feature-Flag an ist, sonst bleibt es beim reinen Text-Pill. Serverseitig
+  bewusst keine generelle UPDATE-RLS-Policy für Spieler auf `players` (RLS prüft nur Zeilen, keine
+  Spalten) — stattdessen eine neue `update_my_profile()`-RPC, die nur genau die drei Felder der
+  eigenen Zeile schreibt, plus zwei neue Storage-Policies auf dem `player-photos`-Bucket, die einen
+  Upload/Ersatz nur für Dateien mit dem eigenen `<player_id>-…`-Präfix erlauben. Technischer Stolperstein
+  beim Bauen: das Profil-Modal ist ein `position: fixed`-Overlay, das anfangs als Kind des Headers
+  gerendert wurde — dessen `backdrop-blur` (`backdrop-filter`) erzeugt laut CSS-Spec einen eigenen
+  Containing Block für `fixed`-Nachfahren, wodurch das Overlay nur die kleine Header-Box statt des
+  ganzen Bildschirms füllte. Behoben über `createPortal(..., document.body)` in `MyProfileModal.tsx`.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche

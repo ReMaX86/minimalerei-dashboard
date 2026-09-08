@@ -2,34 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
+import { Avatar } from '../components/Avatar';
 import { ageFromBirthDate } from '../lib/format';
 import { POSITION_LABELS, type Player } from '../types/database';
-
-function Avatar({ player, size }: { player: Player; size: 'sm' | 'lg' }) {
-  const dims = size === 'lg' ? 'h-24 w-24 text-2xl' : 'h-16 w-16 text-lg';
-  const initials = player.name
-    .split(' ')
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-  if (player.photo_url) {
-    return (
-      <img
-        src={player.photo_url}
-        alt=""
-        className={`${dims} shrink-0 rounded-full object-cover ring-2 ring-white shadow`}
-      />
-    );
-  }
-  return (
-    <div
-      className={`${dims} flex shrink-0 items-center justify-center rounded-full bg-tbw-navy font-bold text-white shadow`}
-    >
-      {initials}
-    </div>
-  );
-}
 
 export function PlayerProfiles() {
   const [players, setPlayers] = useState<Player[] | null>(null);
