@@ -1,8 +1,15 @@
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { RoleBadge } from './RoleBadge';
+import { Avatar } from './Avatar';
+import { MyProfileModal } from './MyProfileModal';
 
 export function Header({ title }: { title: string }) {
   const { role, trainer, player, viewer, logout } = useAuth();
+  const { flags } = useFeatureFlags();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const canEditProfile = role === 'player' && flags.player_profiles;
 
   return (
     <header className="sticky top-0 z-10 bg-tbw-bg/90 backdrop-blur">
@@ -18,7 +25,19 @@ export function Header({ title }: { title: string }) {
         </div>
         <div className="flex items-center gap-2">
           {role === 'trainer' && <RoleBadge role="trainer" />}
-          {role === 'player' && <RoleBadge role="player" />}
+          {role === 'player' &&
+            (canEditProfile && player ? (
+              <button
+                onClick={() => setProfileOpen(true)}
+                className="flex items-center gap-1.5 rounded-full bg-tbw-navy/10 py-0.5 pl-1 pr-2.5 text-xs font-bold text-tbw-navy"
+                title="Mein Profil bearbeiten"
+              >
+                <Avatar player={player} size="xs" />
+                Spieler
+              </button>
+            ) : (
+              <RoleBadge role="player" />
+            ))}
           {role === 'viewer' && <RoleBadge role="viewer" />}
           <button
             onClick={logout}
@@ -29,6 +48,7 @@ export function Header({ title }: { title: string }) {
           </button>
         </div>
       </div>
+      {profileOpen && <MyProfileModal onClose={() => setProfileOpen(false)} />}
     </header>
   );
 }
