@@ -46,7 +46,6 @@ export function Spiele() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [meetingForm, setMeetingForm] = useState<MeetingPointFormValue>(EMPTY_MEETING_POINT);
   const [savingMeeting, setSavingMeeting] = useState(false);
-  const [meetingSaved, setMeetingSaved] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -95,7 +94,6 @@ export function Spiele() {
       meeting_time_carpool: g?.meeting_time_carpool?.slice(0, 5) ?? '',
       meeting_point_carpool: g?.meeting_point_carpool ?? ''
     });
-    setMeetingSaved(false);
   }, [state?.nextGame?.id, state?.nextGame?.meeting_time_hall, state?.nextGame?.meeting_time_carpool, state?.nextGame?.meeting_point_carpool]);
 
   if (error) return <ErrorNote message={error} />;
@@ -135,7 +133,6 @@ export function Spiele() {
   async function saveMeetingPoint() {
     setSavingMeeting(true);
     setError(null);
-    setMeetingSaved(false);
     const isHome = state!.nextGame!.is_home;
     try {
       const { error: updError } = await supabase
@@ -147,7 +144,7 @@ export function Spiele() {
         })
         .eq('id', state!.nextGame!.id);
       if (updError) throw updError;
-      setMeetingSaved(true);
+      setMeetingEditorOpen(false);
       await load();
     } catch {
       setError('Treffpunkt konnte nicht gespeichert werden.');
@@ -165,6 +162,7 @@ export function Spiele() {
         .update({ squad_published: !state!.nextGame!.squad_published })
         .eq('id', state!.nextGame!.id);
       if (updError) throw updError;
+      setSquadEditorOpen(false);
       await load();
     } catch {
       setError('Status konnte nicht geändert werden.');
@@ -220,14 +218,24 @@ export function Spiele() {
                 onClick={() => setSquadEditorOpen((v) => !v)}
                 className="btn-secondary flex-1 !py-2 text-xs"
               >
-                👥 {squadEditorOpen ? 'Kader schließen' : 'Kader festlegen'}
+                👥{' '}
+                {squadEditorOpen
+                  ? 'Kader schließen'
+                  : state.nextGame.squad_published
+                  ? 'Kader ansehen'
+                  : 'Kader festlegen'}
               </button>
               <button
                 type="button"
                 onClick={() => setMeetingEditorOpen((v) => !v)}
                 className="btn-secondary flex-1 !py-2 text-xs"
               >
-                📍 {meetingEditorOpen ? 'Treffpunkt schließen' : 'Treffpunkt hinterlegen'}
+                📍{' '}
+                {meetingEditorOpen
+                  ? 'Treffpunkt schließen'
+                  : meetingPoints(state.nextGame).length > 0
+                  ? 'Treffpunkt bearbeiten'
+                  : 'Treffpunkt hinterlegen'}
               </button>
             </div>
 
@@ -241,7 +249,7 @@ export function Spiele() {
                     onChange={setMeetingForm}
                   />
                 </div>
-                <div className="mt-2 flex items-center gap-3">
+                <div className="mt-2">
                   <button
                     type="button"
                     onClick={saveMeetingPoint}
@@ -250,7 +258,6 @@ export function Spiele() {
                   >
                     {savingMeeting ? 'Speichere…' : 'Treffpunkt speichern'}
                   </button>
-                  {meetingSaved && <span className="text-xs font-semibold text-status-ok">Gespeichert</span>}
                 </div>
               </div>
             )}
