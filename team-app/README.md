@@ -574,6 +574,19 @@ hier die getroffenen Entscheidungen samt Begründung:
     Scrollen für die letzte Stat-Reihe nötig — bewusst nicht noch weiter
     verkleinert, um die Buttons unter Zeitdruck treffsicher antippbar zu
     halten.
+  - **Fünfter Nachtrag (Optik + Verwechslungsschutz):** zwei Anpassungen.
+    (1) `ActionCircle` von dünnem farbigem Umriss auf Volltonfarbe mit
+    sanftem Verlauf (helltönig zur Kernfarbe) und Schatten umgestellt —
+    auf einen Blick klarer erkennbar als Treffer/Fehlwurf/neutral als ein
+    dünner Rand mit farbiger Schrift, wirkt moderner. Dabei auch wieder
+    etwas größer (76px für die Wurf-Paare, 64px für die übrigen Stats,
+    vorher 64px/56px aus dem vierten Nachtrag). (2) Direkt über der
+    Aktions-Karte zeigt eine dezente Zeile "Zuletzt: [Foto] Name · Aktion"
+    die zuletzt erfasste Aktion an (nur im Aktions-Raster, nicht während
+    Startaufstellung/Auswechseln/"Wer?"-Auswahl) — dient als schnelle
+    Verwechslungskontrolle, ohne extra zum "Zuletzt"-Log weiter unten
+    scrollen zu müssen; das Log dort bleibt unverändert für die volle
+    Historie + Rückgängig.
 
 ## Projektstruktur
 
