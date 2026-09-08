@@ -192,6 +192,16 @@ hier die getroffenen Entscheidungen samt Begründung:
   der Startseite für alle Rollen erscheinen. Bewusst nur einseitig (Trainer -> Team, kein Chat)
   — passt zur bisherigen "Self-Check beim Öffnen"-Logik der App und braucht keine
   Push-Benachrichtigungen, um nützlich zu sein.
+- **Mitfahrgelegenheit (Migration `0013`).** Zweite schaltbare Zusatzfunktion, direkt auf der
+  Kader-Seite integriert (nicht als eigener Nav-Reiter) — erscheint nur bei Auswärtsspielen,
+  dort wo auch die Treffpunkt-Infos gepflegt werden. Spieler tragen sich als Fahrer mit einer
+  Platzzahl (+ optionaler Notiz) ein oder reservieren sich einen Platz bei einem Fahrer;
+  `carpool_claims.game_id` ist redundant zu `offer_id` (statt eines Joins), damit ein
+  Unique-Constraint "ein Platz pro Spiel und Spieler" direkt in der DB durchsetzbar ist. Bewusst
+  kein Admin-Bereich dafür — die Selbstverwaltung durch die Spieler reicht, der Trainer kann bei
+  Bedarf über die ohnehin vorhandene `is_trainer()`-Berechtigung in den RLS-Policies eingreifen.
+  Nur mit eigenem Spieler-Login nutzbar (reines Trainer-Konto ohne verknüpften Spieler sieht die
+  Liste nur lesend, siehe `CarpoolSection.tsx`).
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche

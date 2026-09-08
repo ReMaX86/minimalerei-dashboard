@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { MeetingPointFields, EMPTY_MEETING_POINT, type MeetingPointFormValue } from '../components/MeetingPointFields';
+import { CarpoolSection } from '../components/CarpoolSection';
 import { fmtDate, fmtTime } from '../lib/format';
 import { meetingPoints, type Game, type GameSquadRow, type Player } from '../types/database';
 
@@ -18,6 +20,7 @@ interface State {
 
 export function Kader() {
   const { role, isAdmin } = useAuth();
+  const { flags } = useFeatureFlags();
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
@@ -250,6 +253,10 @@ export function Kader() {
             <p className="mt-3 text-sm text-tbw-ink/50">Kader für dieses Spiel noch nicht veröffentlicht.</p>
           ))}
       </section>
+
+      {flags.carpool && role !== 'viewer' && !state.nextGame.is_home && (
+        <CarpoolSection gameId={state.nextGame.id} players={state.players} />
+      )}
 
       <section className="card">
         <button
