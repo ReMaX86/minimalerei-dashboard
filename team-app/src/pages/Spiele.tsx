@@ -325,6 +325,7 @@ export function Spiele() {
                   {sortedForTrainer.map((p) => {
                     const declined = !selectedByPlayer[p.id] && confirmationByPlayer[p.id] === 'declined';
                     const confirmed = selectedByPlayer[p.id] && confirmationByPlayer[p.id] === 'confirmed';
+                    const awaitingResponse = selectedByPlayer[p.id] && confirmationByPlayer[p.id] === 'pending';
                     return (
                       <li key={p.id} className="flex items-center justify-between py-2">
                         <span className="flex items-center gap-1.5 text-sm font-medium text-tbw-navyDark">
@@ -332,6 +333,11 @@ export function Spiele() {
                           {confirmed && (
                             <span className="font-bold text-status-ok" title="Hat zugesagt">
                               ✓
+                            </span>
+                          )}
+                          {awaitingResponse && (
+                            <span className="text-tbw-ink/40" title="Hat noch nicht geantwortet">
+                              🕐
                             </span>
                           )}
                           {flags.absences && playerAbsenceOn(state.absences, p.id, state.nextGame!.game_date) && (
