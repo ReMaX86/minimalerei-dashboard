@@ -197,19 +197,25 @@ export function OfficiatingAdmin() {
       <form onSubmit={addGame} className="card space-y-2">
         <p className="text-sm font-bold text-tbw-navyDark">Neuer Kampfgericht-Termin</p>
         <div className="grid grid-cols-2 gap-2">
-          <input
-            type="date"
-            required
-            className="input min-w-0"
-            value={form.game_date}
-            onChange={(e) => setForm((f) => ({ ...f, game_date: e.target.value }))}
-          />
-          <input
-            type="time"
-            className="input min-w-0"
-            value={form.game_time}
-            onChange={(e) => setForm((f) => ({ ...f, game_time: e.target.value }))}
-          />
+          <label className="block min-w-0 text-xs">
+            <span className="font-semibold text-tbw-ink/50">Datum</span>
+            <input
+              type="date"
+              required
+              className="input mt-1"
+              value={form.game_date}
+              onChange={(e) => setForm((f) => ({ ...f, game_date: e.target.value }))}
+            />
+          </label>
+          <label className="block min-w-0 text-xs">
+            <span className="font-semibold text-tbw-ink/50">Uhrzeit</span>
+            <input
+              type="time"
+              className="input mt-1"
+              value={form.game_time}
+              onChange={(e) => setForm((f) => ({ ...f, game_time: e.target.value }))}
+            />
+          </label>
         </div>
         <select
           required

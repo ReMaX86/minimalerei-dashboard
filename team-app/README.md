@@ -345,6 +345,34 @@ hier die getroffenen Entscheidungen samt Begründung:
   `objects`-Policy aus `0024` aus Sicherheitsgründen wieder (zurück auf "nur die eigene Datei",
   identisch zu `0021`/`0023`), auch wenn das aktuell noch keinen Upload ermöglicht — Nutzer wurde
   gebeten, Supabase-Support zu kontaktieren.
+- **Fix Teil 6: tatsächliche Ursache — fehlende SELECT-Policy für den Metadaten-Rücklese-Schritt
+  nach dem Upload.** Der Supabase-Support (über deren Dashboard-Assistenten) fand die
+  eigentliche Ursache: Storage macht beim Hochladen intern ein `INSERT ... RETURNING`, um die
+  neu angelegten Objekt-Metadaten zurückzugeben — dafür gilt eine eigene `SELECT`-Berechtigung,
+  unabhängig von der `INSERT`-Policy. Wir hatten nie eine `SELECT`-Policy auf `storage.objects`
+  gesetzt (nur die öffentliche Lese-URL für den Bucket, die komplett am RLS-System vorbeigeht) —
+  daher schlug der komplette Request fehl, obwohl der Insert selbst erlaubt gewesen wäre, und
+  zwar exakt mit derselben generischen RLS-Fehlermeldung wie ein echter Insert-Fehlschlag. Das
+  erklärt rückwirkend wirklich alle bisherigen Fehlschläge, unabhängig von Auth-Methode oder
+  Namens-/Ordnerlogik. Zusätzlicher Hinweis vom Support: `upsert: true` (bisher in
+  `MyProfileModal.tsx` und `PlayersAdmin.tsx` verwendet) erfordert für denselben
+  Metadaten-Rücklese-Schritt zusätzlich `UPDATE`-Berechtigung, auch ohne tatsächlichen Konflikt —
+  auf `upsert: false` umgestellt, da Dateinamen ohnehin immer eindeutig sind
+  (Zeitstempel-Suffix), also nie eine echte Datei zum Ersetzen ansteht.
+- **Layout-Fix: Datum-/Uhrzeit-Felder ohne Beschriftung wirkten leer, Felder liefen über den
+  Kartenrand hinaus.** Zwei getrennte, aber verwandte Probleme in Formularen mit
+  `grid-cols-2`-Feldpaaren: (1) Die Datum-/Uhrzeit-Felder in "Neues Spiel"
+  (`GamesAdmin.tsx`), "Neuer Kampfgericht-Termin" (`OfficiatingAdmin.tsx`) und "Neue
+  Trainingszeit" (`TrainingsAdmin.tsx`) hatten keine Beschriftung — auf iOS zeigt ein leeres
+  `<input type="date/time">` anders als am Desktop keinerlei Platzhaltertext, wirkte dadurch wie
+  ein unbenutzbarer leerer Kasten. Jetzt mit "Datum"/"Uhrzeit" bzw. "Beginn"/"Ende"-Label darüber,
+  analog zum bereits bestehenden Muster bei "Größe"/"Geburtsdatum". (2) Wo ein Datum-/Uhrzeit-Feld
+  in ein `<label>` eingepackt in einer `grid-cols-2`-Zeile steht (`MyProfileModal.tsx`,
+  `AbsenceSection.tsx`, `MeetingPointFields.tsx`), lief das Feld auf dem iPhone über den
+  Kartenrand hinaus — native Datum-/Uhrzeit-Eingabefelder haben auf iOS eine Mindestbreite, die
+  ohne `min-w-0` auf dem direkten Grid-Kind (hier: dem `<label>`, nicht dem `<input>` selbst) die
+  Grid-Spalte über die verfügbare Breite hinaus aufzwingt. `min-w-0` allein am `<input>` reicht
+  nicht, wenn ein `<label>` dazwischen sitzt — es muss am direkten Grid-Kind sitzen.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche

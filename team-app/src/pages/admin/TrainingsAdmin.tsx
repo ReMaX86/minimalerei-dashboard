@@ -83,20 +83,26 @@ export function TrainingsAdmin() {
           ))}
         </select>
         <div className="grid grid-cols-2 gap-2">
-          <input
-            type="time"
-            required
-            className="input min-w-0"
-            value={form.start_time}
-            onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))}
-          />
-          <input
-            type="time"
-            required
-            className="input min-w-0"
-            value={form.end_time}
-            onChange={(e) => setForm((f) => ({ ...f, end_time: e.target.value }))}
-          />
+          <label className="block min-w-0 text-xs">
+            <span className="font-semibold text-tbw-ink/50">Beginn</span>
+            <input
+              type="time"
+              required
+              className="input mt-1"
+              value={form.start_time}
+              onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))}
+            />
+          </label>
+          <label className="block min-w-0 text-xs">
+            <span className="font-semibold text-tbw-ink/50">Ende</span>
+            <input
+              type="time"
+              required
+              className="input mt-1"
+              value={form.end_time}
+              onChange={(e) => setForm((f) => ({ ...f, end_time: e.target.value }))}
+            />
+          </label>
         </div>
         <input
           required
