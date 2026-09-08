@@ -285,12 +285,24 @@ hier die getroffenen Entscheidungen samt Begründung:
   RPC-Aufruf (Größe/Geburtsdatum speichern funktionierte einwandfrei) korrekte Ergebnisse, aber
   nicht zuverlässig innerhalb einer Storage-Policy (eigener Dienst, eigene DB-Verbindung) — Ergebnis
   war `new row violates row-level security policy` beim Foto-Upload. Ersetzt durch das offizielle,
-  simplere Supabase-Muster: Dateien liegen jetzt in einem Ordner pro `auth.uid()`
-  (`<auth_user_id>/<timestamp>.<ext>` statt `<player_id>-<timestamp>.<ext>`), die Policy vergleicht
-  nur noch `(storage.foldername(name))[1] = auth.uid()::text` — kein Funktionsaufruf, kein Join,
-  keine verschachtelte RLS-Prüfung einer zweiten Tabelle. `MyProfileModal.tsx` liest die
-  `auth_user_id` dafür über `supabase.auth.getSession()` (lokal, kein Netzwerk-Roundtrip) statt
-  `getUser()`, analog zum bereits bestehenden Muster in `AuthContext.tsx`.
+  simplere Supabase-Muster direkt über `auth.uid()` — kein Funktionsaufruf, kein Join, keine
+  verschachtelte RLS-Prüfung einer zweiten Tabelle (Details zum finalen Namensschema siehe Migration
+  `0021` unten). `MyProfileModal.tsx` liest die `auth_user_id` dafür über
+  `supabase.auth.getSession()` (lokal, kein Netzwerk-Roundtrip) statt `getUser()`, analog zum
+  bereits bestehenden Muster in `AuthContext.tsx`.
+- **Fix Teil 2: Foto-Upload schlug auch mit auth.uid()-Ordner-Policy fehl (Migrationen `0020`/`0021`).**
+  Nach Migration `0019` trat exakt derselbe `new row violates row-level security policy`-Fehler
+  weiterhin auf — bestätigt per `pg_policies`, dass die Policy selbst korrekt in der Datenbank
+  ankam. Migration `0020` lockerte die Policy testweise auf "jeder angemeldete Nutzer" (temporäres
+  Sicherheits-Zugeständnis zur Eingrenzung) — schlug identisch fehl, was die Namens-/Ordner-Abgleichslogik
+  als Ursache endgültig ausschloss. Verdacht: das Ordner-Pfadschema aus 0019
+  (`<auth_user_id>/<timestamp>.<ext>`, enthält "/") lässt Supabase Storage zusätzlich eine Zeile in
+  einer internen Ordner-Hierarchie-Tabelle anlegen, für die keine Policy existiert — dieselbe
+  generische RLS-Fehlermeldung, nur für eine andere Tabelle als `storage.objects`. Migration `0021`
+  geht zurück auf flache Dateinamen ohne "/" (`<auth_user_id>-<timestamp>.<ext>`, genau das Schema,
+  das der bestehende Trainer-Upload-Pfad in `PlayersAdmin.tsx` schon verwendet) und ersetzt die
+  offene Testpolicy wieder durch eine auf die eigene Datei beschränkte (`name like auth.uid()::text
+  || '-%'`).
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche
