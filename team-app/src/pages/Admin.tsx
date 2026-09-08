@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PlayersAdmin } from './admin/PlayersAdmin';
 import { GamesAdmin } from './admin/GamesAdmin';
 import { OfficiatingAdmin } from './admin/OfficiatingAdmin';
 import { TrainingsAdmin } from './admin/TrainingsAdmin';
 import { TrikotsAdmin } from './admin/TrikotsAdmin';
 import { ViewersAdmin } from './admin/ViewersAdmin';
+import { AnnouncementsAdmin } from './admin/AnnouncementsAdmin';
+import { FeatureFlagsAdmin } from './admin/FeatureFlagsAdmin';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 
-const TABS = [
+const CORE_TABS = [
   { id: 'players', label: 'Spieler' },
   { id: 'games', label: 'Spiele' },
   { id: 'officiating', label: 'Kampfgericht' },
@@ -15,15 +18,29 @@ const TABS = [
   { id: 'viewers', label: 'Betrachter' }
 ] as const;
 
-type TabId = (typeof TABS)[number]['id'];
+const FEATURE_TABS = [{ id: 'announcements', label: 'Meldungen' }] as const;
+
+type TabId = (typeof CORE_TABS)[number]['id'] | (typeof FEATURE_TABS)[number]['id'] | 'features';
 
 export function Admin() {
+  const { flags } = useFeatureFlags();
+  const tabs = [
+    ...CORE_TABS,
+    ...FEATURE_TABS.filter((t) => flags[t.id]),
+    { id: 'features', label: 'Funktionen' }
+  ] as const;
   const [tab, setTab] = useState<TabId>('players');
+
+  // Falls der gerade aktive Reiter durch einen deaktivierten Flag verschwindet
+  // (z. B. Trainer schaltet "Meldungen" aus, während er dort ist).
+  useEffect(() => {
+    if (!tabs.some((t) => t.id === tab)) setTab('players');
+  }, [tabs, tab]);
 
   return (
     <div className="space-y-4">
       <div className="flex gap-1 overflow-x-auto rounded-xl bg-black/5 p-1">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -42,6 +59,8 @@ export function Admin() {
       {tab === 'trainings' && <TrainingsAdmin />}
       {tab === 'trikots' && <TrikotsAdmin />}
       {tab === 'viewers' && <ViewersAdmin />}
+      {tab === 'announcements' && <AnnouncementsAdmin />}
+      {tab === 'features' && <FeatureFlagsAdmin />}
     </div>
   );
 }

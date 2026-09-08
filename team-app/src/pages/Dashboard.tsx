@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { UpcomingTrainings } from '../components/UpcomingTrainings';
 import { fmtDate, fmtTime } from '../lib/format';
@@ -10,6 +11,7 @@ import {
   benoetigterSatz,
   meetingPoints,
   officiatingGameLabel,
+  type Announcement,
   type Game,
   type OfficiatingGame,
   type OfficiatingTask,
@@ -24,10 +26,12 @@ interface DashboardData {
   trainerNextOfficiatingGame: (OfficiatingGame & { tasks: OfficiatingTask[] }) | null;
   trikotSets: TrikotSet[];
   players: Record<string, Player>;
+  announcements: Announcement[];
 }
 
 export function Dashboard() {
   const { role, player, isAdmin } = useAuth();
+  const { flags } = useFeatureFlags();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Trainers/admin-players get the full Kampfgericht overview so they can
@@ -42,10 +46,18 @@ export function Dashboard() {
       setError(null);
       const today = new Date().toISOString().slice(0, 10);
 
-      const [gameRes, trikotRes, playersRes] = await Promise.all([
+      const [gameRes, trikotRes, playersRes, announcementsRes] = await Promise.all([
         supabase.from('games').select('*').gte('game_date', today).order('game_date').order('game_time').limit(1).maybeSingle(),
         supabase.from('trikot_sets').select('*').order('id'),
-        supabase.from('players').select('*').eq('is_active', true)
+        supabase.from('players').select('*').eq('is_active', true),
+        flags.announcements
+          ? supabase
+              .from('announcements')
+              .select('*')
+              .order('pinned', { ascending: false })
+              .order('created_at', { ascending: false })
+              .limit(5)
+          : Promise.resolve({ data: [] as Announcement[], error: null })
       ]);
 
       let playerNextTask: DashboardData['playerNextTask'] = null;
@@ -122,7 +134,8 @@ export function Dashboard() {
         playerNextTask,
         trainerNextOfficiatingGame,
         trikotSets: (trikotRes.data as TrikotSet[]) ?? [],
-        players: playersById
+        players: playersById,
+        announcements: (announcementsRes.data as Announcement[]) ?? []
       });
     }
 
@@ -130,7 +143,7 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [role, player, isAdmin]);
+  }, [role, player, isAdmin, flags.announcements]);
 
   if (error) return <div className="card text-sm text-tbw-red">{error}</div>;
   if (!data) return <LoadingSpinner />;
@@ -143,6 +156,25 @@ export function Dashboard() {
   return (
     <div className="space-y-4">
       {player && <p className="headline text-3xl text-tbw-navyDark">Hi {firstName}!</p>}
+
+      {flags.announcements && data.announcements.length > 0 && (
+        <section className="card !bg-tbw-gold/10 !ring-tbw-gold/30">
+          <SectionTitle icon="📣" title="Meldungen" />
+          <ul className="mt-2 space-y-2">
+            {data.announcements.map((a) => (
+              <li key={a.id} className="rounded-xl bg-white p-3">
+                {a.pinned && (
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-gold">Angeheftet</p>
+                )}
+                <p className="text-sm text-tbw-navyDark">{a.message}</p>
+                <p className="mt-1 text-xs text-tbw-ink/40">
+                  {a.author_name} · {fmtDate(a.created_at.slice(0, 10))}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="card">
         <SectionTitle icon="🏀" title="Nächstes Spiel" />
