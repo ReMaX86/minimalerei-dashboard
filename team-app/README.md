@@ -315,22 +315,36 @@ hier die getroffenen Entscheidungen samt Begründung:
   `MyProfileModal.tsx` jetzt den Schritt (Foto-Upload vs. Profil-RPC) und mehr Fehlerdetails
   (`statusCode`/`error`/`code` aus dem Supabase-Fehlerobjekt, nicht nur `message`) an, falls auch
   das noch fehlschlägt.
-- **Fix Teil 4: Wurzelursache gefunden — `storage.buckets` fehlte komplett eine Policy
-  (Migration `0023`).** Die Detail-Fehlermeldung aus Fix Teil 3 zeigte trotz einer nachweislich
-  komplett offenen Policy auf `storage.objects` weiterhin `403 · AccessDenied · new row violates
-  row-level security policy`. Eine Abfrage über alle Tabellen im `storage`-Schema (`pg_tables`)
-  zeigte: auch `storage.buckets` hat RLS aktiviert (Supabase-Standard) — eine zweite Abfrage über
-  `pg_policies` zeigte, dass dafür aber noch nie eine einzige Policy existierte. RLS an, aber ohne
-  Policy, heißt kompletter Zugriffsentzug für jede Rolle außer dem Superuser. Migration `0014` hat
-  den `player-photos`-Bucket zwar per `INSERT` angelegt, aber nie eine `SELECT`-Policy dafür
-  ergänzt. Supabase Storage muss vor jedem Objekt-Schreibzugriff offenbar die Bucket-Zeile selbst
-  lesen können (öffentlich/privat, Größenlimit, erlaubte MIME-Typen) — ohne Leserecht darauf
-  schlägt jeder Upload fehl, unabhängig davon, wie offen die `objects`-Policies sind. Erklärt
-  rückwirkend alle bisherigen Fehlschläge (`0018`–`0022`), vermutlich auch den nie in Produktion
-  getesteten Trainer-Upload-Pfad. Migration `0023` ergänzt eine `select`-Policy auf
-  `storage.buckets` (Bucket-Konfiguration ist nicht sensibel, daher für alle lesbar — passt zum
-  Muster im Rest der App) und schränkt gleichzeitig die testweise offene `objects`-Policy aus
-  Migration `0022` wieder auf die eigene Datei ein (identische Logik wie Migration `0021`).
+- **Fix Teil 4: `storage.buckets` fehlte komplett eine Policy — Verdacht, aber nicht die
+  Ursache (Migration `0023`).** Die Detail-Fehlermeldung aus Fix Teil 3 zeigte trotz einer
+  nachweislich komplett offenen Policy auf `storage.objects` weiterhin `403 · AccessDenied · new
+  row violates row-level security policy`. Eine Abfrage über alle Tabellen im `storage`-Schema
+  (`pg_tables`) zeigte: auch `storage.buckets` hat RLS aktiviert (Supabase-Standard) — eine zweite
+  Abfrage über `pg_policies` zeigte, dass dafür aber noch nie eine einzige Policy existierte.
+  Migration `0014` hat den `player-photos`-Bucket zwar per `INSERT` angelegt, aber nie eine
+  `SELECT`-Policy dafür ergänzt. Naheliegende Theorie: Supabase Storage muss vor jedem
+  Objekt-Schreibzugriff die Bucket-Zeile selbst lesen können. Migration `0023` ergänzte die
+  fehlende `select`-Policy — **hat das Problem aber nicht behoben** (siehe Fix Teil 5), war aber
+  unabhängig davon eine korrekte Lücke, die es sich lohnte zu schließen.
+- **Fix Teil 5: Ursache liegt außerhalb der Datenbank — an Supabase-Support eskaliert
+  (Migrationen `0024`/`0025`).** Migration `0024` testete isoliert "buckets-Policy vorhanden UND
+  objects-Policy komplett offen" (vorher war immer mindestens eine der beiden kaputt/fehlend) —
+  schlug identisch fehl. Ein Projekt-Neustart über das Supabase-Dashboard (gegen einen veralteten
+  internen Cache-Stand nach dem Aufwachen aus der Kostenlos-Tarif-Pause) brachte ebenfalls keine
+  Änderung. Ein manueller Upload direkt im Supabase-Dashboard (Storage -> player-photos ->
+  Upload) funktionierte einwandfrei — das Projekt/der Bucket ist also grundsätzlich intakt.
+  Entscheidender letzter Test: ein Upload über die App mit einem **echten** Trainer-Login
+  (E-Mail/Passwort, keine anonyme Sitzung) über Admin -> Spieler -> Profil bearbeiten -> Foto
+  schlug ebenfalls fehl — das schließt sowohl unsere Policies (mehrfach nachweislich komplett
+  offen getestet) als auch anonyme Spieler-Logins als Ursache aus. Jeder App-initiierte Upload
+  schlägt fehl, unabhängig von Auth-Methode und RLS-Konfiguration, während das Dashboard selbst
+  funktioniert (nutzt vermutlich privilegierten internen Zugriff statt der öffentlichen
+  Storage-API). Das deutet auf eine projektinterne Fehlkonfiguration bei Supabase selbst hin
+  (z. B. ein Sync-Problem zwischen Auth- und Storage-Dienst bei diesem Projekt), die sich nicht
+  über SQL-Migrationen beheben lässt. Migration `0025` schließt die zu Diagnosezwecken offene
+  `objects`-Policy aus `0024` aus Sicherheitsgründen wieder (zurück auf "nur die eigene Datei",
+  identisch zu `0021`/`0023`), auch wenn das aktuell noch keinen Upload ermöglicht — Nutzer wurde
+  gebeten, Supabase-Support zu kontaktieren.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche
