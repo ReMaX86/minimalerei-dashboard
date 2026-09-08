@@ -462,7 +462,13 @@ export function Dashboard() {
                 set.id === ownSetId ? 'bg-tbw-gold/15 ring-2 ring-tbw-gold' : 'bg-tbw-bg'
               }`}
             >
-              <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">{set.label}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
+                {set.label.split(' · ').map((part, i) => (
+                  <span key={i} className="block">
+                    {part}
+                  </span>
+                ))}
+              </p>
               <p className="mt-1 text-sm font-semibold text-tbw-navyDark">
                 {set.current_holder_id ? data.players[set.current_holder_id]?.name ?? '—' : 'Niemand'}
               </p>
