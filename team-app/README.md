@@ -599,6 +599,17 @@ hier die getroffenen Entscheidungen samt Begründung:
     Fehlwurf oder den übrigen Stats — für den Gegner wird laut Schema
     (Migration 0028, `game_stat_events_opponent_scoring_only`) ohnehin nur
     der Punktestand getrackt, kein voller Box-Score.
+  - **Siebter Nachtrag (Scroll-Position bei Screen-Wechseln):** nach einer
+    Aktion, die den angezeigten Inhalt komplett austauscht (z. B.
+    "Wechseln" antippen, wenn man dafür erst zur "Auf dem Feld"-Karte
+    runtergescrollt hatte), blieb die Seite auf der bisherigen
+    Scroll-Position stehen — der neue Bildschirm ("Wer geht raus?") war
+    dadurch unsichtbar, ohne von Hand wieder hochzuscrollen. Ein
+    `screenKey` fasst die sich gegenseitig ausschließenden Ansichten
+    zusammen (Startaufstellung/Auswechseln inkl. beider Teilschritte/
+    "Wer?"-Picker je Aktion/Aktions-Raster); ändert sich dieser Wert,
+    scrollt ein `useEffect` per `window.scrollTo(0, 0)` nach oben — analog
+    zum bereits bestehenden Scroll-Reset bei Tab-Wechseln in `App.tsx`.
 
 ## Projektstruktur
 

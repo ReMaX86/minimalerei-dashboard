@@ -406,6 +406,27 @@ export function GameStatsTracker() {
   const recentEvents = [...events].slice(-6).reverse();
   const lastEvent = events[events.length - 1];
 
+  // Welcher der sich gegenseitig ausschließenden Bildschirme gerade
+  // angezeigt wird (Startaufstellung/Auswechseln/"Wer?"-Picker/Aktions-
+  // Raster) — wechselt der Screen, wird nach oben gescrollt (siehe Effekt
+  // unten). Sonst bleibt man z. B. nach "Wechseln" auf der Scroll-Position
+  // des Auf-dem-Feld-Buttons stehen und sieht die neue Spielerauswahl
+  // gar nicht, ohne selbst wieder hochzuscrollen.
+  const screenKey =
+    trackablePlayers.length === 0
+      ? 'empty'
+      : useCourtSplit && onCourtIds.length < COURT_SIZE
+        ? 'lineup'
+        : useCourtSplit && onCourtIds.length === COURT_SIZE && substituting
+          ? `sub-${outgoingId ?? 'out'}`
+          : pendingAction
+            ? `picker-${pendingAction}`
+            : 'idle';
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [screenKey]);
+
   return (
     <div className="min-h-screen bg-tbw-bg pb-8">
       <div className="sticky top-0 z-10 bg-tbw-navyDark px-4 py-3 text-white">
