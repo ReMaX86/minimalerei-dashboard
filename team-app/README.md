@@ -383,6 +383,14 @@ hier die getroffenen Entscheidungen samt Begründung:
   Werte der alten Codes um (`aufbau`→`pg`, `fluegel`→`sf`, `center`→`c`), damit kein Spieler beim
   Umstieg unbemerkt seine Position verliert; wo "Flügel" ursprünglich SF oder PF gemeint haben
   könnte, wird auf SF mit gemappt, vom Trainer bei Bedarf in Admin -> Spieler zu korrigieren.
+- **Skill-Tags mit Icon + Spitzname, neuer Fastbreak-Skill (Migration `0027`).** Auf Wunsch
+  umbenannt von schlichten Begriffen ("Distanzwurf") zu "Deutsch (Spitzname)" mit Emoji-Icon
+  davor ("🎯 3-Point (Sniper)"), analog zum bestehenden Icon-Muster bei `SectionTitle`. Neuer
+  Skill "⚡ Fastbreak (Turbo)" für schnelle Spieler, die im Gegenstoß stark sind. Icons liegen in
+  `SKILL_ICONS` (`src/types/database.ts`), rein clientseitig — `players.skills` bleibt eine
+  einfache `text[]`-Spalte, die Icons werden nur beim Anzeigen vorangestellt (Admin -> Spieler
+  Profil-Editor, Team-Profildetail). Migration `0027` benennt bereits vergebene Tags der alten
+  fünf Namen auf die neuen um, damit kein Spieler beim Umstieg eine gesetzte Stärke verliert.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche

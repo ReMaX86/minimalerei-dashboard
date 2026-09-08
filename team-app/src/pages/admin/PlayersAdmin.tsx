@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
-import { POSITION_LABELS, SKILL_OPTIONS, type Player, type PlayerPosition } from '../../types/database';
+import { POSITION_LABELS, SKILL_ICONS, SKILL_OPTIONS, type Player, type PlayerPosition } from '../../types/database';
 
 const EMPTY_DETAILS = {
   position: '' as '' | PlayerPosition,
@@ -278,7 +278,7 @@ export function PlayersAdmin() {
                         onClick={() => toggleSkill(skill)}
                         className={`pill ${detailsForm.skills.includes(skill) ? 'pill-ok' : 'pill-open'}`}
                       >
-                        {skill}
+                        {SKILL_ICONS[skill]} {skill}
                       </button>
                     ))}
                   </div>

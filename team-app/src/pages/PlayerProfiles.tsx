@@ -4,7 +4,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { Avatar } from '../components/Avatar';
 import { ageFromBirthDate } from '../lib/format';
-import { POSITION_LABELS, type Player } from '../types/database';
+import { POSITION_LABELS, SKILL_ICONS, type Player, type Skill } from '../types/database';
 
 export function PlayerProfiles() {
   const [players, setPlayers] = useState<Player[] | null>(null);
@@ -68,7 +68,7 @@ export function PlayerProfiles() {
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {selected.skills.map((s) => (
                   <span key={s} className="pill pill-ok">
-                    {s}
+                    {SKILL_ICONS[s as Skill] ?? ''} {s}
                   </span>
                 ))}
               </div>
