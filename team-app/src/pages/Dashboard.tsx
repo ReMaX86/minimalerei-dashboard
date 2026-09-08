@@ -324,7 +324,7 @@ export function Dashboard() {
                   <span className="text-sm font-medium text-tbw-ink/50">Nicht im Kader</span>
                 )}
                 {data.nextGame.squad_published && (
-                  <Link to="/spiele" className="text-xs font-bold text-tbw-navy">
+                  <Link to="/spiele?kader=1" className="text-xs font-bold text-tbw-navy">
                     Kader ansehen →
                   </Link>
                 )}
