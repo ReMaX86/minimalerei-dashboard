@@ -373,6 +373,16 @@ hier die getroffenen Entscheidungen samt Begründung:
   ohne `min-w-0` auf dem direkten Grid-Kind (hier: dem `<label>`, nicht dem `<input>` selbst) die
   Grid-Spalte über die verfügbare Breite hinaus aufzwingt. `min-w-0` allein am `<input>` reicht
   nicht, wenn ein `<label>` dazwischen sitzt — es muss am direkten Grid-Kind sitzen.
+- **5er-Positionssystem statt vereinfachter 3er-Einteilung (Migration `0026`).** Auf Wunsch von
+  der vereinfachten Aufbau/Flügel/Center-Einteilung auf die klassischen fünf Basketball-Positionen
+  mit englischen Kürzeln umgestellt: Point Guard (PG), Shooting Guard (SG), Small Forward (SF),
+  Power Forward (PF), Center (C) — Anzeige jeweils als "Englisch (deutsche Erklärung)", z. B.
+  "Point Guard (Aufbauspieler)". `players.position` ist eine reine `text`-Spalte ohne
+  CHECK-Constraint (Migration `0014`), der Wechsel ist also rein clientseitig (`PlayerPosition`-Typ
+  + `POSITION_LABELS` in `src/types/database.ts`) — Migration `0026` mappt nur bereits vorhandene
+  Werte der alten Codes um (`aufbau`→`pg`, `fluegel`→`sf`, `center`→`c`), damit kein Spieler beim
+  Umstieg unbemerkt seine Position verliert; wo "Flügel" ursprünglich SF oder PF gemeint haben
+  könnte, wird auf SF mit gemappt, vom Trainer bei Bedarf in Admin -> Spieler zu korrigieren.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche
