@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { Avatar } from '../components/Avatar';
+import { useScrollResetOnChange } from '../hooks/useScrollResetOnChange';
 import { ageFromBirthDate } from '../lib/format';
 import { POSITION_LABELS, SKILL_ICONS, type Player, type Skill } from '../types/database';
 
@@ -10,6 +11,8 @@ export function PlayerProfiles() {
   const [players, setPlayers] = useState<Player[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useScrollResetOnChange(selectedId);
 
   const load = useCallback(async () => {
     setError(null);

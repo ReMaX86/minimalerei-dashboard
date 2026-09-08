@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useScrollResetOnChange } from '../hooks/useScrollResetOnChange';
 import { PlayersAdmin } from './admin/PlayersAdmin';
 import { GamesAdmin } from './admin/GamesAdmin';
 import { OfficiatingAdmin } from './admin/OfficiatingAdmin';
@@ -30,6 +31,8 @@ export function Admin() {
     { id: 'features', label: 'Funktionen' }
   ] as const;
   const [tab, setTab] = useState<TabId>('players');
+
+  useScrollResetOnChange(tab);
 
   // Falls der gerade aktive Reiter durch einen deaktivierten Flag verschwindet
   // (z. B. Trainer schaltet "Meldungen" aus, während er dort ist).

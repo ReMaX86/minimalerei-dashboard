@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Avatar } from '../components/Avatar';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
+import { useScrollResetOnChange } from '../hooks/useScrollResetOnChange';
 import { computeBoxScore, computeQuarterScores, computeTeamScore, quarterLabel } from '../lib/gameStats';
 import { fmtDate, fmtTime, shortPlayerName } from '../lib/format';
 import {
@@ -408,10 +409,10 @@ export function GameStatsTracker() {
 
   // Welcher der sich gegenseitig ausschließenden Bildschirme gerade
   // angezeigt wird (Startaufstellung/Auswechseln/"Wer?"-Picker/Aktions-
-  // Raster) — wechselt der Screen, wird nach oben gescrollt (siehe Effekt
-  // unten). Sonst bleibt man z. B. nach "Wechseln" auf der Scroll-Position
-  // des Auf-dem-Feld-Buttons stehen und sieht die neue Spielerauswahl
-  // gar nicht, ohne selbst wieder hochzuscrollen.
+  // Raster) — wechselt der Screen, wird nach oben gescrollt. Sonst bleibt
+  // man z. B. nach "Wechseln" auf der Scroll-Position des
+  // Auf-dem-Feld-Buttons stehen und sieht die neue Spielerauswahl gar
+  // nicht, ohne selbst wieder hochzuscrollen.
   const screenKey =
     trackablePlayers.length === 0
       ? 'empty'
@@ -423,9 +424,7 @@ export function GameStatsTracker() {
             ? `picker-${pendingAction}`
             : 'idle';
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [screenKey]);
+  useScrollResetOnChange(screenKey);
 
   return (
     <div className="min-h-screen bg-tbw-bg pb-8">

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { ErrorNote } from '../components/ErrorNote';
+import { useScrollResetOnChange } from '../hooks/useScrollResetOnChange';
 import { IconCalendar, IconTeam, IconJersey, IconClipboard } from '../components/NavIcons';
 
 type Step = 'intro' | 'welcome' | 'trainer-login' | 'trainer-forgot-password' | 'player-code';
@@ -26,6 +27,8 @@ const INTRO_SLIDES = [
 
 export function Onboarding() {
   const [step, setStep] = useState<Step>('intro');
+
+  useScrollResetOnChange(step);
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-tbw-navyDark to-tbw-navy text-white">
