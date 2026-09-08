@@ -716,6 +716,47 @@ hier die getroffenen Entscheidungen samt Begründung:
     unterhalb des vorhandenen Inhalts auf, wie z. B. "Kader anzeigen" auf
     `Spiele.tsx` — das braucht keinen Reset), `useScrollResetOnChange`
     mit dem entsprechenden State-Wert aufrufen.
+- **Kader-Bestätigung (Migration `0030_squad_confirmation.sql`).** Ein
+  Spieler, der im veröffentlichten Kader steht, sieht in der Kader-Liste
+  unter "Spiele" seine eigene Zeile hervorgehoben (fett, "(Du)") mit zwei
+  Buttons "✓ Kann" / "✗ Kann nicht" statt nur des Namens.
+  - **Datenmodell:** `game_squad.confirmation` (`pending` | `confirmed` |
+    `declined`, Default `pending`). Direktes Schreiben bleibt weiterhin
+    Trainer-only (bestehende RLS-Policy unverändert) — ein Spieler ändert
+    ausschließlich über die neue security-definer-RPC
+    `respond_to_squad(p_game_id, p_confirmed)` seine EIGENE Zeile, und
+    nur solange er dort noch `is_selected = true` ist.
+  - **Absage entfernt automatisch aus dem Kader:** die RPC setzt bei
+    `p_confirmed = false` neben `confirmation = 'declined'` auch
+    `is_selected = false` — der Spieler verschwindet damit sofort aus
+    der (nur ausgewählte Spieler zeigenden) Kader-Liste, auch für sich
+    selbst. Eine Zusage kann er jederzeit wieder zu einer Absage ändern
+    (Link "Doch nicht?" neben der "✓ Zugesagt"-Pille); nach einer Absage
+    ist er raus und kann nicht mehr selbst zurück — nur der Trainer kann
+    ihn erneut aufnehmen, danach kann er wieder reagieren.
+  - **"Abgesagt"-Zustand nur für den Trainer sichtbar:** die Trainer-Kader-
+    Bearbeitung zeigt für einen entfernten Spieler mit
+    `confirmation = 'declined'` statt "nicht im Kader" die Pille
+    "abgesagt" (`pill-warn`), damit eine Absage von einer normalen
+    Nichtberücksichtigung unterscheidbar bleibt. Jeder manuelle Trainer-
+    Eingriff (`toggle()` in `Spiele.tsx`, egal ob rein oder raus) setzt
+    `confirmation` wieder auf `pending` zurück — für andere Spieler bleibt
+    der Absage-Status also unsichtbar, sie sehen die abgesagte Person
+    einfach nicht mehr in der Liste.
+  - **Dashboard-Meldung für den Trainer:** neue Spalte
+    `games.squad_decline_pending` (Default `false`), von der RPC bei
+    einer Absage auf `true` gesetzt. Solange sie gesetzt ist, zeigt
+    `Dashboard.tsx` für Trainer/Admin oberhalb von "Nächstes Spiel" eine
+    Kachel ("Kader-Absage", Warnfarbe) mit den Namen aller aktuell
+    abgesagten Spieler und einem "Kader bearbeiten"-Link auf
+    `/spiele?kader=1`. Die Meldung gilt bewusst schon als "gesehen",
+    sobald der Trainer die Kader-Bearbeitung für dieses Spiel öffnet
+    (unabhängig davon, ob er den betroffenen Spieler tatsächlich
+    anfasst) — `Spiele.tsx` setzt `squad_decline_pending` per Effekt auf
+    `false`, sobald `squadEditorOpen` wahr wird. Das ist bewusst getrennt
+    von der pro Spieler persistenten "abgesagt"-Pille im Editor (die
+    bleibt bestehen, bis der Trainer den Spieler wieder aufnimmt) — die
+    Dashboard-Kachel ist nur ein einmaliger Hinweis, keine Aufgabenliste.
 
 ## Projektstruktur
 

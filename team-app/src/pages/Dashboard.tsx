@@ -41,6 +41,7 @@ interface DashboardData {
   absencesOverview: PlayerAbsence[];
   lastResult: Game | null;
   myTotalPoints: number | null;
+  declinedNames: string[];
 }
 
 export function Dashboard() {
@@ -85,8 +86,22 @@ export function Dashboard() {
       let playerInSquad: DashboardData['playerInSquad'] = null;
       let carpoolOffers: CarpoolOffer[] = [];
       let carpoolClaims: CarpoolClaim[] = [];
+      let declinedNames: string[] = [];
 
       const nextGame = gameRes.data as Game | null;
+      const playersById: Record<string, Player> = {};
+      (playersRes.data as Player[] | null)?.forEach((p) => (playersById[p.id] = p));
+
+      if (isAdmin && nextGame?.squad_decline_pending) {
+        const { data: declinedRows } = await supabase
+          .from('game_squad')
+          .select('player_id')
+          .eq('game_id', nextGame.id)
+          .eq('confirmation', 'declined');
+        declinedNames = ((declinedRows as { player_id: string }[] | null) ?? [])
+          .map((r) => playersById[r.player_id]?.name)
+          .filter((n): n is string => !!n);
+      }
 
       if (flags.carpool && nextGame && !nextGame.is_home) {
         const [offersRes, claimsRes] = await Promise.all([
@@ -188,9 +203,6 @@ export function Dashboard() {
 
       if (cancelled) return;
 
-      const playersById: Record<string, Player> = {};
-      (playersRes.data as Player[] | null)?.forEach((p) => (playersById[p.id] = p));
-
       if (gameRes.error || trikotRes.error) {
         setError('Fehler beim Laden der Startseite.');
         return;
@@ -208,7 +220,8 @@ export function Dashboard() {
         carpoolClaims,
         absencesOverview,
         lastResult,
-        myTotalPoints
+        myTotalPoints,
+        declinedNames
       });
     }
 
@@ -246,6 +259,18 @@ export function Dashboard() {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {isAdmin && data.nextGame?.squad_decline_pending && data.declinedNames.length > 0 && (
+        <section className="card !bg-status-warn/10 !ring-status-warn/30">
+          <SectionTitle icon="⚠️" title="Kader-Absage" />
+          <p className="mt-2 text-sm text-tbw-navyDark">
+            {declinedNamesText(data.declinedNames)} leider am Spiel vs. {data.nextGame.opponent} nicht teilnehmen.
+          </p>
+          <Link to="/spiele?kader=1" className="btn-secondary mt-3 block w-full text-center !py-2 text-sm">
+            Kader bearbeiten
+          </Link>
         </section>
       )}
 
@@ -485,6 +510,11 @@ export function Dashboard() {
       </section>
     </div>
   );
+}
+
+function declinedNamesText(names: string[]): string {
+  if (names.length === 1) return `${names[0]} kann`;
+  return `${names.slice(0, -1).join(', ')} und ${names[names.length - 1]} können`;
 }
 
 function SectionTitle({ icon, title }: { icon: string; title: string }) {
