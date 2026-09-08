@@ -467,6 +467,41 @@ hier die getroffenen Entscheidungen samt Begründung:
   React Router setzt bei einer clientseitigen Navigation den Scroll nicht automatisch zurück
   (anders als ein echter Seitenwechsel) — in `App.tsx` per `useEffect` auf `location.pathname`
   ergänzt: `window.scrollTo(0, 0)` bei jedem Routenwechsel.
+- **Live-Stats-Tracking während des Spiels (Migration `0028`) statt manueller
+  "Punkte pro Spieler"-Nacherfassung (Migration `0016`).** Ersetzt eine eigene
+  Zusatz-App (easystatsapp.com) durch eine direkt integrierte, an Kader/Spielplan
+  angebundene Funktion — bewusst nicht in der normalen Tab-Oberfläche, sondern als
+  eigene Vollbild-Route `/stats/:gameId` ohne `Shell`/`BottomNav`
+  (`src/pages/GameStatsTracker.tsx`), erreichbar über einen "📊 Spiel-Stats
+  tracken"-Button auf der Startseite (ab Spieltag) bzw. einen "Stats
+  tracken"/"Stats ansehen"-Link je Spiel im Admin-Bereich.
+  - **Datenmodell:** jede Aktion (Korb, Rebound, Assist, Foul, ...) ist eine
+    einzelne Zeile in `game_stat_events` (Team, Spieler, Viertel, Stat-Typ) —
+    kein aggregierter Zwischenstand in der DB. `games.final_score_us`/
+    `final_score_opponent` werden per Trigger (`recalc_game_score()`) bei
+    jedem Insert/Delete aus den Events neu berechnet, es gibt also keine
+    zweite, manuell zu pflegende Quelle für den Endstand mehr. Box-Score
+    und Viertel-Stände werden rein clientseitig aus den geladenen Events
+    aggregiert (`src/lib/gameStats.ts`).
+  - **Zugriff bewusst nicht auf Trainer/Admin beschränkt** — laut Absprache
+    trackt "wer gerade Zeit hat beim Spiel", also jeder Spieler oder Trainer.
+  - **"Nur eine Person gleichzeitig"** ist ein weicher Lock mit Herzschlag
+    (`game_stat_sessions` + `claim_stat_session`/`heartbeat_stat_session`/
+    `release_stat_session`-RPCs), bewusst kein harter Lock: läuft der
+    Herzschlag (alle 15s) länger als 30s nicht, gilt der Lock als frei, und
+    ein anderer Nutzer kann jederzeit aktiv "Trotzdem übernehmen" — verhindert,
+    dass jemand dauerhaft ausgesperrt bleibt, nur weil eine Seite nicht sauber
+    verlassen wurde (Handy weggesteckt, Tab geschlossen). Wer den Lock
+    verliert, bekommt das beim nächsten Herzschlag mitgeteilt und die Eingabe
+    wird clientseitig gesperrt.
+  - **Abschluss:** "Spiel beenden" (`finalize_game_stats`) setzt
+    `games.stats_finalized_at` und gibt den Lock frei — danach zeigt dieselbe
+    Route nur noch den Box-Score, ohne Eingabe-UI. Trainer/Admin können über
+    "Wieder öffnen" (`reopen_game_stats`, bewusst Trainer-only) ein
+    versehentlich abgeschlossenes Spiel erneut freigeben.
+  - **Alte Funktion entfernt:** `game_player_points`-Tabelle und
+    `GamePointsEditor.tsx` gelöscht, das manuelle Endstand-Eingabefeld im
+    "Neues Spiel"-Formular entfernt (Endstand ist jetzt reine Ableitung).
 
 ## Projektstruktur
 

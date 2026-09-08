@@ -26,7 +26,7 @@ export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: st
   },
   stats: {
     label: 'Punkte & Ergebnisse',
-    description: 'Endstand pro Spiel und Punkte pro Spieler, manuell vom Trainer eingetragen.'
+    description: 'Live-Stats-Tracking während des Spiels — Endstand und Box-Score ergeben sich automatisch daraus.'
   }
 };
 
@@ -144,6 +144,7 @@ export interface Game {
   meeting_point_carpool: string | null;
   final_score_us: number | null;
   final_score_opponent: number | null;
+  stats_finalized_at: string | null;
   created_at: string;
 }
 
@@ -262,10 +263,62 @@ export function playerAbsenceOn(
   return absences.some((a) => a.player_id === playerId && dateIso >= a.start_date && dateIso <= a.end_date);
 }
 
-export interface GamePlayerPoints {
+export type StatTeam = 'us' | 'opponent';
+
+export type StatType =
+  | 'fg2_made'
+  | 'fg2_miss'
+  | 'fg3_made'
+  | 'fg3_miss'
+  | 'ft_made'
+  | 'ft_miss'
+  | 'rebound'
+  | 'assist'
+  | 'steal'
+  | 'block'
+  | 'turnover'
+  | 'foul';
+
+// Nur diese drei zählen für den Punktestand — auch beim Gegner, für den nur
+// der Punktestand getrackt wird (siehe game_stat_events_opponent_scoring_only
+// in Migration 0028), kein voller Box-Score.
+export const STAT_POINT_VALUES: Partial<Record<StatType, number>> = {
+  fg2_made: 2,
+  fg3_made: 3,
+  ft_made: 1
+};
+
+export const STAT_TYPE_LABELS: Record<StatType, string> = {
+  fg2_made: '2er ✓',
+  fg2_miss: '2er ✗',
+  fg3_made: '3er ✓',
+  fg3_miss: '3er ✗',
+  ft_made: 'FW ✓',
+  ft_miss: 'FW ✗',
+  rebound: 'Rebound',
+  assist: 'Assist',
+  steal: 'Steal',
+  block: 'Block',
+  turnover: 'Ballverlust',
+  foul: 'Foul'
+};
+
+export interface GameStatEvent {
+  id: string;
   game_id: string;
-  player_id: string;
-  points: number;
+  team: StatTeam;
+  player_id: string | null;
+  quarter: number;
+  stat_type: StatType;
+  created_by_name: string;
+  created_at: string;
+}
+
+export interface GameStatSessionState {
+  holder_name: string;
+  started_at: string;
+  last_heartbeat: string;
+  is_me: boolean;
 }
 
 export type GameResult = 'sieg' | 'niederlage' | 'unentschieden';

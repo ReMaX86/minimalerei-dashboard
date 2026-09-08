@@ -9,6 +9,7 @@ import { AbsenceSection } from '../components/AbsenceSection';
 import { fmtDate, fmtDateShort, fmtTime } from '../lib/format';
 import {
   OFFICIATING_TASK_LABELS,
+  STAT_POINT_VALUES,
   benoetigterSatz,
   gameResult,
   meetingPoints,
@@ -21,6 +22,7 @@ import {
   type OfficiatingTask,
   type Player,
   type PlayerAbsence,
+  type StatType,
   type TrikotSet
 } from '../types/database';
 
@@ -147,19 +149,21 @@ export function Dashboard() {
         const { data: lastGameRow } = await supabase
           .from('games')
           .select('*')
-          .not('final_score_us', 'is', null)
+          .not('stats_finalized_at', 'is', null)
           .order('game_date', { ascending: false })
           .limit(1)
           .maybeSingle();
         lastResult = lastGameRow as Game | null;
 
         if (role === 'player' && player) {
-          const { data: pointsRows } = await supabase
-            .from('game_player_points')
-            .select('points')
-            .eq('player_id', player.id);
-          myTotalPoints = ((pointsRows as { points: number }[] | null) ?? []).reduce(
-            (sum, r) => sum + r.points,
+          const { data: statRows } = await supabase
+            .from('game_stat_events')
+            .select('stat_type')
+            .eq('team', 'us')
+            .eq('player_id', player.id)
+            .in('stat_type', ['fg2_made', 'fg3_made', 'ft_made']);
+          myTotalPoints = ((statRows as { stat_type: StatType }[] | null) ?? []).reduce(
+            (sum, r) => sum + (STAT_POINT_VALUES[r.stat_type] ?? 0),
             0
           );
         }
@@ -299,6 +303,17 @@ export function Dashboard() {
             <p className="mt-2 text-xs text-tbw-ink/50">
               Trikot: {benoetigterSatz(data.nextGame) === 'weiss' ? 'Weiß' : 'Schwarz'}
             </p>
+            {flags.stats &&
+              (role === 'player' || role === 'trainer') &&
+              data.nextGame.game_date <= new Date().toISOString().slice(0, 10) &&
+              !data.nextGame.stats_finalized_at && (
+                <Link
+                  to={`/stats/${data.nextGame.id}`}
+                  className="btn-accent mt-2 block w-full text-center !py-2 text-sm"
+                >
+                  📊 Spiel-Stats tracken
+                </Link>
+              )}
             {role === 'player' && (
               <div className="mt-3 flex items-center justify-between border-t border-black/5 pt-3">
                 {!data.nextGame.squad_published ? (
@@ -352,6 +367,14 @@ export function Dashboard() {
             <p className="mt-2 border-t border-black/5 pt-2 text-xs text-tbw-ink/50">
               Deine Punkte diese Saison: <span className="font-bold text-tbw-navyDark">{data.myTotalPoints}</span>
             </p>
+          )}
+          {(role === 'player' || role === 'trainer') && (
+            <Link
+              to={`/stats/${data.lastResult.id}`}
+              className="mt-2 block border-t border-black/5 pt-2 text-xs font-bold text-tbw-navy"
+            >
+              Box-Score ansehen →
+            </Link>
           )}
         </section>
       )}
