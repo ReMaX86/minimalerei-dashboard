@@ -10,6 +10,7 @@ import { fmtDate, fmtTime } from '../lib/format';
 import { meetingPoints, playerAbsenceOn, type Game, type GameSquadRow, type Player, type PlayerAbsence } from '../types/database';
 
 const MAX_SQUAD_SIZE = 12;
+const UPCOMING_PREVIEW_COUNT = 3;
 
 interface State {
   nextGame: Game | null;
@@ -19,11 +20,27 @@ interface State {
   absences: PlayerAbsence[];
 }
 
-export function Kader() {
+function GameListItem({ game }: { game: Game }) {
+  return (
+    <li className="rounded-xl bg-tbw-bg p-3 text-sm">
+      <p className="font-semibold text-tbw-navyDark">
+        vs. {game.opponent} <span className="pill pill-open ml-1">{game.is_home ? 'Heim' : 'Auswärts'}</span>
+      </p>
+      <p className="text-tbw-ink/60">
+        {fmtDate(game.game_date)} · {fmtTime(game.game_time)} Uhr · {game.location}
+      </p>
+    </li>
+  );
+}
+
+export function Spiele() {
   const { role, isAdmin } = useAuth();
   const { flags } = useFeatureFlags();
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [squadOpen, setSquadOpen] = useState(false);
+  const [squadEditorOpen, setSquadEditorOpen] = useState(false);
+  const [meetingEditorOpen, setMeetingEditorOpen] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -39,7 +56,7 @@ export function Kader() {
       supabase.from('players').select('*').eq('is_active', true)
     ]);
     if (gamesRes.error || playersRes.error) {
-      setError('Fehler beim Laden des Kaders.');
+      setError('Fehler beim Laden der Spiele.');
       return;
     }
     const games = (gamesRes.data as Game[]) ?? [];
@@ -68,7 +85,7 @@ export function Kader() {
   }, [flags.absences]);
 
   useEffect(() => {
-    load().catch(() => setError('Fehler beim Laden des Kaders.'));
+    load().catch(() => setError('Fehler beim Laden der Spiele.'));
   }, [load]);
 
   useEffect(() => {
@@ -161,6 +178,8 @@ export function Kader() {
   const sortedForTrainer = [...state.players].sort(
     (a, b) => Number(!!selectedByPlayer[b.id]) - Number(!!selectedByPlayer[a.id]) || a.name.localeCompare(b.name, 'de')
   );
+  const next3 = state.upcomingGames.slice(0, UPCOMING_PREVIEW_COUNT);
+  const rest = state.upcomingGames.slice(UPCOMING_PREVIEW_COUNT);
 
   return (
     <div className="space-y-4">
@@ -173,6 +192,7 @@ export function Kader() {
               {fmtDate(state.nextGame.game_date)} · {fmtTime(state.nextGame.game_time)} Uhr ·{' '}
               {state.nextGame.is_home ? 'Heim' : 'Auswärts'}
             </p>
+            <p className="text-sm text-tbw-ink/60">{state.nextGame.location}</p>
             {!isAdmin && meetingPoints(state.nextGame).length > 0 && (
               <div className="mt-2 rounded-xl bg-tbw-bg px-3 py-2">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-ink/40">Treffpunkt</p>
@@ -194,79 +214,113 @@ export function Kader() {
 
         {isAdmin && (
           <>
-            <div className="mt-3 border-t border-black/5 pt-3">
-              <p className="text-sm font-bold text-tbw-navyDark">Treffpunkt</p>
-              <div className="mt-2">
-                <MeetingPointFields
-                  isHome={state.nextGame.is_home}
-                  value={meetingForm}
-                  onChange={setMeetingForm}
-                />
-              </div>
-              <div className="mt-2 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={saveMeetingPoint}
-                  disabled={savingMeeting}
-                  className="btn-secondary !px-3 !py-1.5 text-xs"
-                >
-                  {savingMeeting ? 'Speichere…' : 'Treffpunkt speichern'}
-                </button>
-                {meetingSaved && <span className="text-xs font-semibold text-status-ok">Gespeichert</span>}
-              </div>
+            <div className="mt-3 flex gap-2 border-t border-black/5 pt-3">
+              <button
+                type="button"
+                onClick={() => setSquadEditorOpen((v) => !v)}
+                className="btn-secondary flex-1 !py-2 text-xs"
+              >
+                👥 {squadEditorOpen ? 'Kader schließen' : 'Kader festlegen'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMeetingEditorOpen((v) => !v)}
+                className="btn-secondary flex-1 !py-2 text-xs"
+              >
+                📍 {meetingEditorOpen ? 'Treffpunkt schließen' : 'Treffpunkt hinterlegen'}
+              </button>
             </div>
 
-            <ul className="mt-3 divide-y divide-black/5">
-              {sortedForTrainer.map((p) => (
-                <li key={p.id} className="flex items-center justify-between py-2">
-                  <span className="flex items-center gap-1.5 text-sm font-medium text-tbw-navyDark">
-                    {p.name}
-                    {flags.absences && playerAbsenceOn(state.absences, p.id, state.nextGame!.game_date) && (
-                      <span className="pill pill-warn" title="Im Urlaub eingetragen">
-                        🌴
-                      </span>
-                    )}
-                  </span>
+            {meetingEditorOpen && (
+              <div className="mt-3 border-t border-black/5 pt-3">
+                <p className="text-sm font-bold text-tbw-navyDark">Treffpunkt</p>
+                <div className="mt-2">
+                  <MeetingPointFields
+                    isHome={state.nextGame.is_home}
+                    value={meetingForm}
+                    onChange={setMeetingForm}
+                  />
+                </div>
+                <div className="mt-2 flex items-center gap-3">
                   <button
-                    disabled={togglingId === p.id || (atCap && !selectedByPlayer[p.id])}
-                    onClick={() => toggle(p.id)}
-                    className={`pill ${selectedByPlayer[p.id] ? 'pill-ok' : 'pill-open'} disabled:opacity-40`}
+                    type="button"
+                    onClick={saveMeetingPoint}
+                    disabled={savingMeeting}
+                    className="btn-secondary !px-3 !py-1.5 text-xs"
                   >
-                    {selectedByPlayer[p.id] ? 'im Kader' : 'nicht im Kader'}
+                    {savingMeeting ? 'Speichere…' : 'Treffpunkt speichern'}
                   </button>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-xs text-tbw-ink/50">
-              {selectedCount} von max. {MAX_SQUAD_SIZE} im Kader
-              {atCap && ' · Kader ist voll'}
-            </p>
-            <button onClick={togglePublish} disabled={publishing} className="btn-primary mt-3 w-full">
-              {publishing
-                ? 'Speichere…'
-                : state.nextGame.squad_published
-                ? 'Zurückziehen'
-                : 'Veröffentlichen'}
-            </button>
+                  {meetingSaved && <span className="text-xs font-semibold text-status-ok">Gespeichert</span>}
+                </div>
+              </div>
+            )}
+
+            {squadEditorOpen && (
+              <div className="mt-3 border-t border-black/5 pt-3">
+                <ul className="divide-y divide-black/5">
+                  {sortedForTrainer.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between py-2">
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-tbw-navyDark">
+                        {p.name}
+                        {flags.absences && playerAbsenceOn(state.absences, p.id, state.nextGame!.game_date) && (
+                          <span className="pill pill-warn" title="Im Urlaub eingetragen">
+                            🌴
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        disabled={togglingId === p.id || (atCap && !selectedByPlayer[p.id])}
+                        onClick={() => toggle(p.id)}
+                        className={`pill ${selectedByPlayer[p.id] ? 'pill-ok' : 'pill-open'} disabled:opacity-40`}
+                      >
+                        {selectedByPlayer[p.id] ? 'im Kader' : 'nicht im Kader'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-tbw-ink/50">
+                  {selectedCount} von max. {MAX_SQUAD_SIZE} im Kader
+                  {atCap && ' · Kader ist voll'}
+                </p>
+                <button onClick={togglePublish} disabled={publishing} className="btn-primary mt-3 w-full">
+                  {publishing
+                    ? 'Speichere…'
+                    : state.nextGame.squad_published
+                    ? 'Zurückziehen'
+                    : 'Veröffentlichen'}
+                </button>
+              </div>
+            )}
           </>
         )}
 
         {role === 'player' &&
           !isAdmin &&
           (state.nextGame.squad_published ? (
-            state.players.filter((p) => selectedByPlayer[p.id]).length === 0 ? (
-              <p className="mt-3 text-sm text-tbw-ink/50">Niemand im Kader.</p>
-            ) : (
-              <ul className="mt-3 divide-y divide-black/5">
-                {state.players
-                  .filter((p) => selectedByPlayer[p.id])
-                  .map((p) => (
-                    <li key={p.id} className="py-2 text-sm font-medium text-tbw-navyDark">
-                      {p.name}
-                    </li>
-                  ))}
-              </ul>
-            )
+            <div className="mt-3 border-t border-black/5 pt-3">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+                onClick={() => setSquadOpen((v) => !v)}
+              >
+                👥 Kader {squadOpen ? 'ausblenden' : 'anzeigen'}
+                <span>{squadOpen ? '▲' : '▼'}</span>
+              </button>
+              {squadOpen &&
+                (state.players.filter((p) => selectedByPlayer[p.id]).length === 0 ? (
+                  <p className="mt-3 text-sm text-tbw-ink/50">Niemand im Kader.</p>
+                ) : (
+                  <ul className="mt-3 divide-y divide-black/5">
+                    {state.players
+                      .filter((p) => selectedByPlayer[p.id])
+                      .map((p) => (
+                        <li key={p.id} className="py-2 text-sm font-medium text-tbw-navyDark">
+                          {p.name}
+                        </li>
+                      ))}
+                  </ul>
+                ))}
+            </div>
           ) : (
             <p className="mt-3 text-sm text-tbw-ink/50">Kader für dieses Spiel noch nicht veröffentlicht.</p>
           ))}
@@ -276,32 +330,35 @@ export function Kader() {
         <CarpoolSection gameId={state.nextGame.id} players={state.players} />
       )}
 
-      <section className="card">
-        <button
-          className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
-          onClick={() => setShowMore((v) => !v)}
-        >
-          Weitere Spieltage anzeigen
-          <span>{showMore ? '▲' : '▼'}</span>
-        </button>
-        {showMore && (
-          <ul className="mt-3 space-y-2">
-            {state.upcomingGames.length === 0 && (
-              <p className="text-sm text-tbw-ink/50">Keine weiteren Spiele geplant.</p>
-            )}
-            {state.upcomingGames.map((g) => (
-              <li key={g.id} className="rounded-xl bg-tbw-bg p-3 text-sm">
-                <p className="font-semibold text-tbw-navyDark">
-                  vs. {g.opponent} <span className="pill pill-open ml-1">{g.is_home ? 'Heim' : 'Auswärts'}</span>
-                </p>
-                <p className="text-tbw-ink/60">
-                  {fmtDate(g.game_date)} · {fmtTime(g.game_time)} Uhr · {g.location}
-                </p>
-              </li>
+      {next3.length > 0 && (
+        <section className="card">
+          <p className="text-sm font-bold text-tbw-navyDark">Nächste Spiele</p>
+          <ul className="mt-2 space-y-2">
+            {next3.map((g) => (
+              <GameListItem key={g.id} game={g} />
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
+
+      {rest.length > 0 && (
+        <section className="card">
+          <button
+            className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+            onClick={() => setShowMore((v) => !v)}
+          >
+            Weitere Spieltage anzeigen
+            <span>{showMore ? '▲' : '▼'}</span>
+          </button>
+          {showMore && (
+            <ul className="mt-3 space-y-2">
+              {rest.map((g) => (
+                <GameListItem key={g.id} game={g} />
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
     </div>
   );
 }

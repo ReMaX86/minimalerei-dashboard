@@ -282,7 +282,7 @@ export function Dashboard() {
                   <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-ink/40">
                     Mitfahrgelegenheit
                   </p>
-                  <Link to="/kader" className="text-[10px] font-bold text-tbw-navy">
+                  <Link to="/spiele" className="text-[10px] font-bold text-tbw-navy">
                     Verwalten →
                   </Link>
                 </div>
@@ -324,7 +324,7 @@ export function Dashboard() {
                   <span className="text-sm font-medium text-tbw-ink/50">Nicht im Kader</span>
                 )}
                 {data.nextGame.squad_published && (
-                  <Link to="/kader" className="text-xs font-bold text-tbw-navy">
+                  <Link to="/spiele" className="text-xs font-bold text-tbw-navy">
                     Kader ansehen →
                   </Link>
                 )}

@@ -10,7 +10,7 @@ import { ResetPassword } from './pages/ResetPassword';
 import { Dashboard } from './pages/Dashboard';
 import { Trikots } from './pages/Trikots';
 import { Kampfgericht } from './pages/Kampfgericht';
-import { Kader } from './pages/Kader';
+import { Spiele } from './pages/Spiele';
 import { Admin } from './pages/Admin';
 import { PlayerProfiles } from './pages/PlayerProfiles';
 import { GameStatsTracker } from './pages/GameStatsTracker';
@@ -106,17 +106,18 @@ export default function App() {
         }
       />
       <Route
-        path="/kader"
+        path="/spiele"
         element={
           role === 'viewer' ? (
             <Navigate to="/" replace />
           ) : (
-            <Shell title="Kader">
-              <Kader />
+            <Shell title="Spiele & Kader">
+              <Spiele />
             </Shell>
           )
         }
       />
+      <Route path="/kader" element={<Navigate to="/spiele" replace />} />
       <Route
         path="/team"
         element={

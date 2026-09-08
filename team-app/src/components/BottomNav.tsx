@@ -7,7 +7,7 @@ const ITEMS = [
   { to: '/', label: 'Start', Icon: IconHome, end: true },
   { to: '/trikots', label: 'Trikots', Icon: IconJersey, end: false },
   { to: '/kampfgericht', label: 'Kampfgericht', Icon: IconClipboard, end: false },
-  { to: '/kader', label: 'Kader', Icon: IconTeam, end: false }
+  { to: '/spiele', label: 'Spiele', Icon: IconTeam, end: false }
 ];
 
 // Betrachter (z. B. Abteilungsleiter) sehen nur Spielplan + Kampfgericht,
