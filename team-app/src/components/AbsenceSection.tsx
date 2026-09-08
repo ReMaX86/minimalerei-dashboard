@@ -109,8 +109,8 @@ export function AbsenceSection() {
       <div className="mt-3 border-t border-black/5 pt-3">
         {showForm ? (
           <form onSubmit={submit} className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block min-w-0 text-xs">
+            <div className="space-y-2">
+              <label className="block text-xs">
                 <span className="font-semibold text-tbw-ink/50">Von</span>
                 <input
                   type="date"
@@ -120,7 +120,7 @@ export function AbsenceSection() {
                   onChange={(e) => setStartDate(e.target.value)}
                 />
               </label>
-              <label className="block min-w-0 text-xs">
+              <label className="block text-xs">
                 <span className="font-semibold text-tbw-ink/50">Bis</span>
                 <input
                   type="date"
