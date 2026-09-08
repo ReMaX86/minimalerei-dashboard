@@ -763,6 +763,18 @@ hier die getroffenen Entscheidungen samt Begründung:
     'confirmed'`) ein grünes ✓ — vorher war für den Trainer nicht
     unterscheidbar, ob ein im Kader stehender Spieler schon reagiert hat
     oder noch auf "pending" steht.
+  - **Zweiter Nachtrag (Uhr-Symbol für noch offene Antworten, Hinweis auf
+    dem Spieler-Dashboard):** ausgewählte Spieler mit `confirmation ===
+    'pending'` zeigen in der Trainer-Kader-Bearbeitung jetzt statt gar
+    keinem Symbol ein 🕐 neben dem Namen (analog zum ✓ bei Zusage) — macht
+    auf einen Blick sichtbar, wer noch nicht reagiert hat. Auf dem
+    Spieler-Dashboard steht unter "Du bist dabei!" bei ausstehender
+    Rückmeldung (`myConfirmation === 'pending'`) zusätzlich ein auffälliger
+    roter Hinweis "⚠️ Bitte Teilnahme bestätigen" (verlinkt auf
+    `/spiele?kader=1`); bei erfolgter Zusage steht stattdessen
+    "Du bist dabei! (zugesagt)" ohne den Hinweis. Dashboard.tsx lädt dafür
+    zusätzlich `confirmation` aus der eigenen `game_squad`-Zeile
+    (vorher nur `is_selected`).
 
 ## Projektstruktur
 

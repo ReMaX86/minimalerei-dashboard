@@ -22,6 +22,7 @@ import {
   type OfficiatingTask,
   type Player,
   type PlayerAbsence,
+  type SquadConfirmation,
   type StatType,
   type TrikotSet
 } from '../types/database';
@@ -31,6 +32,7 @@ const RESULT_LABELS = { sieg: 'Sieg', niederlage: 'Niederlage', unentschieden: '
 interface DashboardData {
   nextGame: Game | null;
   playerInSquad: boolean | null;
+  myConfirmation: SquadConfirmation | null;
   playerNextTask: (OfficiatingTask & { officiating_games: OfficiatingGame }) | null;
   trainerNextOfficiatingGame: (OfficiatingGame & { tasks: OfficiatingTask[] }) | null;
   trikotSets: TrikotSet[];
@@ -84,6 +86,7 @@ export function Dashboard() {
       let playerNextTask: DashboardData['playerNextTask'] = null;
       let trainerNextOfficiatingGame: DashboardData['trainerNextOfficiatingGame'] = null;
       let playerInSquad: DashboardData['playerInSquad'] = null;
+      let myConfirmation: DashboardData['myConfirmation'] = null;
       let carpoolOffers: CarpoolOffer[] = [];
       let carpoolClaims: CarpoolClaim[] = [];
       let declinedNames: string[] = [];
@@ -115,11 +118,12 @@ export function Dashboard() {
       if (role === 'player' && player && nextGame?.squad_published) {
         const { data: squadRow } = await supabase
           .from('game_squad')
-          .select('is_selected')
+          .select('is_selected, confirmation')
           .eq('game_id', nextGame.id)
           .eq('player_id', player.id)
           .maybeSingle();
         playerInSquad = squadRow?.is_selected ?? false;
+        myConfirmation = playerInSquad ? (squadRow?.confirmation as SquadConfirmation) ?? 'pending' : null;
       }
 
       if (role === 'player' && player) {
@@ -211,6 +215,7 @@ export function Dashboard() {
       setData({
         nextGame: nextGame ?? null,
         playerInSquad,
+        myConfirmation,
         playerNextTask,
         trainerNextOfficiatingGame,
         trikotSets: (trikotRes.data as TrikotSet[]) ?? [],
@@ -340,17 +345,26 @@ export function Dashboard() {
                 </Link>
               )}
             {role === 'player' && (
-              <div className="mt-3 flex items-center justify-between border-t border-black/5 pt-3">
-                {!data.nextGame.squad_published ? (
-                  <span className="text-sm text-tbw-ink/50">Kader noch nicht veröffentlicht</span>
-                ) : data.playerInSquad ? (
-                  <span className="text-sm font-bold text-status-ok">Du bist dabei!</span>
-                ) : (
-                  <span className="text-sm font-medium text-tbw-ink/50">Nicht im Kader</span>
-                )}
-                {data.nextGame.squad_published && (
-                  <Link to="/spiele?kader=1" className="text-xs font-bold text-tbw-navy">
-                    Kader ansehen →
+              <div className="mt-3 border-t border-black/5 pt-3">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  {!data.nextGame.squad_published ? (
+                    <span className="text-sm text-tbw-ink/50">Kader noch nicht veröffentlicht</span>
+                  ) : data.playerInSquad ? (
+                    <span className="text-sm font-bold text-status-ok">
+                      Du bist dabei!{data.myConfirmation === 'confirmed' && ' (zugesagt)'}
+                    </span>
+                  ) : (
+                    <span className="text-sm font-medium text-tbw-ink/50">Nicht im Kader</span>
+                  )}
+                  {data.nextGame.squad_published && (
+                    <Link to="/spiele?kader=1" className="shrink-0 text-xs font-bold text-tbw-navy">
+                      Kader ansehen →
+                    </Link>
+                  )}
+                </div>
+                {data.playerInSquad && data.myConfirmation === 'pending' && (
+                  <Link to="/spiele?kader=1" className="mt-2 block text-sm font-bold text-tbw-red">
+                    ⚠️ Bitte Teilnahme bestätigen
                   </Link>
                 )}
               </div>
