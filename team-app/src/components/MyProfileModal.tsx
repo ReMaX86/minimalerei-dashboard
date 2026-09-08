@@ -22,8 +22,12 @@ export function MyProfileModal({ onClose }: { onClose: () => void }) {
     try {
       let photo_url = player.photo_url;
       if (photoFile) {
+        const {
+          data: { session }
+        } = await supabase.auth.getSession();
+        if (!session) throw new Error('Nicht angemeldet.');
         const ext = photoFile.name.split('.').pop() ?? 'jpg';
-        const path = `${player.id}-${Date.now()}.${ext}`;
+        const path = `${session.user.id}/${Date.now()}.${ext}`;
         const { error: uploadError } = await supabase.storage
           .from('player-photos')
           .upload(path, photoFile, { upsert: true });
