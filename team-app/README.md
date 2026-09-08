@@ -452,6 +452,21 @@ hier die getroffenen Entscheidungen samt Begründung:
   vom aufgelösten Login-Status erreichbar ist (siehe `App.tsx`), da der Mail-Link bereits eine
   gültige Recovery-Session mitbringt. Erfordert, dass die Redirect-URL in Supabase unter
   Authentication -> URL Configuration eingetragen ist (siehe Setup-Schritt 6).
+- **Urlaub/Abwesenheit auf der Startseite aktualisierte "Nächste Trainingseinheit" erst nach
+  Verlassen/Wiederbetreten der Seite.** `AbsenceSection.tsx` und `UpcomingTrainings.tsx` sind
+  zwei unabhängige Komponenten auf `Dashboard.tsx`, jede mit eigenem Datenabruf — ein Eintragen
+  oder Löschen einer Abwesenheit hat den bereits geladenen `absences`-State in
+  `UpcomingTrainings` nicht mitbekommen. `AbsenceSection` bekommt jetzt einen
+  `onChange`-Callback, den `Dashboard.tsx` nutzt, um einen `absenceVersion`-Zähler
+  hochzuzählen; der wird sowohl als `refreshKey`-Prop an `UpcomingTrainings` durchgereicht (dort
+  in den `useCallback`-Deps von `load()`, damit ein Wertwechsel einen Refetch auslöst, obwohl
+  `refreshKey` selbst nicht gelesen wird) als auch in die Dependency-Liste von `Dashboard.tsx`s
+  eigenem Lade-Effekt aufgenommen (aktualisiert die "Aktuell abwesend"-Übersicht für
+  Captains/Trainer mit).
+- **Reiterwechsel (Bottom-Nav) behielt die Scroll-Position der vorherigen Seite bei.**
+  React Router setzt bei einer clientseitigen Navigation den Scroll nicht automatisch zurück
+  (anders als ein echter Seitenwechsel) — in `App.tsx` per `useEffect` auf `location.pathname`
+  ergänzt: `window.scrollTo(0, 0)` bei jedem Routenwechsel.
 
 ## Projektstruktur
 

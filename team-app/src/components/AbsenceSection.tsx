@@ -7,7 +7,7 @@ import { DateField } from './DateTimeField';
 import { fmtDateShort } from '../lib/format';
 import type { PlayerAbsence } from '../types/database';
 
-export function AbsenceSection() {
+export function AbsenceSection({ onChange }: { onChange: () => void }) {
   const { player } = useAuth();
   const [absences, setAbsences] = useState<PlayerAbsence[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +57,7 @@ export function AbsenceSection() {
       setEndDate('');
       setNote('');
       await load();
+      onChange();
     } catch {
       setError('Abwesenheit konnte nicht gespeichert werden.');
     } finally {
@@ -71,6 +72,7 @@ export function AbsenceSection() {
       const { error: delError } = await supabase.from('player_absences').delete().eq('id', id);
       if (delError) throw delError;
       await load();
+      onChange();
     } catch {
       setError('Abwesenheit konnte nicht gelöscht werden.');
     } finally {

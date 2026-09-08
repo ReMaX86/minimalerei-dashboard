@@ -39,6 +39,13 @@ export default function App() {
     }
   }, [role]);
 
+  // React Router doesn't reset scroll on navigation the way a full page load
+  // does — switching tabs in the bottom nav otherwise leaves the new page
+  // scrolled to wherever the previous one was left.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
   if (location.pathname === '/reset-password' || passwordRecovery) {
     return <ResetPassword />;
   }
