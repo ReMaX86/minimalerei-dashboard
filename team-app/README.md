@@ -651,6 +651,12 @@ hier die getroffenen Entscheidungen samt Begründung:
     "Gespeichert"-Bestätigung neben dem Treffpunkt-Speichern-Button ist
     dadurch redundant geworden (das Panel schließt sich ja direkt) und
     wurde entfernt.
+  - **Zweiter Nachtrag (Status-Pill umbenannt):** die Pill neben dem
+    nächsten Spiel hieß bislang schlicht "Entwurf"/"veröffentlicht" —
+    das las sich so, als stünde das ganze Spiel noch nicht fest, obwohl
+    sich der Status ausschließlich auf `squad_published` bezieht. Jetzt
+    "Kader ausstehend"/"Kader veröffentlicht", macht also explizit, dass
+    nur der Kader betroffen ist.
 
 ## Projektstruktur
 
