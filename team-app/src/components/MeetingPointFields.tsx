@@ -1,3 +1,5 @@
+import { TimeField } from './DateTimeField';
+
 export interface MeetingPointFormValue {
   meeting_time_hall: string;
   meeting_time_carpool: string;
@@ -26,15 +28,11 @@ export function MeetingPointFields({
     <div className="space-y-2">
       {!isHome && (
         <div className="space-y-2">
-          <label className="block text-xs">
-            <span className="font-semibold text-tbw-ink/50">Fahrgemeinschaft — Zeit</span>
-            <input
-              type="time"
-              className="input mt-1"
-              value={value.meeting_time_carpool}
-              onChange={(e) => onChange({ ...value, meeting_time_carpool: e.target.value })}
-            />
-          </label>
+          <TimeField
+            label="Fahrgemeinschaft — Zeit"
+            value={value.meeting_time_carpool}
+            onChange={(v) => onChange({ ...value, meeting_time_carpool: v })}
+          />
           <label className="block text-xs">
             <span className="font-semibold text-tbw-ink/50">Fahrgemeinschaft — Ort</span>
             <input
@@ -47,17 +45,11 @@ export function MeetingPointFields({
           </label>
         </div>
       )}
-      <label className="block text-xs">
-        <span className="font-semibold text-tbw-ink/50">
-          {isHome ? 'Treffpunkt in der Halle' : 'Direkt zur Halle — Zeit'}
-        </span>
-        <input
-          type="time"
-          className="input mt-1"
-          value={value.meeting_time_hall}
-          onChange={(e) => onChange({ ...value, meeting_time_hall: e.target.value })}
-        />
-      </label>
+      <TimeField
+        label={isHome ? 'Treffpunkt in der Halle' : 'Direkt zur Halle — Zeit'}
+        value={value.meeting_time_hall}
+        onChange={(v) => onChange({ ...value, meeting_time_hall: v })}
+      />
     </div>
   );
 }

@@ -393,6 +393,26 @@ hier die getroffenen Entscheidungen samt Begründung:
   Safari-spezifische Rendering-Verhalten lässt sich mit dem hier verfügbaren
   Chromium-Test-Browser nicht nachstellen — dieser Fix ist unverifiziert und braucht eine
   Rückmeldung vom echten iPhone.
+  **Dritter Nachtrag:** `overflow: hidden` hat auf dem echten iPhone nicht zuverlässig geholfen
+  (laut Rückmeldung war "Mein Profil" davor sogar noch in Ordnung, danach lief dort wieder ein
+  Feld über den Rand — die anderen Formulare weiterhin unverändert betroffen). Grundproblem:
+  `overflow: hidden` clippt nur nachträglich, verhindert aber nicht, dass die Box des nativen
+  Steuerelements selbst größer gerendert wird, als CSS vorgibt — auf iOS offenbar nicht
+  zuverlässig wirksam. Statt weiter am nativen Rendering herumzudoktern (drei Versuche in Folge
+  unverifizierbar, da Safari-spezifisch und mit dem hier verfügbaren Chromium-Browser nicht
+  nachstellbar), jetzt strukturell gelöst: neue `DateField`/`TimeField`-Komponenten
+  (`src/components/DateTimeField.tsx`) lassen das native `<input type="date"/"time">` weiter
+  Werte liefern und den nativen iOS-Picker öffnen, machen es aber komplett unsichtbar
+  (`opacity: 0`) und positionieren es `absolute` mit `inset-0` innerhalb eines
+  `overflow-hidden`-Wrappers — dadurch wird seine Box zwingend auf die Wrapper-Größe begrenzt,
+  unabhängig vom internen Rendering. Der sichtbare Wert (Datum/Uhrzeit oder Platzhaltertext) wird
+  stattdessen von einem ganz normalen `<span>` mit der `.input`-Klasse darunter angezeigt — für
+  dessen Breite/Overflow gelten die üblichen, plattformübergreifend zuverlässigen CSS-Regeln, da
+  kein natives Shadow-DOM mehr beteiligt ist. Alle sieben Datum-/Uhrzeit-Felder der App
+  (`MyProfileModal.tsx`, `AbsenceSection.tsx`, `MeetingPointFields.tsx`, `GamesAdmin.tsx`,
+  `OfficiatingAdmin.tsx`, `TrainingsAdmin.tsx`, `PlayersAdmin.tsx`) auf die neuen Komponenten
+  umgestellt; die jetzt überflüssige `overflow: hidden`/`max-width: 100%`-Regel aus dem zweiten
+  Nachtrag wieder aus `src/index.css` entfernt.
 - **5er-Positionssystem statt vereinfachter 3er-Einteilung (Migration `0026`).** Auf Wunsch von
   der vereinfachten Aufbau/Flügel/Center-Einteilung auf die klassischen fünf Basketball-Positionen
   mit englischen Kürzeln umgestellt: Point Guard (PG), Shooting Guard (SG), Small Forward (SF),

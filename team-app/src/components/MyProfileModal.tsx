@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Avatar } from './Avatar';
 import { ErrorNote } from './ErrorNote';
+import { DateField } from './DateTimeField';
 
 function describeError(err: unknown): string {
   if (!err || typeof err !== 'object') return String(err);
@@ -107,15 +108,7 @@ export function MyProfileModal({ onClose }: { onClose: () => void }) {
               onChange={(e) => setHeightCm(e.target.value)}
             />
           </label>
-          <label className="block text-xs">
-            <span className="font-semibold text-tbw-ink/50">Geburtsdatum</span>
-            <input
-              type="date"
-              className="input mt-1"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-            />
-          </label>
+          <DateField label="Geburtsdatum" value={birthDate} onChange={setBirthDate} />
         </div>
 
         {error && (

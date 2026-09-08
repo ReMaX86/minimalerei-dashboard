@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
+import { DateField } from '../../components/DateTimeField';
 import { POSITION_LABELS, SKILL_ICONS, SKILL_OPTIONS, type Player, type PlayerPosition } from '../../types/database';
 
 const EMPTY_DETAILS = {
@@ -250,15 +251,11 @@ export function PlayersAdmin() {
                     onChange={(e) => setDetailsForm((f) => ({ ...f, height_cm: e.target.value }))}
                   />
                 </div>
-                <label className="block text-xs">
-                  <span className="font-semibold text-tbw-ink/50">Geburtsdatum</span>
-                  <input
-                    type="date"
-                    className="input mt-1"
-                    value={detailsForm.birth_date}
-                    onChange={(e) => setDetailsForm((f) => ({ ...f, birth_date: e.target.value }))}
-                  />
-                </label>
+                <DateField
+                  label="Geburtsdatum"
+                  value={detailsForm.birth_date}
+                  onChange={(v) => setDetailsForm((f) => ({ ...f, birth_date: v }))}
+                />
                 <label className="block text-xs">
                   <span className="font-semibold text-tbw-ink/50">Foto</span>
                   <input

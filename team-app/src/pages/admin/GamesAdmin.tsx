@@ -5,6 +5,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
 import { MeetingPointFields, EMPTY_MEETING_POINT } from '../../components/MeetingPointFields';
 import { GamePointsEditor } from '../../components/GamePointsEditor';
+import { DateField, TimeField } from '../../components/DateTimeField';
 import { fmtDate, fmtTime } from '../../lib/format';
 import { gameResult, meetingPoints, type Game, type Player, type TrikotSetId } from '../../types/database';
 
@@ -123,26 +124,18 @@ export function GamesAdmin() {
       <form onSubmit={submit} className="card space-y-2">
         <p className="text-sm font-bold text-tbw-navyDark">{editingId ? 'Spiel bearbeiten' : 'Neues Spiel'}</p>
         <div className="space-y-2">
-          <label className="block text-xs">
-            <span className="font-semibold text-tbw-ink/50">Datum</span>
-            <input
-              type="date"
-              required
-              className="input mt-1"
-              value={form.game_date}
-              onChange={(e) => setForm((f) => ({ ...f, game_date: e.target.value }))}
-            />
-          </label>
-          <label className="block text-xs">
-            <span className="font-semibold text-tbw-ink/50">Uhrzeit</span>
-            <input
-              type="time"
-              required
-              className="input mt-1"
-              value={form.game_time}
-              onChange={(e) => setForm((f) => ({ ...f, game_time: e.target.value }))}
-            />
-          </label>
+          <DateField
+            label="Datum"
+            required
+            value={form.game_date}
+            onChange={(v) => setForm((f) => ({ ...f, game_date: v }))}
+          />
+          <TimeField
+            label="Uhrzeit"
+            required
+            value={form.game_time}
+            onChange={(v) => setForm((f) => ({ ...f, game_time: v }))}
+          />
         </div>
         <input
           required

@@ -35,17 +35,6 @@
        input with a font-size below 16px, and doesn't zoom back out after. */
     @apply w-full rounded-2xl border border-black/10 bg-white px-3.5 py-2.5 text-base text-tbw-ink outline-none focus:border-tbw-navy focus:ring-2 focus:ring-tbw-navy/20;
   }
-  /* iOS Safari's native date/time picker control can render its internal
-     content (segment placeholders + calendar/clock icon) wider than the
-     input's own CSS width, spilling past the field's border and even past
-     the card — width/min-width on the element or its parent don't stop
-     this, it's the shadow-root content itself ignoring the box. Clipping
-     via overflow-hidden keeps the visible field inside its own border. */
-  input[type='date'],
-  input[type='time'] {
-    max-width: 100%;
-    overflow: hidden;
-  }
   .pill {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold tracking-wide;
   }

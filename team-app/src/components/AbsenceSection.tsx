@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from './LoadingSpinner';
 import { ErrorNote } from './ErrorNote';
+import { DateField } from './DateTimeField';
 import { fmtDateShort } from '../lib/format';
 import type { PlayerAbsence } from '../types/database';
 
@@ -110,27 +111,8 @@ export function AbsenceSection() {
         {showForm ? (
           <form onSubmit={submit} className="space-y-2">
             <div className="space-y-2">
-              <label className="block text-xs">
-                <span className="font-semibold text-tbw-ink/50">Von</span>
-                <input
-                  type="date"
-                  required
-                  className="input mt-1"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-              </label>
-              <label className="block text-xs">
-                <span className="font-semibold text-tbw-ink/50">Bis</span>
-                <input
-                  type="date"
-                  required
-                  min={startDate || undefined}
-                  className="input mt-1"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </label>
+              <DateField label="Von" required value={startDate} onChange={setStartDate} />
+              <DateField label="Bis" required min={startDate || undefined} value={endDate} onChange={setEndDate} />
             </div>
             <input
               type="text"
