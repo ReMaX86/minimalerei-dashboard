@@ -587,6 +587,18 @@ hier die getroffenen Entscheidungen samt Begründung:
     Verwechslungskontrolle, ohne extra zum "Zuletzt"-Log weiter unten
     scrollen zu müssen; das Log dort bleibt unverändert für die volle
     Historie + Rückgängig.
+  - **Sechster Nachtrag (Gegner-Punkte in den Aktions-Ablauf integriert):**
+    die eigene "Gegner"-Karte mit +2/+3/+1-Buttons ist weg. Stattdessen
+    läuft das Erfassen von Gegner-Punkten über denselben Aktion-zuerst-
+    Ablauf wie für die eigene Mannschaft: 2er/3er/Freiwurf-Treffer
+    antippen, im "Wer?"-Picker erscheint als sechste, optisch abgesetzte
+    Kachel (`OpponentTile`, gestrichelter Rand, gedeckte statt navy/grüne
+    Farben, 🆚-Symbol) neben den bis zu fünf Spielern auf dem Feld — Tippen
+    darauf bucht den Punkt auf `team = 'opponent'`. Taucht bewusst nur bei
+    den drei Treffer-Aktionen auf (`OPPONENT_ELIGIBLE`), nicht bei
+    Fehlwurf oder den übrigen Stats — für den Gegner wird laut Schema
+    (Migration 0028, `game_stat_events_opponent_scoring_only`) ohnehin nur
+    der Punktestand getrackt, kein voller Box-Score.
 
 ## Projektstruktur
 
