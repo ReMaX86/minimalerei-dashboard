@@ -48,8 +48,9 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   // Trainers/admin-players get the full Kampfgericht overview so they can
   // plan; a read-only Betrachter (e.g. Abteilungsleiter) gets to see the
-  // same overview, just with no way to assign/edit anything.
-  const showOfficiatingOverview = isAdmin || role === 'viewer';
+  // same overview, just with no way to assign/edit anything. Captains/
+  // Co-Captains get it too so they can remind teammates who's up next.
+  const showOfficiatingOverview = isAdmin || role === 'viewer' || !!player?.is_captain || !!player?.is_co_captain;
 
   useEffect(() => {
     let cancelled = false;

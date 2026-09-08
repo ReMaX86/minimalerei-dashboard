@@ -243,6 +243,17 @@ hier die getroffenen Entscheidungen samt Begründung:
   Spiele; leere Eingabefelder löschen eine vorhandene Zeile wieder, statt sie auf 0 zu setzen.
   Zeigt auf der Startseite das letzte Ergebnis (inkl. Sieg/Niederlage-Badge) und für Spieler ihre
   Saison-Punktesumme.
+- **Captain / Co-Captain (Migration `0017`).** Kein Feature-Flag, sondern zwei weitere Flags auf
+  `players` nach demselben Muster wie das bestehende `is_admin` (Migration `0006`): der Spieler
+  bleibt ganz normal eingeloggt, bekommt aber zusätzliche Rechte. Trainer weist die Rollen in
+  Admin -> Spieler zu (kein Alleinstellungs-Zwang — theoretisch könnten mehrere Spieler gleichzeitig
+  Captain sein, falls ein Team das so will). Aktuell zwei Sonderrechte: (1) den nächsten
+  Trikotwäscher bestätigen/ablehnen, bisher nur der betroffene Spieler selbst und der Trainer —
+  serverseitig durchgesetzt über eine neue `is_captain_or_co_captain()`-Helper-Funktion, die
+  `confirm_trikot_handover()` zusätzlich zu `is_trainer()` prüft (rein clientseitiges Ausblenden
+  der Buttons wäre nicht ausreichend); (2) auf der Startseite dieselbe Kampfgericht-Team-Übersicht
+  wie Trainer/Betrachter sehen (`showOfficiatingOverview`), um Mitspieler an offene Termine erinnern
+  zu können — zusätzlich zur eigenen persönlichen Kampfgericht-Karte, nicht statt ihr.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche

@@ -84,17 +84,17 @@ export function PlayersAdmin() {
     }
   }
 
-  async function toggleAdmin(p: Player) {
+  async function toggleFlag(p: Player, field: 'is_admin' | 'is_captain' | 'is_co_captain', errorMsg: string) {
     setError(null);
     try {
       const { error: updError } = await supabase
         .from('players')
-        .update({ is_admin: !p.is_admin })
+        .update({ [field]: !p[field] })
         .eq('id', p.id);
       if (updError) throw updError;
       await load();
     } catch {
-      setError('Trainer-Rechte konnten nicht geändert werden.');
+      setError(errorMsg);
     }
   }
 
@@ -187,6 +187,8 @@ export function PlayersAdmin() {
               <p className="flex flex-wrap items-center gap-1.5 font-semibold text-tbw-navyDark">
                 {p.name}
                 {p.is_admin && <span className="pill pill-warn">Trainer</span>}
+                {p.is_captain && <span className="pill pill-ok">Captain</span>}
+                {p.is_co_captain && <span className="pill pill-ok">Co-Captain</span>}
               </p>
               <p className="text-xs text-tbw-ink/50">Code: {p.access_code}</p>
             </div>
@@ -197,8 +199,23 @@ export function PlayersAdmin() {
               <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => toggleActive(p)}>
                 {p.is_active ? 'Deaktivieren' : 'Aktivieren'}
               </button>
-              <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => toggleAdmin(p)}>
+              <button
+                className="btn-secondary !px-2 !py-1 text-xs"
+                onClick={() => toggleFlag(p, 'is_admin', 'Trainer-Rechte konnten nicht geändert werden.')}
+              >
                 {p.is_admin ? 'Trainer-Rechte entziehen' : 'Zu Trainer machen'}
+              </button>
+              <button
+                className="btn-secondary !px-2 !py-1 text-xs"
+                onClick={() => toggleFlag(p, 'is_captain', 'Captain-Status konnte nicht geändert werden.')}
+              >
+                {p.is_captain ? 'Captain entfernen' : 'Zum Captain machen'}
+              </button>
+              <button
+                className="btn-secondary !px-2 !py-1 text-xs"
+                onClick={() => toggleFlag(p, 'is_co_captain', 'Co-Captain-Status konnte nicht geändert werden.')}
+              >
+                {p.is_co_captain ? 'Co-Captain entfernen' : 'Zum Co-Captain machen'}
               </button>
               <button
                 className="btn-secondary !px-2 !py-1 text-xs"
