@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { Avatar } from '../components/Avatar';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { computeBoxScore, computeQuarterScores, computeTeamScore, quarterLabel } from '../lib/gameStats';
@@ -26,6 +27,18 @@ const SCORING_BUTTONS: { made: StatType; miss: StatType; label: string }[] = [
 
 const OTHER_STATS: StatType[] = ['rebound', 'assist', 'steal', 'block', 'turnover', 'foul'];
 
+// Kurzform für die kleineren Aktions-Kreise — die vollen Bezeichnungen aus
+// STAT_TYPE_LABELS (z. B. "Ballverlust") sind für einen Kreis zu lang,
+// werden aber weiterhin im "Zuletzt"-Log und der Box-Score-Kopfzeile genutzt.
+const OTHER_STAT_SHORT: Partial<Record<StatType, string>> = {
+  rebound: 'Reb',
+  assist: 'Ast',
+  steal: 'Stl',
+  block: 'Blk',
+  turnover: 'TO',
+  foul: 'Foul'
+};
+
 const HEARTBEAT_MS = 15_000;
 
 type LockState =
@@ -34,6 +47,62 @@ type LockState =
   | { kind: 'blocked'; session: GameStatSessionState }
   | { kind: 'takenOver' }
   | { kind: 'held' };
+
+function PlayerTile({
+  player,
+  onClick,
+  selected,
+  disabled
+}: {
+  player: Player;
+  onClick: () => void;
+  selected?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 p-2 text-center disabled:opacity-30 ${
+        selected ? 'border-status-ok bg-status-ok/5' : 'border-transparent bg-tbw-bg active:scale-[0.97]'
+      }`}
+    >
+      <Avatar player={player} size="sm" />
+      <span className="text-xs font-semibold leading-tight text-tbw-navyDark">{shortPlayerName(player.name)}</span>
+    </button>
+  );
+}
+
+function ActionCircle({
+  label,
+  sublabel,
+  tone,
+  onClick,
+  disabled
+}: {
+  label: string;
+  sublabel?: string;
+  tone: 'make' | 'miss' | 'neutral';
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  const toneClasses =
+    tone === 'make'
+      ? 'border-status-ok text-status-ok'
+      : tone === 'miss'
+        ? 'border-tbw-red text-tbw-red'
+        : 'border-tbw-navy/15 text-tbw-navyDark';
+  return (
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-full border-2 bg-white text-center active:scale-95 disabled:opacity-30 ${toneClasses}`}
+    >
+      <span className="text-base font-extrabold leading-none">{label}</span>
+      {sublabel && <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">{sublabel}</span>}
+    </button>
+  );
+}
 
 export function GameStatsTracker() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -50,7 +119,9 @@ export function GameStatsTracker() {
   const [events, setEvents] = useState<GameStatEvent[]>([]);
   const [lockState, setLockState] = useState<LockState>({ kind: 'loading' });
   const [error, setError] = useState<string | null>(null);
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  // Erst Aktion, dann Spieler: pendingAction ist gesetzt, sobald eine
+  // Aktion angetippt wurde, und wartet auf den zugehörigen Spieler.
+  const [pendingAction, setPendingAction] = useState<StatType | null>(null);
   const [quarter, setQuarter] = useState(1);
   const [busy, setBusy] = useState(false);
   const insertedStack = useRef<string[]>([]);
@@ -223,7 +294,7 @@ export function GameStatsTracker() {
       const row = data as GameStatEvent;
       insertedStack.current.push(row.id);
       setEvents((prev) => [...prev, row]);
-      setSelectedPlayerId(null);
+      setPendingAction(null);
     } catch {
       setError('Aktion konnte nicht gespeichert werden.');
     } finally {
@@ -422,57 +493,34 @@ export function GameStatsTracker() {
               </div>
             </div>
 
-            {!selectedPlayerId && trackablePlayers.length === 0 && (
+            {trackablePlayers.length === 0 && (
               <div className="card mt-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Spieler</p>
                 <p className="mt-2 text-sm text-tbw-ink/40">Kein Kader für dieses Spiel hinterlegt.</p>
               </div>
             )}
 
-            {!selectedPlayerId && trackablePlayers.length > 0 && !useCourtSplit && (
-              <div className="card mt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Spieler</p>
-                <div className="mt-2 grid grid-cols-3 gap-2">
-                  {trackablePlayers.map((p) => (
-                    <button
-                      key={p.id}
-                      className="rounded-xl bg-tbw-bg px-2 py-2.5 text-xs font-semibold text-tbw-navyDark"
-                      onClick={() => setSelectedPlayerId(p.id)}
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {!selectedPlayerId && useCourtSplit && onCourtIds.length < COURT_SIZE && (
+            {trackablePlayers.length > 0 && useCourtSplit && onCourtIds.length < COURT_SIZE && (
               <div className="card mt-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
                   Startaufstellung ({onCourtIds.length}/{COURT_SIZE})
                 </p>
                 <p className="mt-1 text-xs text-tbw-ink/50">Wer steht auf dem Feld?</p>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  {trackablePlayers.map((p) => {
-                    const picked = onCourtIds.includes(p.id);
-                    return (
-                      <button
-                        key={p.id}
-                        disabled={!picked && onCourtIds.length >= COURT_SIZE}
-                        className={`rounded-xl px-2 py-3 text-sm font-semibold disabled:opacity-30 ${
-                          picked ? 'bg-tbw-navy text-white' : 'bg-tbw-bg text-tbw-navyDark'
-                        }`}
-                        onClick={() => toggleStarter(p.id)}
-                      >
-                        {shortPlayerName(p.name)} {picked ? '✓' : ''}
-                      </button>
-                    );
-                  })}
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {trackablePlayers.map((p) => (
+                    <PlayerTile
+                      key={p.id}
+                      player={p}
+                      selected={onCourtIds.includes(p.id)}
+                      disabled={!onCourtIds.includes(p.id) && onCourtIds.length >= COURT_SIZE}
+                      onClick={() => toggleStarter(p.id)}
+                    />
+                  ))}
                 </div>
               </div>
             )}
 
-            {!selectedPlayerId && useCourtSplit && onCourtIds.length === COURT_SIZE && substituting && (
+            {trackablePlayers.length > 0 && useCourtSplit && onCourtIds.length === COURT_SIZE && substituting && (
               <div className="card mt-3">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
@@ -482,102 +530,110 @@ export function GameStatsTracker() {
                     Abbrechen
                   </button>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="mt-3 grid grid-cols-3 gap-2">
                   {(outgoingId ? benchPlayers : onCourtPlayers).map((p) => (
-                    <button
+                    <PlayerTile
                       key={p.id}
-                      className="rounded-xl bg-tbw-bg px-2 py-3 text-sm font-semibold text-tbw-navyDark"
+                      player={p}
                       onClick={() => (outgoingId ? confirmSubstitution(p.id) : setOutgoingId(p.id))}
-                    >
-                      {shortPlayerName(p.name)}
-                    </button>
+                    />
                   ))}
                 </div>
               </div>
             )}
 
-            {!selectedPlayerId && useCourtSplit && onCourtIds.length === COURT_SIZE && !substituting && (
-              <div className="card mt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Auf dem Feld</p>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  {onCourtPlayers.slice(0, 4).map((p) => (
-                    <button
-                      key={p.id}
-                      className="rounded-2xl bg-tbw-navy py-5 text-base font-bold text-white active:scale-[0.97]"
-                      onClick={() => setSelectedPlayerId(p.id)}
-                    >
-                      {shortPlayerName(p.name)}
+            {trackablePlayers.length > 0 &&
+              (!useCourtSplit || onCourtIds.length === COURT_SIZE) &&
+              !substituting &&
+              pendingAction && (
+                <div className="card mt-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
+                      Wer? — {STAT_TYPE_LABELS[pendingAction]}
+                    </p>
+                    <button className="text-xs font-bold text-tbw-red" onClick={() => setPendingAction(null)}>
+                      Abbrechen
                     </button>
-                  ))}
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {(useCourtSplit ? onCourtPlayers : trackablePlayers).map((p) => (
+                      <PlayerTile key={p.id} player={p} disabled={busy} onClick={() => addStat('us', pendingAction, p.id)} />
+                    ))}
+                  </div>
                 </div>
-                {onCourtPlayers[4] && (
-                  <button
-                    className="mt-2 w-full rounded-2xl bg-tbw-navy py-5 text-base font-bold text-white active:scale-[0.97]"
-                    onClick={() => setSelectedPlayerId(onCourtPlayers[4].id)}
-                  >
-                    {shortPlayerName(onCourtPlayers[4].name)}
-                  </button>
-                )}
-                {benchPlayers.length > 0 && (
-                  <div className="mt-3">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-ink/30">Bank</p>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {benchPlayers.map((p) => (
-                        <span key={p.id} className="rounded-full bg-tbw-bg px-2.5 py-1 text-xs text-tbw-ink/40">
-                          {shortPlayerName(p.name)}
-                        </span>
+              )}
+
+            {trackablePlayers.length > 0 &&
+              (!useCourtSplit || onCourtIds.length === COURT_SIZE) &&
+              !substituting &&
+              !pendingAction && (
+                <>
+                  {useCourtSplit && (
+                    <div className="card mt-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Auf dem Feld</p>
+                        <button className="text-xs font-bold text-tbw-navy" onClick={startSubstitution}>
+                          🔄 Wechseln
+                        </button>
+                      </div>
+                      <div className="mt-2 flex gap-3 overflow-x-auto pb-1">
+                        {onCourtPlayers.map((p) => (
+                          <div key={p.id} className="flex shrink-0 flex-col items-center gap-1">
+                            <Avatar player={p} size="sm" />
+                            <span className="text-[10px] font-semibold text-tbw-navyDark">
+                              {shortPlayerName(p.name)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      {benchPlayers.length > 0 && (
+                        <>
+                          <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-tbw-ink/30">Bank</p>
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            {benchPlayers.map((p) => (
+                              <span key={p.id} className="rounded-full bg-tbw-bg px-2.5 py-1 text-xs text-tbw-ink/40">
+                                {shortPlayerName(p.name)}
+                              </span>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="card mt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Aktion</p>
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      {SCORING_BUTTONS.flatMap(({ made, miss, label }) => [
+                        <ActionCircle
+                          key={made}
+                          label={label}
+                          sublabel="Treffer"
+                          tone="make"
+                          onClick={() => setPendingAction(made)}
+                        />,
+                        <ActionCircle
+                          key={miss}
+                          label={label}
+                          sublabel="Fehlwurf"
+                          tone="miss"
+                          onClick={() => setPendingAction(miss)}
+                        />
+                      ])}
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {OTHER_STATS.map((statType) => (
+                        <ActionCircle
+                          key={statType}
+                          label={OTHER_STAT_SHORT[statType] ?? STAT_TYPE_LABELS[statType]}
+                          tone="neutral"
+                          onClick={() => setPendingAction(statType)}
+                        />
                       ))}
                     </div>
                   </div>
-                )}
-                <button className="btn-secondary mt-3 w-full" onClick={startSubstitution}>
-                  🔄 Auswechseln
-                </button>
-              </div>
-            )}
-
-            {selectedPlayerId && (
-              <div className="card mt-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
-                    Aktion für {playersById[selectedPlayerId]?.name}
-                  </p>
-                  <button className="text-xs font-bold text-tbw-navy" onClick={() => setSelectedPlayerId(null)}>
-                    ← Spieler wechseln
-                  </button>
-                </div>
-                {SCORING_BUTTONS.map(({ made, miss, label }) => (
-                  <div key={made} className="flex gap-2">
-                    <button
-                      className="flex-1 rounded-xl bg-status-ok/10 py-2 text-sm font-bold text-status-ok"
-                      disabled={busy}
-                      onClick={() => addStat('us', made, selectedPlayerId)}
-                    >
-                      {label} ✓
-                    </button>
-                    <button
-                      className="flex-1 rounded-xl bg-tbw-red/10 py-2 text-sm font-bold text-tbw-red"
-                      disabled={busy}
-                      onClick={() => addStat('us', miss, selectedPlayerId)}
-                    >
-                      {label} ✗
-                    </button>
-                  </div>
-                ))}
-                <div className="grid grid-cols-3 gap-2 pt-1">
-                  {OTHER_STATS.map((statType) => (
-                    <button
-                      key={statType}
-                      className="btn-secondary !py-2 text-xs"
-                      disabled={busy}
-                      onClick={() => addStat('us', statType, selectedPlayerId)}
-                    >
-                      {STAT_TYPE_LABELS[statType]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+                </>
+              )}
 
             <div className="card mt-3">
               <div className="flex items-center justify-between">
@@ -593,14 +649,19 @@ export function GameStatsTracker() {
               {recentEvents.length === 0 ? (
                 <p className="mt-1 text-xs text-tbw-ink/40">Noch keine Aktionen.</p>
               ) : (
-                <ul className="mt-1 space-y-0.5">
-                  {recentEvents.map((e) => (
-                    <li key={e.id} className="text-xs text-tbw-ink/60">
-                      {quarterLabel(e.quarter)} ·{' '}
-                      {e.team === 'opponent' ? 'Gegner' : (playersById[e.player_id ?? '']?.name ?? '?')} ·{' '}
-                      {STAT_TYPE_LABELS[e.stat_type]}
-                    </li>
-                  ))}
+                <ul className="mt-1 space-y-1">
+                  {recentEvents.map((e) => {
+                    const evPlayer = e.player_id ? playersById[e.player_id] : undefined;
+                    return (
+                      <li key={e.id} className="flex items-center gap-2 text-xs text-tbw-ink/60">
+                        {evPlayer && <Avatar player={evPlayer} size="xs" />}
+                        <span>
+                          {quarterLabel(e.quarter)} · {e.team === 'opponent' ? 'Gegner' : (evPlayer?.name ?? '?')} ·{' '}
+                          {STAT_TYPE_LABELS[e.stat_type]}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
@@ -635,7 +696,10 @@ export function GameStatsTracker() {
                   {boxScore.map((b) => (
                     <tr key={b.playerId} className="border-t border-black/5">
                       <td className="py-1.5 pr-2 font-semibold text-tbw-navyDark">
-                        {playersById[b.playerId]?.name ?? '?'}
+                        <div className="flex items-center gap-2">
+                          {playersById[b.playerId] && <Avatar player={playersById[b.playerId]} size="xs" />}
+                          {playersById[b.playerId]?.name ?? '?'}
+                        </div>
                       </td>
                       <td className="px-1 py-1.5 text-right font-bold text-tbw-navyDark">{b.points}</td>
                       <td className="px-1 py-1.5 text-right text-tbw-ink/60">

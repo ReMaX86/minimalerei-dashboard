@@ -532,10 +532,30 @@ hier die getroffenen Entscheidungen samt Begründung:
     (2) Spieler-Buttons zeigen nur noch Vorname + Anfangsbuchstabe
     Nachname (`shortPlayerName()` in `src/lib/format.ts`, z. B. "Marc R."),
     voller Name war auf den großen Buttons unnötig breit. (3) Nach einer
-    erfassten Aktion springt die Ansicht automatisch zurück zur
-    Spielerauswahl (vorher blieb der zuletzt gewählte Spieler aktiv) — der
-    Trainer wollte laut eigener Aussage lieber jedes Mal neu antippen, als
-    sich merken zu müssen, ob noch der richtige Spieler ausgewählt ist.
+    erfassten Aktion springt die Ansicht automatisch zurück (siehe
+    Dritter Nachtrag: seit dort zur Aktionsauswahl statt zur
+    Spielerauswahl) — der Trainer wollte laut eigener Aussage lieber
+    jedes Mal neu antippen, als sich merken zu müssen, ob noch der
+    richtige Spieler ausgewählt ist.
+  - **Dritter Nachtrag (Vergleich mit der bisher genutzten Zusatz-App
+    easystatsapp.com, per Screenshots):** zwei weitere Anpassungen.
+    (1) Reihenfolge umgedreht — erst Aktion, dann Spieler, statt
+    umgekehrt: Standardansicht ist jetzt ein Raster aus runden
+    Aktions-Buttons (`ActionCircle` in `GameStatsTracker.tsx`, angelehnt
+    an easystatsapp.com aber in der eigenen Farbwelt statt deren
+    Lila-Verlauf) — 2er/3er/Freiwurf als Treffer/Fehlwurf-Paar
+    grün/rot, darunter Rebound/Assist/Steal/Block/Ballverlust/Foul in
+    Kurzform. Erst nach dem Antippen einer Aktion erscheint "Wer? —
+    <Aktion>" mit den 5 Spielern auf dem Feld zur Auswahl (nur bei
+    diesen, nicht der Bank); "Abbrechen" verwirft die Aktion und geht
+    zurück zum Aktions-Raster. Startaufstellung/Auswechseln bleiben
+    unverändert Spieler-zuerst (dort gibt es keine Aktion zum Voranstellen).
+    (2) Spielerprofil-Fotos statt reiner Namens-Buttons — neue
+    `PlayerTile`-Komponente nutzt die bestehende `Avatar`-Komponente
+    (dieselbe wie in Kader/Spielerprofile, mit Foto oder Initialen-Kreis
+    als Fallback) für Startaufstellung, Auswechseln, den "Wer?"-Picker,
+    den "Auf dem Feld"-Streifen, das "Zuletzt"-Log und die
+    Box-Score-Tabelle — durchgängig statt nur an einzelnen Stellen.
 
 ## Projektstruktur
 
