@@ -681,6 +681,10 @@ hier die getroffenen Entscheidungen samt Begründung:
   jeder Teil als eigener `block`-Span gerendert, statt den Umbruch dem
   Browser bei zufälliger Containerbreite zu überlassen — beide Kacheln
   sind dadurch immer zweizeilig.
+  - **Nachtrag:** dasselbe Muster (`set.label.split(' · ')` als je ein
+    `block`-Span) auch im eigenständigen Trikots-Reiter (`Trikots.tsx`)
+    ergänzt — dort liegt dieselbe zweispaltige Kachel-Ansicht vor, war
+    aber beim ersten Fix übersehen worden.
 
 ## Projektstruktur
 
