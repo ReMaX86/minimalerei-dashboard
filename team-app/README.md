@@ -692,6 +692,30 @@ hier die getroffenen Entscheidungen samt Begründung:
   das passende Panel — `squadOpen` für Spieler, `squadEditorOpen` für
   Trainer/Admin (relevant für einen spielenden Trainer mit `isAdmin`,
   der trotzdem über den Spieler-Dashboard-Link kommt).
+- **Scroll-Reset bei In-Page-Screenwechseln vereinheitlicht.** Bislang gab
+  es nur den Scroll-Reset bei Routenwechseln (`App.tsx`, per
+  `location.pathname`) sowie eine einzelne Insel-Lösung dafür in
+  `GameStatsTracker.tsx` (`screenKey`-Effekt) — jede andere Seite, die
+  innerhalb derselben Route zwischen deutlich unterschiedlichen Inhalten
+  wechselt (Liste → Detail, Tabs, Formular-Schritte), hatte keinen
+  Scroll-Reset. Konkret aufgefallen bei `PlayerProfiles.tsx` (Team):
+  runterscrollen in der Spielerübersicht, dann einen Spieler antippen —
+  die Detailansicht öffnete sich, aber nur angeschnitten auf der alten
+  Scroll-Position statt von oben.
+  - Dafür jetzt der wiederverwendbare Hook `useScrollResetOnChange(key)`
+    (`src/hooks/useScrollResetOnChange.ts`, `window.scrollTo(0, 0)` in
+    einem `useEffect` über `key`) — `GameStatsTracker.tsx` wurde darauf
+    umgestellt (identisches Verhalten wie vorher, nur ohne Duplikation),
+    und zusätzlich ergänzt bei `PlayerProfiles.tsx` (`selectedId`, Liste
+    ↔ Detail), `Admin.tsx` (`tab`, wechselt zwischen den
+    Admin-Unterseiten) und `Onboarding.tsx` (`step`, wechselt zwischen
+    Intro/Login/Code-Screens).
+  - **Konvention für neue Features:** sobald eine Seite innerhalb
+    derselben Route per State zwischen "Screens" umschaltet, die den
+    bisherigen Inhalt komplett ersetzen (nicht: ein Abschnitt klappt sich
+    unterhalb des vorhandenen Inhalts auf, wie z. B. "Kader anzeigen" auf
+    `Spiele.tsx` — das braucht keinen Reset), `useScrollResetOnChange`
+    mit dem entsprechenden State-Wert aufrufen.
 
 ## Projektstruktur
 
@@ -700,6 +724,7 @@ team-app/
   src/
     lib/            Supabase-Client, Rotationslogik, Formatierung
     context/         AuthContext (Trainer-/Spieler-Session)
+    hooks/           geteilte React-Hooks (z. B. useScrollResetOnChange)
     components/      geteilte UI-Bausteine (Header, BottomNav, ...)
     pages/           Start, Trikots, Kampfgericht, Kader, Onboarding
     pages/admin/      Admin-Unterseiten (Spieler, Spiele, Kampfgericht, Training)
