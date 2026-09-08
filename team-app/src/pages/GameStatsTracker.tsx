@@ -88,24 +88,28 @@ function ActionCircle({
   disabled?: boolean;
   size?: 'md' | 'sm';
 }) {
+  // Volltonfarbe statt nur Umriss — auf einen Blick klarer als Treffer/
+  // Fehlwurf zu erkennen als dünner farbiger Rand mit farbiger Schrift.
+  // Ein dezenter Verlauf (hellere Ausgangsfarbe zur Kernfarbe) statt platt
+  // eingefärbt wirkt weniger wie ein reines Icon und moderner.
   const toneClasses =
     tone === 'make'
-      ? 'border-status-ok text-status-ok'
+      ? 'bg-gradient-to-b from-[#4ADE80] to-status-ok text-white shadow-[0_4px_14px_-4px_rgba(34,197,94,0.55)]'
       : tone === 'miss'
-        ? 'border-tbw-red text-tbw-red'
-        : 'border-tbw-navy/15 text-tbw-navyDark';
+        ? 'bg-gradient-to-b from-[#F58C90] to-tbw-red text-white shadow-[0_4px_14px_-4px_rgba(229,72,77,0.55)]'
+        : 'bg-gradient-to-b from-tbw-navy to-tbw-navyDark text-white shadow-[0_4px_14px_-4px_rgba(7,22,15,0.4)]';
   // Feste Größe statt an die Grid-Spalte gestreckt (aspect-square) — sonst
   // werden die Kreise auf einem Handy riesig und die Aktionsliste passt
   // nicht mehr auf einen Bildschirm.
-  const dims = size === 'md' ? 'h-16 w-16' : 'h-14 w-14';
+  const dims = size === 'md' ? 'h-[76px] w-[76px]' : 'h-16 w-16';
   return (
     <button
       disabled={disabled}
       onClick={onClick}
-      className={`flex ${dims} shrink-0 flex-col items-center justify-center gap-0.5 rounded-full border-2 bg-white text-center active:scale-95 disabled:opacity-30 ${toneClasses}`}
+      className={`flex ${dims} shrink-0 flex-col items-center justify-center gap-0.5 rounded-full text-center transition active:scale-95 disabled:opacity-40 ${toneClasses}`}
     >
-      <span className="text-sm font-extrabold leading-none">{label}</span>
-      {sublabel && <span className="text-[8px] font-semibold uppercase tracking-wide opacity-70">{sublabel}</span>}
+      <span className="text-base font-extrabold leading-none">{label}</span>
+      {sublabel && <span className="text-[9px] font-bold uppercase tracking-wide opacity-80">{sublabel}</span>}
     </button>
   );
 }
@@ -379,6 +383,7 @@ export function GameStatsTracker() {
   const teamScore = computeTeamScore(events);
   const quarterScores = computeQuarterScores(events);
   const recentEvents = [...events].slice(-6).reverse();
+  const lastEvent = events[events.length - 1];
 
   return (
     <div className="min-h-screen bg-tbw-bg pb-8">
@@ -574,7 +579,20 @@ export function GameStatsTracker() {
               !substituting &&
               !pendingAction && (
                 <>
-                  <div className="card mt-3">
+                  {lastEvent && (
+                    <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-tbw-ink/45">
+                      <span>Zuletzt:</span>
+                      {lastEvent.team === 'us' && lastEvent.player_id && playersById[lastEvent.player_id] && (
+                        <Avatar player={playersById[lastEvent.player_id]} size="xs" />
+                      )}
+                      <span className="font-semibold text-tbw-ink/70">
+                        {lastEvent.team === 'opponent' ? 'Gegner' : (playersById[lastEvent.player_id ?? '']?.name ?? '?')}
+                      </span>
+                      <span>· {STAT_TYPE_LABELS[lastEvent.stat_type]}</span>
+                    </p>
+                  )}
+
+                  <div className="card mt-2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Aktion</p>
                     <div className="mt-2 flex flex-col items-center gap-2">
                       {SCORING_BUTTONS.map(({ made, miss, label }) => (
