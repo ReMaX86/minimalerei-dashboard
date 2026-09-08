@@ -206,7 +206,7 @@ export function Spiele() {
             )}
           </div>
           <span className={state.nextGame.squad_published ? 'pill pill-ok' : 'pill pill-open'}>
-            {state.nextGame.squad_published ? 'veröffentlicht' : 'Entwurf'}
+            {state.nextGame.squad_published ? 'Kader veröffentlicht' : 'Kader ausstehend'}
           </span>
         </div>
 
