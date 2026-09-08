@@ -12,6 +12,8 @@ import {
   meetingPoints,
   officiatingGameLabel,
   type Announcement,
+  type CarpoolClaim,
+  type CarpoolOffer,
   type Game,
   type OfficiatingGame,
   type OfficiatingTask,
@@ -27,6 +29,8 @@ interface DashboardData {
   trikotSets: TrikotSet[];
   players: Record<string, Player>;
   announcements: Announcement[];
+  carpoolOffers: CarpoolOffer[];
+  carpoolClaims: CarpoolClaim[];
 }
 
 export function Dashboard() {
@@ -63,8 +67,19 @@ export function Dashboard() {
       let playerNextTask: DashboardData['playerNextTask'] = null;
       let trainerNextOfficiatingGame: DashboardData['trainerNextOfficiatingGame'] = null;
       let playerInSquad: DashboardData['playerInSquad'] = null;
+      let carpoolOffers: CarpoolOffer[] = [];
+      let carpoolClaims: CarpoolClaim[] = [];
 
       const nextGame = gameRes.data as Game | null;
+
+      if (flags.carpool && nextGame && !nextGame.is_home) {
+        const [offersRes, claimsRes] = await Promise.all([
+          supabase.from('carpool_offers').select('*').eq('game_id', nextGame.id),
+          supabase.from('carpool_claims').select('*').eq('game_id', nextGame.id)
+        ]);
+        carpoolOffers = (offersRes.data as CarpoolOffer[]) ?? [];
+        carpoolClaims = (claimsRes.data as CarpoolClaim[]) ?? [];
+      }
 
       if (role === 'player' && player && nextGame?.squad_published) {
         const { data: squadRow } = await supabase
@@ -135,7 +150,9 @@ export function Dashboard() {
         trainerNextOfficiatingGame,
         trikotSets: (trikotRes.data as TrikotSet[]) ?? [],
         players: playersById,
-        announcements: (announcementsRes.data as Announcement[]) ?? []
+        announcements: (announcementsRes.data as Announcement[]) ?? [],
+        carpoolOffers,
+        carpoolClaims
       });
     }
 
@@ -143,7 +160,7 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [role, player, isAdmin, flags.announcements]);
+  }, [role, player, isAdmin, flags.announcements, flags.carpool]);
 
   if (error) return <div className="card text-sm text-tbw-red">{error}</div>;
   if (!data) return <LoadingSpinner />;
@@ -200,6 +217,30 @@ export function Dashboard() {
                     {m.place ? `, ${m.place}` : ''}
                   </p>
                 ))}
+              </div>
+            )}
+
+            {flags.carpool && data.carpoolOffers.length > 0 && (
+              <div className="mt-2 rounded-xl bg-tbw-bg px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-ink/40">
+                    Mitfahrgelegenheit
+                  </p>
+                  <Link to="/kader" className="text-[10px] font-bold text-tbw-navy">
+                    Verwalten →
+                  </Link>
+                </div>
+                {data.carpoolOffers.map((o) => {
+                  const free = o.seats - data.carpoolClaims.filter((c) => c.offer_id === o.id).length;
+                  return (
+                    <p key={o.id} className="text-xs text-tbw-ink/60">
+                      <span className="font-semibold text-tbw-ink/80">
+                        {data.players[o.driver_player_id]?.name ?? '?'}
+                      </span>{' '}
+                      · {free > 0 ? `${free} von ${o.seats} Plätzen frei` : 'voll'}
+                    </p>
+                  );
+                })}
               </div>
             )}
 
