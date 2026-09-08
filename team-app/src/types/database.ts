@@ -4,7 +4,7 @@ export type OfficiatingTaskType = 'uhr' | 'anschreiber' | 'zeit';
 // Optionale Zusatzfunktionen, die ein Trainer pro Team an-/ausschalten kann
 // (Admin -> Funktionen). Neuer Key hier + eine Zeile in Migration/Seed, dann
 // ist eine neue Funktion schaltbar.
-export type FeatureKey = 'announcements' | 'carpool' | 'player_profiles';
+export type FeatureKey = 'announcements' | 'carpool' | 'player_profiles' | 'absences';
 
 export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: string }> = {
   announcements: {
@@ -18,6 +18,11 @@ export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: st
   player_profiles: {
     label: 'Spielerprofile',
     description: 'Team-Übersicht mit Foto, Position, Größe, Alter und Skills pro Spieler.'
+  },
+  absences: {
+    label: 'Urlaub/Abwesenheit',
+    description:
+      'Spieler tragen eigene Abwesenheiten ein — Training wird automatisch abgesagt, beim Kader wird ein Hinweis angezeigt.'
   }
 };
 
@@ -200,4 +205,23 @@ export function meetingPoints(
     });
   }
   return points;
+}
+
+export interface PlayerAbsence {
+  id: string;
+  player_id: string;
+  start_date: string;
+  end_date: string;
+  note: string | null;
+  created_at: string;
+}
+
+// Zeitraum statt einzelner Absage-Zeilen: ein Termin/Spiel "fällt in" einen
+// Urlaub, wenn sein Datum im [start_date, end_date]-Bereich liegt.
+export function playerAbsenceOn(
+  absences: Pick<PlayerAbsence, 'player_id' | 'start_date' | 'end_date'>[],
+  playerId: string,
+  dateIso: string
+): boolean {
+  return absences.some((a) => a.player_id === playerId && dateIso >= a.start_date && dateIso <= a.end_date);
 }

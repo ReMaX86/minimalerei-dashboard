@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { LoadingSpinner } from './LoadingSpinner';
 import { ErrorNote } from './ErrorNote';
 import { fmtDate, fmtTime } from '../lib/format';
 import { nextTrainingOccurrences, type TrainingOccurrence } from '../lib/trainingSchedule';
-import type { Player, Training, TrainingRsvpRow } from '../types/database';
+import { playerAbsenceOn, type Player, type PlayerAbsence, type Training, type TrainingRsvpRow } from '../types/database';
 
 const UPCOMING_COUNT = 2;
 
@@ -13,10 +14,12 @@ interface State {
   occurrences: TrainingOccurrence[];
   rsvps: TrainingRsvpRow[];
   players: Player[];
+  absences: PlayerAbsence[];
 }
 
 export function UpcomingTrainings() {
   const { role, player } = useAuth();
+  const { flags } = useFeatureFlags();
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -24,9 +27,13 @@ export function UpcomingTrainings() {
 
   const load = useCallback(async () => {
     setError(null);
-    const [trainingsRes, playersRes] = await Promise.all([
+    const today = new Date().toISOString().slice(0, 10);
+    const [trainingsRes, playersRes, absencesRes] = await Promise.all([
       supabase.from('trainings').select('*'),
-      supabase.from('players').select('*').eq('is_active', true)
+      supabase.from('players').select('*').eq('is_active', true),
+      flags.absences
+        ? supabase.from('player_absences').select('*').gte('end_date', today)
+        : Promise.resolve({ data: [] as PlayerAbsence[], error: null })
     ]);
     if (trainingsRes.error || playersRes.error) {
       setError('Fehler beim Laden der Trainingszeiten.');
@@ -53,8 +60,13 @@ export function UpcomingTrainings() {
       );
     }
 
-    setState({ occurrences, rsvps, players: (playersRes.data as Player[]) ?? [] });
-  }, []);
+    setState({
+      occurrences,
+      rsvps,
+      players: (playersRes.data as Player[]) ?? [],
+      absences: (absencesRes.data as PlayerAbsence[]) ?? []
+    });
+  }, [flags.absences]);
 
   useEffect(() => {
     load().catch(() => setError('Fehler beim Laden der Trainingszeiten.'));
@@ -105,14 +117,17 @@ export function UpcomingTrainings() {
         const rsvpsForOcc = state.rsvps.filter(
           (r) => r.training_id === occ.training.id && r.session_date === occ.date
         );
-        const zusagen = state.players.filter((p) =>
-          rsvpsForOcc.some((r) => r.player_id === p.id && r.is_attending)
+        const isAbsent = (p: Player) => flags.absences && playerAbsenceOn(state.absences, p.id, occ.date);
+        const urlaub = state.players.filter(isAbsent);
+        const zusagen = state.players.filter(
+          (p) => !isAbsent(p) && rsvpsForOcc.some((r) => r.player_id === p.id && r.is_attending)
         );
-        const absagen = state.players.filter((p) =>
-          rsvpsForOcc.some((r) => r.player_id === p.id && !r.is_attending)
+        const absagen = state.players.filter(
+          (p) => !isAbsent(p) && rsvpsForOcc.some((r) => r.player_id === p.id && !r.is_attending)
         );
-        const offen = state.players.filter((p) => !rsvpsForOcc.some((r) => r.player_id === p.id));
+        const offen = state.players.filter((p) => !isAbsent(p) && !rsvpsForOcc.some((r) => r.player_id === p.id));
         const myVote = player ? rsvpsForOcc.find((r) => r.player_id === player.id)?.is_attending ?? null : null;
+        const myAbsence = player && flags.absences ? playerAbsenceOn(state.absences, player.id, occ.date) : false;
         const isExpanded = expanded.has(key);
 
         return (
@@ -123,11 +138,18 @@ export function UpcomingTrainings() {
                 {fmtTime(occ.training.start_time)}–{fmtTime(occ.training.end_time)} · {occ.training.location}
               </p>
               <p className="mt-1 text-xs text-tbw-ink/50">
-                ✓ {zusagen.length} · ✗ {absagen.length} · {offen.length} offen {isExpanded ? '▲' : '▼'}
+                ✓ {zusagen.length} · ✗ {absagen.length}
+                {urlaub.length > 0 && ` · 🌴 ${urlaub.length}`} · {offen.length} offen {isExpanded ? '▲' : '▼'}
               </p>
             </button>
 
-            {role === 'player' && (
+            {role === 'player' && myAbsence && (
+              <p className="mt-2 text-sm text-tbw-ink/50">
+                🌴 Du bist in diesem Zeitraum als abwesend eingetragen — Training gilt als abgesagt.
+              </p>
+            )}
+
+            {role === 'player' && !myAbsence && (
               <div className="mt-2 flex items-center gap-4">
                 <button
                   onClick={() => vote(occ, true)}
@@ -164,6 +186,7 @@ export function UpcomingTrainings() {
               <div className="mt-3 space-y-2 border-t border-black/5 pt-3 text-sm">
                 <AttendeeGroup label="Zusagen" pillClass="pill-ok" players={zusagen} />
                 <AttendeeGroup label="Absagen" pillClass="pill-open" players={absagen} />
+                {urlaub.length > 0 && <AttendeeGroup label="Urlaub" pillClass="pill-warn" players={urlaub} />}
                 <AttendeeGroup label="Noch offen" pillClass="pill-open" players={offen} muted />
               </div>
             )}

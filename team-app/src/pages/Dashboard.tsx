@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { UpcomingTrainings } from '../components/UpcomingTrainings';
-import { fmtDate, fmtTime } from '../lib/format';
+import { AbsenceSection } from '../components/AbsenceSection';
+import { fmtDate, fmtDateShort, fmtTime } from '../lib/format';
 import {
   OFFICIATING_TASK_LABELS,
   benoetigterSatz,
@@ -18,6 +19,7 @@ import {
   type OfficiatingGame,
   type OfficiatingTask,
   type Player,
+  type PlayerAbsence,
   type TrikotSet
 } from '../types/database';
 
@@ -31,6 +33,7 @@ interface DashboardData {
   announcements: Announcement[];
   carpoolOffers: CarpoolOffer[];
   carpoolClaims: CarpoolClaim[];
+  absencesOverview: PlayerAbsence[];
 }
 
 export function Dashboard() {
@@ -116,6 +119,17 @@ export function Dashboard() {
         }
       }
 
+      let absencesOverview: PlayerAbsence[] = [];
+      if (isAdmin && flags.absences) {
+        const { data: absenceRows } = await supabase
+          .from('player_absences')
+          .select('*')
+          .gte('end_date', today)
+          .order('start_date')
+          .limit(10);
+        absencesOverview = (absenceRows as PlayerAbsence[]) ?? [];
+      }
+
       if (showOfficiatingOverview) {
         const { data: nextOg } = await supabase
           .from('officiating_games')
@@ -152,7 +166,8 @@ export function Dashboard() {
         players: playersById,
         announcements: (announcementsRes.data as Announcement[]) ?? [],
         carpoolOffers,
-        carpoolClaims
+        carpoolClaims,
+        absencesOverview
       });
     }
 
@@ -160,7 +175,7 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [role, player, isAdmin, flags.announcements, flags.carpool]);
+  }, [role, player, isAdmin, flags.announcements, flags.carpool, flags.absences]);
 
   if (error) return <div className="card text-sm text-tbw-red">{error}</div>;
   if (!data) return <LoadingSpinner />;
@@ -319,6 +334,24 @@ export function Dashboard() {
           )}
         </section>
       )}
+
+      {isAdmin && flags.absences && data.absencesOverview.length > 0 && (
+        <section className="card">
+          <SectionTitle icon="🌴" title="Aktuell abwesend" />
+          <ul className="mt-2 space-y-1">
+            {data.absencesOverview.map((a) => (
+              <li key={a.id} className="flex items-center justify-between text-sm">
+                <span className="font-medium text-tbw-navyDark">{data.players[a.player_id]?.name ?? '?'}</span>
+                <span className="text-tbw-ink/50">
+                  {fmtDateShort(a.start_date)} – {fmtDateShort(a.end_date)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {flags.absences && role === 'player' && <AbsenceSection />}
 
       <section className="card">
         <SectionTitle icon="👕" title="Wer hat die Trikots?" />
