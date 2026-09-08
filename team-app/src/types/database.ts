@@ -40,8 +40,34 @@ export const POSITION_LABELS: Record<PlayerPosition, string> = {
   c: 'Center (Mittelspieler)'
 };
 
-export const SKILL_OPTIONS = ['Distanzwurf', 'Verteidigung', 'Athletik', 'Passspiel', 'Rebound'] as const;
+export const SKILL_OPTIONS = [
+  '3-Point (Sniper)',
+  'Rebound (Glas-Cleaner)',
+  'Blocks (Blockmaschine)',
+  'Verteidigung (Defense Monster)',
+  'Passspiel (Playmaker)',
+  'Ballhandling (Crossover-King)',
+  'Athletik (Highflyer)',
+  'Freiwurf (Mr. Automatik)',
+  'Fastbreak (Turbo)',
+  'Motor (Energizer)',
+  'Post-Play (Tank)'
+] as const;
 export type Skill = (typeof SKILL_OPTIONS)[number];
+
+export const SKILL_ICONS: Record<Skill, string> = {
+  '3-Point (Sniper)': '🎯',
+  'Rebound (Glas-Cleaner)': '🧹',
+  'Blocks (Blockmaschine)': '✋',
+  'Verteidigung (Defense Monster)': '🛡️',
+  'Passspiel (Playmaker)': '🤝',
+  'Ballhandling (Crossover-King)': '🕹️',
+  'Athletik (Highflyer)': '🦅',
+  'Freiwurf (Mr. Automatik)': '💯',
+  'Fastbreak (Turbo)': '⚡',
+  'Motor (Energizer)': '🔋',
+  'Post-Play (Tank)': '💪'
+};
 
 export interface Announcement {
   id: string;
