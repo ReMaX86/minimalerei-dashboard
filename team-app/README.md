@@ -673,6 +673,14 @@ hier die getroffenen Entscheidungen samt Begründung:
   Admin weiterhin nur für Trainer/Admin-Spieler — beide werden jetzt aber
   an ihrer festen Zielposition eingefügt (Team direkt hinter Spiele,
   Admin am Ende) statt wie zuvor pauschal ans Ende der Liste angehängt.
+- **Trikot-Kacheln auf dem Dashboard brachen uneinheitlich um** (nur
+  "Schwarz · Auswärts" wickelte sich in der zweispaltigen Kachel auf zwei
+  Zeilen, "Weiß · Heim" blieb einzeilig — sah auf echten Geräten schief
+  aus). `set.label` (Format immer "Farbe · Ort", siehe Seed-Daten in
+  `0001_init.sql`) wird in `Dashboard.tsx` jetzt am " · " gesplittet und
+  jeder Teil als eigener `block`-Span gerendert, statt den Umbruch dem
+  Browser bei zufälliger Containerbreite zu überlassen — beide Kacheln
+  sind dadurch immer zweizeilig.
 
 ## Projektstruktur
 
