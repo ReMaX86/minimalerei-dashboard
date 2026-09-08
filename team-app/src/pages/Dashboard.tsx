@@ -10,6 +10,7 @@ import { fmtDate, fmtDateShort, fmtTime } from '../lib/format';
 import {
   OFFICIATING_TASK_LABELS,
   benoetigterSatz,
+  gameResult,
   meetingPoints,
   officiatingGameLabel,
   type Announcement,
@@ -23,6 +24,8 @@ import {
   type TrikotSet
 } from '../types/database';
 
+const RESULT_LABELS = { sieg: 'Sieg', niederlage: 'Niederlage', unentschieden: 'Unentschieden' } as const;
+
 interface DashboardData {
   nextGame: Game | null;
   playerInSquad: boolean | null;
@@ -34,6 +37,8 @@ interface DashboardData {
   carpoolOffers: CarpoolOffer[];
   carpoolClaims: CarpoolClaim[];
   absencesOverview: PlayerAbsence[];
+  lastResult: Game | null;
+  myTotalPoints: number | null;
 }
 
 export function Dashboard() {
@@ -130,6 +135,30 @@ export function Dashboard() {
         absencesOverview = (absenceRows as PlayerAbsence[]) ?? [];
       }
 
+      let lastResult: Game | null = null;
+      let myTotalPoints: number | null = null;
+      if (flags.stats) {
+        const { data: lastGameRow } = await supabase
+          .from('games')
+          .select('*')
+          .not('final_score_us', 'is', null)
+          .order('game_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        lastResult = lastGameRow as Game | null;
+
+        if (role === 'player' && player) {
+          const { data: pointsRows } = await supabase
+            .from('game_player_points')
+            .select('points')
+            .eq('player_id', player.id);
+          myTotalPoints = ((pointsRows as { points: number }[] | null) ?? []).reduce(
+            (sum, r) => sum + r.points,
+            0
+          );
+        }
+      }
+
       if (showOfficiatingOverview) {
         const { data: nextOg } = await supabase
           .from('officiating_games')
@@ -167,7 +196,9 @@ export function Dashboard() {
         announcements: (announcementsRes.data as Announcement[]) ?? [],
         carpoolOffers,
         carpoolClaims,
-        absencesOverview
+        absencesOverview,
+        lastResult,
+        myTotalPoints
       });
     }
 
@@ -175,7 +206,7 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [role, player, isAdmin, flags.announcements, flags.carpool, flags.absences]);
+  }, [role, player, isAdmin, flags.announcements, flags.carpool, flags.absences, flags.stats]);
 
   if (error) return <div className="card text-sm text-tbw-red">{error}</div>;
   if (!data) return <LoadingSpinner />;
@@ -283,6 +314,41 @@ export function Dashboard() {
           <p className="mt-2 text-sm text-tbw-ink/50">Kein Spiel geplant.</p>
         )}
       </section>
+
+      {flags.stats && data.lastResult && (
+        <section className="card">
+          <SectionTitle icon="🏆" title="Letztes Ergebnis" />
+          <div className="mt-2 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-tbw-navyDark">vs. {data.lastResult.opponent}</p>
+              <p className="text-xs text-tbw-ink/50">{fmtDate(data.lastResult.game_date)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xl font-extrabold text-tbw-navyDark">
+                {data.lastResult.final_score_us}:{data.lastResult.final_score_opponent}
+              </p>
+              {gameResult(data.lastResult) && (
+                <span
+                  className={`pill ${
+                    gameResult(data.lastResult) === 'sieg'
+                      ? 'pill-ok'
+                      : gameResult(data.lastResult) === 'niederlage'
+                        ? 'pill-open'
+                        : ''
+                  }`}
+                >
+                  {RESULT_LABELS[gameResult(data.lastResult)!]}
+                </span>
+              )}
+            </div>
+          </div>
+          {role === 'player' && data.myTotalPoints !== null && (
+            <p className="mt-2 border-t border-black/5 pt-2 text-xs text-tbw-ink/50">
+              Deine Punkte diese Saison: <span className="font-bold text-tbw-navyDark">{data.myTotalPoints}</span>
+            </p>
+          )}
+        </section>
+      )}
 
       {role === 'player' && (
         <section className="card">

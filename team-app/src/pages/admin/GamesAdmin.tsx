@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useFeatureFlags } from '../../context/FeatureFlagsContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
 import { MeetingPointFields, EMPTY_MEETING_POINT } from '../../components/MeetingPointFields';
+import { GamePointsEditor } from '../../components/GamePointsEditor';
 import { fmtDate, fmtTime } from '../../lib/format';
-import { meetingPoints, type Game, type TrikotSetId } from '../../types/database';
+import { gameResult, meetingPoints, type Game, type Player, type TrikotSetId } from '../../types/database';
+
+const RESULT_LABELS = { sieg: 'Sieg', niederlage: 'Niederlage', unentschieden: 'Unentschieden' } as const;
 
 const EMPTY_FORM = {
   game_date: '',
@@ -13,24 +17,33 @@ const EMPTY_FORM = {
   is_home: true,
   trikot_override: '' as '' | TrikotSetId,
   location: '',
+  final_score_us: '',
+  final_score_opponent: '',
   ...EMPTY_MEETING_POINT
 };
 
 export function GamesAdmin() {
+  const { flags } = useFeatureFlags();
   const [games, setGames] = useState<Game[] | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pointsForId, setPointsForId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
-    const { data, error: loadError } = await supabase.from('games').select('*').order('game_date').order('game_time');
-    if (loadError) {
+    const [gamesRes, playersRes] = await Promise.all([
+      supabase.from('games').select('*').order('game_date').order('game_time'),
+      supabase.from('players').select('*').eq('is_active', true).order('name')
+    ]);
+    if (gamesRes.error || playersRes.error) {
       setError('Fehler beim Laden der Spiele.');
       return;
     }
-    setGames((data as Game[]) ?? []);
+    setGames((gamesRes.data as Game[]) ?? []);
+    setPlayers((playersRes.data as Player[]) ?? []);
   }, []);
 
   useEffect(() => {
@@ -46,6 +59,8 @@ export function GamesAdmin() {
       is_home: g.is_home,
       trikot_override: g.trikot_override ?? '',
       location: g.location,
+      final_score_us: g.final_score_us?.toString() ?? '',
+      final_score_opponent: g.final_score_opponent?.toString() ?? '',
       meeting_time_hall: g.meeting_time_hall?.slice(0, 5) ?? '',
       meeting_time_carpool: g.meeting_time_carpool?.slice(0, 5) ?? '',
       meeting_point_carpool: g.meeting_point_carpool ?? ''
@@ -68,6 +83,8 @@ export function GamesAdmin() {
       is_home: form.is_home,
       trikot_override: form.trikot_override || null,
       location: form.location.trim(),
+      final_score_us: form.final_score_us ? Number(form.final_score_us) : null,
+      final_score_opponent: form.final_score_opponent ? Number(form.final_score_opponent) : null,
       meeting_time_hall: form.meeting_time_hall || null,
       meeting_time_carpool: form.is_home ? null : form.meeting_time_carpool || null,
       meeting_point_carpool: form.is_home ? null : form.meeting_point_carpool.trim() || null
@@ -154,6 +171,30 @@ export function GamesAdmin() {
             <option value="schwarz">Trikot: Schwarz erzwingen</option>
           </select>
         </div>
+        {flags.stats && (
+          <div className="border-t border-black/5 pt-2">
+            <p className="text-xs font-semibold text-tbw-ink/50">Endstand</p>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                placeholder="Wir"
+                className="input min-w-0"
+                value={form.final_score_us}
+                onChange={(e) => setForm((f) => ({ ...f, final_score_us: e.target.value }))}
+              />
+              <span className="text-tbw-ink/40">:</span>
+              <input
+                type="number"
+                min={0}
+                placeholder="Gegner"
+                className="input min-w-0"
+                value={form.final_score_opponent}
+                onChange={(e) => setForm((f) => ({ ...f, final_score_opponent: e.target.value }))}
+              />
+            </div>
+          </div>
+        )}
         <div className="border-t border-black/5 pt-2">
           <p className="text-xs font-semibold text-tbw-ink/50">Treffpunkt</p>
           <div className="mt-2">
@@ -197,16 +238,41 @@ export function GamesAdmin() {
                     {m.place ? `${m.time ? ', ' : ''}${m.place}` : ''}
                   </p>
                 ))}
+                {flags.stats && gameResult(g) && (
+                  <p className="text-xs text-tbw-ink/40">
+                    Endstand: {g.final_score_us}:{g.final_score_opponent} ·{' '}
+                    <span
+                      className={
+                        gameResult(g) === 'sieg'
+                          ? 'font-semibold text-status-ok'
+                          : gameResult(g) === 'niederlage'
+                            ? 'font-semibold text-tbw-red'
+                            : 'font-semibold'
+                      }
+                    >
+                      {RESULT_LABELS[gameResult(g)!]}
+                    </span>
+                  </p>
+                )}
               </div>
-              <div className="flex shrink-0 gap-2">
+              <div className="flex shrink-0 flex-col gap-2">
                 <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => edit(g)}>
                   Bearbeiten
                 </button>
+                {flags.stats && (
+                  <button
+                    className="btn-secondary !px-2 !py-1 text-xs"
+                    onClick={() => setPointsForId(pointsForId === g.id ? null : g.id)}
+                  >
+                    {pointsForId === g.id ? 'Punkte schließen' : 'Punkte'}
+                  </button>
+                )}
                 <button className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red" onClick={() => remove(g.id)}>
                   Löschen
                 </button>
               </div>
             </div>
+            {pointsForId === g.id && <GamePointsEditor gameId={g.id} players={players} />}
           </li>
         ))}
         {games.length === 0 && <p className="text-sm text-tbw-ink/50">Noch keine Spiele eingetragen.</p>}
