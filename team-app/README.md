@@ -273,11 +273,24 @@ hier die getroffenen Entscheidungen samt Begründung:
   bewusst keine generelle UPDATE-RLS-Policy für Spieler auf `players` (RLS prüft nur Zeilen, keine
   Spalten) — stattdessen eine neue `update_my_profile()`-RPC, die nur genau die drei Felder der
   eigenen Zeile schreibt, plus zwei neue Storage-Policies auf dem `player-photos`-Bucket, die einen
-  Upload/Ersatz nur für Dateien mit dem eigenen `<player_id>-…`-Präfix erlauben. Technischer Stolperstein
-  beim Bauen: das Profil-Modal ist ein `position: fixed`-Overlay, das anfangs als Kind des Headers
-  gerendert wurde — dessen `backdrop-blur` (`backdrop-filter`) erzeugt laut CSS-Spec einen eigenen
-  Containing Block für `fixed`-Nachfahren, wodurch das Overlay nur die kleine Header-Box statt des
-  ganzen Bildschirms füllte. Behoben über `createPortal(..., document.body)` in `MyProfileModal.tsx`.
+  Upload/Ersatz nur für die eigenen Dateien erlauben (Details/Korrektur siehe Migration `0019`
+  unten). Technischer Stolperstein beim Bauen: das Profil-Modal ist ein `position: fixed`-Overlay,
+  das anfangs als Kind des Headers gerendert wurde — dessen `backdrop-blur` (`backdrop-filter`)
+  erzeugt laut CSS-Spec einen eigenen Containing Block für `fixed`-Nachfahren, wodurch das Overlay
+  nur die kleine Header-Box statt des ganzen Bildschirms füllte. Behoben über
+  `createPortal(..., document.body)` in `MyProfileModal.tsx`.
+- **Fix: Foto-Upload aus "Mein Profil" schlug in Produktion fehl (Migration `0019`).** Die
+  "self"-Storage-Policies aus Migration `0018` prüften den Dateinamen über `current_player_id()`
+  — eine security-definer Funktion mit Join über `player_auth_links`. Das lieferte beim direkten
+  RPC-Aufruf (Größe/Geburtsdatum speichern funktionierte einwandfrei) korrekte Ergebnisse, aber
+  nicht zuverlässig innerhalb einer Storage-Policy (eigener Dienst, eigene DB-Verbindung) — Ergebnis
+  war `new row violates row-level security policy` beim Foto-Upload. Ersetzt durch das offizielle,
+  simplere Supabase-Muster: Dateien liegen jetzt in einem Ordner pro `auth.uid()`
+  (`<auth_user_id>/<timestamp>.<ext>` statt `<player_id>-<timestamp>.<ext>`), die Policy vergleicht
+  nur noch `(storage.foldername(name))[1] = auth.uid()::text` — kein Funktionsaufruf, kein Join,
+  keine verschachtelte RLS-Prüfung einer zweiten Tabelle. `MyProfileModal.tsx` liest die
+  `auth_user_id` dafür über `supabase.auth.getSession()` (lokal, kein Netzwerk-Roundtrip) statt
+  `getUser()`, analog zum bereits bestehenden Muster in `AuthContext.tsx`.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche
