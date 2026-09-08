@@ -2,22 +2,23 @@ import { useState, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { ErrorNote } from '../components/ErrorNote';
+import { IconCalendar, IconTeam, IconJersey, IconClipboard } from '../components/NavIcons';
 
 type Step = 'intro' | 'welcome' | 'trainer-login' | 'trainer-forgot-password' | 'player-code';
 
 const INTRO_SLIDES = [
   {
-    icon: '📅',
+    Icon: IconCalendar,
     title: 'Spielplan & Training',
     text: 'Alle Termine auf einen Blick — beim Training mit einem Klick zu- oder absagen.'
   },
   {
-    icon: '🧑‍🤝‍🧑',
+    Icon: IconTeam,
     title: 'Kader',
     text: 'Sofort sehen, ob du beim nächsten Spiel dabei bist.'
   },
   {
-    icon: '👕',
+    Icon: IconJersey,
     title: 'Trikots & Kampfgericht',
     text: 'Fair verteilt: wer als nächstes wäscht und wer am Kampfgericht sitzt, immer klar geregelt.'
   }
@@ -49,7 +50,7 @@ function Intro({ onDone }: { onDone: () => void }) {
   return (
     <div className="text-center">
       <p className="text-sm font-semibold uppercase tracking-[0.2em] text-tbw-gold">Willkommen</p>
-      <div className="mt-6 text-6xl">{slide.icon}</div>
+      <slide.Icon className="mx-auto mt-6 h-14 w-14 text-tbw-gold" />
       <h2 className="headline mt-6 text-3xl text-white">{slide.title}</h2>
       <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-white/70">{slide.text}</p>
 
@@ -91,12 +92,12 @@ function Welcome({ onTrainer, onPlayer }: { onTrainer: () => void; onPlayer: () 
 
       <div className="mt-8 grid grid-cols-3 gap-2 text-center">
         {[
-          { icon: '👕', label: 'Trikots' },
-          { icon: '📋', label: 'Kampfgericht' },
-          { icon: '🧑‍🤝‍🧑', label: 'Kader' }
+          { Icon: IconJersey, label: 'Trikots' },
+          { Icon: IconClipboard, label: 'Kampfgericht' },
+          { Icon: IconTeam, label: 'Kader' }
         ].map((f) => (
           <div key={f.label} className="rounded-2xl bg-white/5 py-4 ring-1 ring-white/10">
-            <div className="text-xl">{f.icon}</div>
+            <f.Icon className="mx-auto h-5 w-5 text-tbw-gold" />
             <div className="mt-1 text-[11px] font-semibold text-white/70">{f.label}</div>
           </div>
         ))}
