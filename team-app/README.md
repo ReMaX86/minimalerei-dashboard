@@ -219,6 +219,18 @@ hier die getroffenen Entscheidungen samt Begründung:
   vor dem ersten Laden der Feature-Flags getroffen wurde. `App.tsx` wartet jetzt zusätzlich zum
   bestehenden `role === 'loading'`-Check auch auf `flags.loading`, bevor die Routen gerendert
   werden.
+- **Urlaub/Abwesenheit (Migration `0015`).** Vierte schaltbare Zusatzfunktion. Spieler tragen
+  selbst einen Zeitraum ein (Von/Bis + optionale Notiz), statt dass der Trainer das pflegt.
+  Bewusst als Zeitraum in einer eigenen Tabelle statt als einzelne Absage-Zeilen: `playerAbsenceOn()`
+  in `src/types/database.ts` prüft beim Anzeigen, ob ein Termin/Spiel in den Zeitraum fällt — ein
+  Urlaub verschwindet dadurch automatisch aus vergangenen Terminen, ohne dass irgendwo Zeilen
+  aufgeräumt werden müssen. Wirkt sich an zwei Stellen aus: in `UpcomingTrainings` werden
+  betroffene Trainingstermine für den Spieler wie eine Absage behandelt (eigene "Urlaub"-Gruppe
+  statt Zu-/Absage-Buttons, kein Schreiben einzelner RSVP-Zeilen); auf der Kader-Seite zeigt der
+  Trainer beim Zusammenstellen ein 🌴-Badge neben dem Namen, blockiert die Auswahl aber bewusst
+  nicht — der Trainer kennt Ausnahmefälle besser als eine automatische Regel. Trainer sehen
+  zusätzlich eine kompakte "Aktuell abwesend"-Übersicht auf der Startseite; auch hier bewusst kein
+  Zugriff für Betrachter (persönliche Daten, wie schon bei den Spielerprofilen).
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche

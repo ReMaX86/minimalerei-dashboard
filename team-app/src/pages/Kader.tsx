@@ -7,7 +7,7 @@ import { ErrorNote } from '../components/ErrorNote';
 import { MeetingPointFields, EMPTY_MEETING_POINT, type MeetingPointFormValue } from '../components/MeetingPointFields';
 import { CarpoolSection } from '../components/CarpoolSection';
 import { fmtDate, fmtTime } from '../lib/format';
-import { meetingPoints, type Game, type GameSquadRow, type Player } from '../types/database';
+import { meetingPoints, playerAbsenceOn, type Game, type GameSquadRow, type Player, type PlayerAbsence } from '../types/database';
 
 const MAX_SQUAD_SIZE = 12;
 
@@ -16,6 +16,7 @@ interface State {
   upcomingGames: Game[];
   squad: GameSquadRow[];
   players: Player[];
+  absences: PlayerAbsence[];
 }
 
 export function Kader() {
@@ -44,17 +45,27 @@ export function Kader() {
     const games = (gamesRes.data as Game[]) ?? [];
     const nextGame = games[0] ?? null;
     let squad: GameSquadRow[] = [];
+    let absences: PlayerAbsence[] = [];
     if (nextGame) {
       const { data: squadRows } = await supabase.from('game_squad').select('*').eq('game_id', nextGame.id);
       squad = (squadRows as GameSquadRow[]) ?? [];
+      if (flags.absences) {
+        const { data: absenceRows } = await supabase
+          .from('player_absences')
+          .select('*')
+          .lte('start_date', nextGame.game_date)
+          .gte('end_date', nextGame.game_date);
+        absences = (absenceRows as PlayerAbsence[]) ?? [];
+      }
     }
     setState({
       nextGame,
       upcomingGames: games.slice(1),
       squad,
+      absences,
       players: ((playersRes.data as Player[]) ?? []).sort((a, b) => a.name.localeCompare(b.name, 'de'))
     });
-  }, []);
+  }, [flags.absences]);
 
   useEffect(() => {
     load().catch(() => setError('Fehler beim Laden des Kaders.'));
@@ -208,7 +219,14 @@ export function Kader() {
             <ul className="mt-3 divide-y divide-black/5">
               {sortedForTrainer.map((p) => (
                 <li key={p.id} className="flex items-center justify-between py-2">
-                  <span className="text-sm font-medium text-tbw-navyDark">{p.name}</span>
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-tbw-navyDark">
+                    {p.name}
+                    {flags.absences && playerAbsenceOn(state.absences, p.id, state.nextGame!.game_date) && (
+                      <span className="pill pill-warn" title="Im Urlaub eingetragen">
+                        🌴
+                      </span>
+                    )}
+                  </span>
                   <button
                     disabled={togglingId === p.id || (atCap && !selectedByPlayer[p.id])}
                     onClick={() => toggle(p.id)}
