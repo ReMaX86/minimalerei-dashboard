@@ -231,6 +231,18 @@ hier die getroffenen Entscheidungen samt Begründung:
   nicht — der Trainer kennt Ausnahmefälle besser als eine automatische Regel. Trainer sehen
   zusätzlich eine kompakte "Aktuell abwesend"-Übersicht auf der Startseite; auch hier bewusst kein
   Zugriff für Betrachter (persönliche Daten, wie schon bei den Spielerprofilen).
+- **Punkte & Ergebnisse (Migration `0016`).** Fünfte schaltbare Zusatzfunktion, manuell vom
+  Trainer gepflegt statt automatisch von einer Liga-Plattform übernommen — für basketball-bund.net
+  ist keine dokumentierte öffentliche Schnittstelle bekannt, ein Scraper wäre fehleranfällig
+  (bricht bei jeder Layout-Änderung) und im Zweifel nicht im Sinne der Nutzungsbedingungen. Bei
+  Bedarf lässt sich das später ergänzen, sobald klar ist, ob/wie ein Zugriff möglich ist. Endstand
+  ist bewusst `final_score_us`/`final_score_opponent` statt `home`/`away`, damit Sieg/Niederlage
+  direkt aus dem Vergleich der beiden Werte folgt, unabhängig vom Heimrecht (`gameResult()` in
+  `src/types/database.ts`). Punkte pro Spieler liegen in einer eigenen Tabelle
+  (`game_player_points`), gepflegt über eine ausklappbare Punkte-Eingabe je Spiel in Admin ->
+  Spiele; leere Eingabefelder löschen eine vorhandene Zeile wieder, statt sie auf 0 zu setzen.
+  Zeigt auf der Startseite das letzte Ergebnis (inkl. Sieg/Niederlage-Badge) und für Spieler ihre
+  Saison-Punktesumme.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche

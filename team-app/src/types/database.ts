@@ -4,7 +4,7 @@ export type OfficiatingTaskType = 'uhr' | 'anschreiber' | 'zeit';
 // Optionale Zusatzfunktionen, die ein Trainer pro Team an-/ausschalten kann
 // (Admin -> Funktionen). Neuer Key hier + eine Zeile in Migration/Seed, dann
 // ist eine neue Funktion schaltbar.
-export type FeatureKey = 'announcements' | 'carpool' | 'player_profiles' | 'absences';
+export type FeatureKey = 'announcements' | 'carpool' | 'player_profiles' | 'absences' | 'stats';
 
 export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: string }> = {
   announcements: {
@@ -23,6 +23,10 @@ export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: st
     label: 'Urlaub/Abwesenheit',
     description:
       'Spieler tragen eigene Abwesenheiten ein — Training wird automatisch abgesagt, beim Kader wird ein Hinweis angezeigt.'
+  },
+  stats: {
+    label: 'Punkte & Ergebnisse',
+    description: 'Endstand pro Spiel und Punkte pro Spieler, manuell vom Trainer eingetragen.'
   }
 };
 
@@ -108,6 +112,8 @@ export interface Game {
   meeting_time_hall: string | null;
   meeting_time_carpool: string | null;
   meeting_point_carpool: string | null;
+  final_score_us: number | null;
+  final_score_opponent: number | null;
   created_at: string;
 }
 
@@ -224,4 +230,21 @@ export function playerAbsenceOn(
   dateIso: string
 ): boolean {
   return absences.some((a) => a.player_id === playerId && dateIso >= a.start_date && dateIso <= a.end_date);
+}
+
+export interface GamePlayerPoints {
+  game_id: string;
+  player_id: string;
+  points: number;
+}
+
+export type GameResult = 'sieg' | 'niederlage' | 'unentschieden';
+
+// "us" vs. "opponent" statt "home"/"away", damit Sieg/Niederlage unabhängig
+// vom Heimrecht direkt aus dem Vergleich der beiden Endstände folgt.
+export function gameResult(game: Pick<Game, 'final_score_us' | 'final_score_opponent'>): GameResult | null {
+  if (game.final_score_us == null || game.final_score_opponent == null) return null;
+  if (game.final_score_us > game.final_score_opponent) return 'sieg';
+  if (game.final_score_us < game.final_score_opponent) return 'niederlage';
+  return 'unentschieden';
 }
