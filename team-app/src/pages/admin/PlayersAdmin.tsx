@@ -125,7 +125,7 @@ export function PlayersAdmin() {
         const ext = photoFile.name.split('.').pop() ?? 'jpg';
         const path = `${p.id}-${Date.now()}.${ext}`;
         const { error: uploadError } = await supabase.storage.from('player-photos').upload(path, photoFile, {
-          upsert: true
+          upsert: false
         });
         if (uploadError) throw uploadError;
         photo_url = supabase.storage.from('player-photos').getPublicUrl(path).data.publicUrl;

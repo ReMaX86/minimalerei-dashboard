@@ -45,7 +45,7 @@ export function MyProfileModal({ onClose }: { onClose: () => void }) {
         const path = `${session.user.id}-${Date.now()}.${ext}`;
         const { error: uploadError } = await supabase.storage
           .from('player-photos')
-          .upload(path, photoFile, { upsert: true });
+          .upload(path, photoFile, { upsert: false });
         if (uploadError) {
           step = `upload path=${path}`;
           throw uploadError;
