@@ -667,6 +667,12 @@ hier die getroffenen Entscheidungen samt Begründung:
     Schrift (`!text-[10px]` statt der Standard-`text-xs` aus `.pill`); der
     linken Spalte (Gegner/Datum/Ort) dafür `min-w-0` ergänzt, damit sie bei
     Platzmangel wie gehabt selbst umbricht statt die Pill zu verdrängen.
+- **Reihenfolge der Bottom-Nav geändert** (`src/components/BottomNav.tsx`):
+  Start – Spiele – Team – Trikots – Kampfgericht – Admin. Team wird
+  weiterhin nur bei aktiviertem `player_profiles`-Flag eingeblendet und
+  Admin weiterhin nur für Trainer/Admin-Spieler — beide werden jetzt aber
+  an ihrer festen Zielposition eingefügt (Team direkt hinter Spiele,
+  Admin am Ende) statt wie zuvor pauschal ans Ende der Liste angehängt.
 
 ## Projektstruktur
 

@@ -5,9 +5,9 @@ import { IconHome, IconJersey, IconClipboard, IconTeam, IconUser, IconGear } fro
 
 const ITEMS = [
   { to: '/', label: 'Start', Icon: IconHome, end: true },
+  { to: '/spiele', label: 'Spiele', Icon: IconTeam, end: false },
   { to: '/trikots', label: 'Trikots', Icon: IconJersey, end: false },
-  { to: '/kampfgericht', label: 'Kampfgericht', Icon: IconClipboard, end: false },
-  { to: '/spiele', label: 'Spiele', Icon: IconTeam, end: false }
+  { to: '/kampfgericht', label: 'Kampfgericht', Icon: IconClipboard, end: false }
 ];
 
 // Betrachter (z. B. Abteilungsleiter) sehen nur Spielplan + Kampfgericht,
@@ -23,7 +23,8 @@ export function BottomNav() {
 
   let items = role === 'viewer' ? VIEWER_ITEMS : ITEMS;
   if (role !== 'viewer' && flags.player_profiles) {
-    items = [...items, { to: '/team', label: 'Team', Icon: IconUser, end: false }];
+    // Team direkt hinter Spiele einreihen, nicht ans Ende anhängen.
+    items = [...items.slice(0, 2), { to: '/team', label: 'Team', Icon: IconUser, end: false }, ...items.slice(2)];
   }
   if (isAdmin) {
     items = [...items, { to: '/admin', label: 'Admin', Icon: IconGear, end: false }];
