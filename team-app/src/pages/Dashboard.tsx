@@ -152,17 +152,26 @@ export function Dashboard() {
               vs. {data.nextGame.opponent}{' '}
               <span className="pill pill-open ml-1">{data.nextGame.is_home ? 'Heim' : 'Auswärts'}</span>
             </p>
-            <p className="text-sm text-tbw-ink/70">
+            <p className="text-base font-bold text-tbw-navyDark">
               {fmtDate(data.nextGame.game_date)} · {fmtTime(data.nextGame.game_time)} Uhr
             </p>
             <p className="text-sm text-tbw-ink/70">{data.nextGame.location}</p>
-            {meetingPoints(data.nextGame).map((m) => (
-              <p key={m.label} className="text-xs text-tbw-ink/50">
-                Treffpunkt {m.label}: {m.time ? `${fmtTime(m.time)} Uhr` : ''}
-                {m.place ? `${m.time ? ', ' : ''}${m.place}` : ''}
-              </p>
-            ))}
-            <p className="text-xs text-tbw-ink/50">
+
+            {meetingPoints(data.nextGame).length > 0 && (
+              <div className="mt-2 rounded-xl bg-tbw-bg px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-ink/40">Treffpunkt</p>
+                {meetingPoints(data.nextGame).map((m) => (
+                  <p key={m.label} className="text-xs text-tbw-ink/60">
+                    {m.time && <span className="font-semibold text-tbw-ink/80">{fmtTime(m.time)} Uhr</span>}
+                    {m.time && ' · '}
+                    {m.label}
+                    {m.place ? `, ${m.place}` : ''}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            <p className="mt-2 text-xs text-tbw-ink/50">
               Trikot: {benoetigterSatz(data.nextGame) === 'weiss' ? 'Weiß' : 'Schwarz'}
             </p>
             {role === 'player' && (

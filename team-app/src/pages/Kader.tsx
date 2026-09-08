@@ -155,17 +155,23 @@ export function Kader() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">Nächster Spieltag</p>
             <p className="text-base font-bold text-tbw-navyDark">vs. {state.nextGame.opponent}</p>
-            <p className="text-sm text-tbw-ink/60">
+            <p className="text-sm font-bold text-tbw-navyDark">
               {fmtDate(state.nextGame.game_date)} · {fmtTime(state.nextGame.game_time)} Uhr ·{' '}
               {state.nextGame.is_home ? 'Heim' : 'Auswärts'}
             </p>
-            {!isAdmin &&
-              meetingPoints(state.nextGame).map((m) => (
-                <p key={m.label} className="text-xs text-tbw-ink/50">
-                  Treffpunkt {m.label}: {m.time ? `${fmtTime(m.time)} Uhr` : ''}
-                  {m.place ? `${m.time ? ', ' : ''}${m.place}` : ''}
-                </p>
-              ))}
+            {!isAdmin && meetingPoints(state.nextGame).length > 0 && (
+              <div className="mt-2 rounded-xl bg-tbw-bg px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-ink/40">Treffpunkt</p>
+                {meetingPoints(state.nextGame).map((m) => (
+                  <p key={m.label} className="text-xs text-tbw-ink/60">
+                    {m.time && <span className="font-semibold text-tbw-ink/80">{fmtTime(m.time)} Uhr</span>}
+                    {m.time && ' · '}
+                    {m.label}
+                    {m.place ? `, ${m.place}` : ''}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
           <span className={state.nextGame.squad_published ? 'pill pill-ok' : 'pill pill-open'}>
             {state.nextGame.squad_published ? 'veröffentlicht' : 'Entwurf'}
