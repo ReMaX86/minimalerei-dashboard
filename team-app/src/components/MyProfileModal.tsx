@@ -38,8 +38,9 @@ export function MyProfileModal({ onClose }: { onClose: () => void }) {
       if (rpcError) throw rpcError;
       await refreshPlayer();
       onClose();
-    } catch {
-      setError('Profil konnte nicht gespeichert werden.');
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      setError(`Profil konnte nicht gespeichert werden. (${detail})`);
     } finally {
       setSaving(false);
     }
