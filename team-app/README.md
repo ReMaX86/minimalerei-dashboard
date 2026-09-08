@@ -757,6 +757,12 @@ hier die getroffenen Entscheidungen samt Begründung:
     von der pro Spieler persistenten "abgesagt"-Pille im Editor (die
     bleibt bestehen, bis der Trainer den Spieler wieder aufnimmt) — die
     Dashboard-Kachel ist nur ein einmaliger Hinweis, keine Aufgabenliste.
+  - **Nachtrag (Zusage sichtbar für den Trainer):** in der Trainer-Kader-
+    Bearbeitung steht jetzt neben dem Namen eines ausgewählten und
+    bereits zugesagten Spielers (`is_selected` und `confirmation ===
+    'confirmed'`) ein grünes ✓ — vorher war für den Trainer nicht
+    unterscheidbar, ob ein im Kader stehender Spieler schon reagiert hat
+    oder noch auf "pending" steht.
 
 ## Projektstruktur
 
