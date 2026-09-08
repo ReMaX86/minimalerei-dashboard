@@ -315,6 +315,22 @@ hier die getroffenen Entscheidungen samt Begründung:
   `MyProfileModal.tsx` jetzt den Schritt (Foto-Upload vs. Profil-RPC) und mehr Fehlerdetails
   (`statusCode`/`error`/`code` aus dem Supabase-Fehlerobjekt, nicht nur `message`) an, falls auch
   das noch fehlschlägt.
+- **Fix Teil 4: Wurzelursache gefunden — `storage.buckets` fehlte komplett eine Policy
+  (Migration `0023`).** Die Detail-Fehlermeldung aus Fix Teil 3 zeigte trotz einer nachweislich
+  komplett offenen Policy auf `storage.objects` weiterhin `403 · AccessDenied · new row violates
+  row-level security policy`. Eine Abfrage über alle Tabellen im `storage`-Schema (`pg_tables`)
+  zeigte: auch `storage.buckets` hat RLS aktiviert (Supabase-Standard) — eine zweite Abfrage über
+  `pg_policies` zeigte, dass dafür aber noch nie eine einzige Policy existierte. RLS an, aber ohne
+  Policy, heißt kompletter Zugriffsentzug für jede Rolle außer dem Superuser. Migration `0014` hat
+  den `player-photos`-Bucket zwar per `INSERT` angelegt, aber nie eine `SELECT`-Policy dafür
+  ergänzt. Supabase Storage muss vor jedem Objekt-Schreibzugriff offenbar die Bucket-Zeile selbst
+  lesen können (öffentlich/privat, Größenlimit, erlaubte MIME-Typen) — ohne Leserecht darauf
+  schlägt jeder Upload fehl, unabhängig davon, wie offen die `objects`-Policies sind. Erklärt
+  rückwirkend alle bisherigen Fehlschläge (`0018`–`0022`), vermutlich auch den nie in Produktion
+  getesteten Trainer-Upload-Pfad. Migration `0023` ergänzt eine `select`-Policy auf
+  `storage.buckets` (Bucket-Konfiguration ist nicht sensibel, daher für alle lesbar — passt zum
+  Muster im Rest der App) und schränkt gleichzeitig die testweise offene `objects`-Policy aus
+  Migration `0022` wieder auf die eigene Datei ein (identische Logik wie Migration `0021`).
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche
