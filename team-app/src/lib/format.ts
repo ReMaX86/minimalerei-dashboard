@@ -17,3 +17,14 @@ export function isFuture(iso: string): boolean {
   today.setHours(0, 0, 0, 0);
   return new Date(iso + 'T00:00:00') >= today;
 }
+
+export function ageFromBirthDate(iso: string): number {
+  const birth = new Date(iso + 'T00:00:00');
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const hadBirthdayThisYear =
+    today.getMonth() > birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+  if (!hadBirthdayThisYear) age -= 1;
+  return age;
+}

@@ -4,7 +4,7 @@ export type OfficiatingTaskType = 'uhr' | 'anschreiber' | 'zeit';
 // Optionale Zusatzfunktionen, die ein Trainer pro Team an-/ausschalten kann
 // (Admin -> Funktionen). Neuer Key hier + eine Zeile in Migration/Seed, dann
 // ist eine neue Funktion schaltbar.
-export type FeatureKey = 'announcements' | 'carpool';
+export type FeatureKey = 'announcements' | 'carpool' | 'player_profiles';
 
 export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: string }> = {
   announcements: {
@@ -14,8 +14,23 @@ export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: st
   carpool: {
     label: 'Mitfahrgelegenheit',
     description: 'Fahrgemeinschaften für Auswärtsspiele organisieren.'
+  },
+  player_profiles: {
+    label: 'Spielerprofile',
+    description: 'Team-Übersicht mit Foto, Position, Größe, Alter und Skills pro Spieler.'
   }
 };
+
+export type PlayerPosition = 'aufbau' | 'fluegel' | 'center';
+
+export const POSITION_LABELS: Record<PlayerPosition, string> = {
+  aufbau: 'Aufbau',
+  fluegel: 'Flügel',
+  center: 'Center'
+};
+
+export const SKILL_OPTIONS = ['Distanzwurf', 'Verteidigung', 'Athletik', 'Passspiel', 'Rebound'] as const;
+export type Skill = (typeof SKILL_OPTIONS)[number];
 
 export interface Announcement {
   id: string;
@@ -54,6 +69,11 @@ export interface Player {
   auth_user_id: string | null;
   is_active: boolean;
   is_admin: boolean;
+  position: PlayerPosition | null;
+  height_cm: number | null;
+  birth_date: string | null;
+  photo_url: string | null;
+  skills: string[];
   created_at: string;
 }
 
