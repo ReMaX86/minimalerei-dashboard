@@ -373,6 +373,15 @@ hier die getroffenen Entscheidungen samt Begründung:
   ohne `min-w-0` auf dem direkten Grid-Kind (hier: dem `<label>`, nicht dem `<input>` selbst) die
   Grid-Spalte über die verfügbare Breite hinaus aufzwingt. `min-w-0` allein am `<input>` reicht
   nicht, wenn ein `<label>` dazwischen sitzt — es muss am direkten Grid-Kind sitzen.
+  **Nachtrag:** `min-w-0` hat den Überlauf auf echten iPhones trotzdem nicht behoben — iOS
+  erzwingt für `<input type="date">`/`type="time"` eine interne Mindest-Rendergröße für das
+  native Steuerelement selbst (Kalender-Icon + Segmente), die sich per CSS gar nicht
+  unterschreiten lässt, unabhängig von `width`/`min-width` auf Container-Ebene. Bei zwei
+  Datum-/Uhrzeit-Feldern nebeneinander in einer 390px-Karte reicht der Platz schlicht nicht.
+  Einzig zuverlässige Lösung: diese Feldpaare in `MyProfileModal.tsx`, `AbsenceSection.tsx`,
+  `MeetingPointFields.tsx`, `GamesAdmin.tsx`, `OfficiatingAdmin.tsx` und `TrainingsAdmin.tsx`
+  von `grid grid-cols-2` auf `space-y-2` (untereinander statt nebeneinander) umgestellt — kein
+  Feld konkurriert mehr um Breite mit einem anderen Datum-/Uhrzeit-Feld.
 - **5er-Positionssystem statt vereinfachter 3er-Einteilung (Migration `0026`).** Auf Wunsch von
   der vereinfachten Aufbau/Flügel/Center-Einteilung auf die klassischen fünf Basketball-Positionen
   mit englischen Kürzeln umgestellt: Point Guard (PG), Shooting Guard (SG), Small Forward (SF),

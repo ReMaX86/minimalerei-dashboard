@@ -25,8 +25,8 @@ export function MeetingPointFields({
   return (
     <div className="space-y-2">
       {!isHome && (
-        <div className="grid grid-cols-2 gap-2">
-          <label className="block min-w-0 text-xs">
+        <div className="space-y-2">
+          <label className="block text-xs">
             <span className="font-semibold text-tbw-ink/50">Fahrgemeinschaft — Zeit</span>
             <input
               type="time"
@@ -35,7 +35,7 @@ export function MeetingPointFields({
               onChange={(e) => onChange({ ...value, meeting_time_carpool: e.target.value })}
             />
           </label>
-          <label className="block min-w-0 text-xs">
+          <label className="block text-xs">
             <span className="font-semibold text-tbw-ink/50">Fahrgemeinschaft — Ort</span>
             <input
               type="text"

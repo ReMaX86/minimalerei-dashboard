@@ -122,8 +122,8 @@ export function GamesAdmin() {
     <div className="space-y-4">
       <form onSubmit={submit} className="card space-y-2">
         <p className="text-sm font-bold text-tbw-navyDark">{editingId ? 'Spiel bearbeiten' : 'Neues Spiel'}</p>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="block min-w-0 text-xs">
+        <div className="space-y-2">
+          <label className="block text-xs">
             <span className="font-semibold text-tbw-ink/50">Datum</span>
             <input
               type="date"
@@ -133,7 +133,7 @@ export function GamesAdmin() {
               onChange={(e) => setForm((f) => ({ ...f, game_date: e.target.value }))}
             />
           </label>
-          <label className="block min-w-0 text-xs">
+          <label className="block text-xs">
             <span className="font-semibold text-tbw-ink/50">Uhrzeit</span>
             <input
               type="time"

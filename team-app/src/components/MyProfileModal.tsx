@@ -97,8 +97,8 @@ export function MyProfileModal({ onClose }: { onClose: () => void }) {
           </label>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <label className="block min-w-0 text-xs">
+        <div className="mt-4 space-y-2">
+          <label className="block text-xs">
             <span className="font-semibold text-tbw-ink/50">Größe (cm)</span>
             <input
               type="number"
@@ -107,7 +107,7 @@ export function MyProfileModal({ onClose }: { onClose: () => void }) {
               onChange={(e) => setHeightCm(e.target.value)}
             />
           </label>
-          <label className="block min-w-0 text-xs">
+          <label className="block text-xs">
             <span className="font-semibold text-tbw-ink/50">Geburtsdatum</span>
             <input
               type="date"
