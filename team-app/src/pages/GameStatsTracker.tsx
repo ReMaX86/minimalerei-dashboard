@@ -40,6 +40,7 @@ export function GameStatsTracker() {
 
   const [game, setGame] = useState<Game | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [squadPlayerIds, setSquadPlayerIds] = useState<string[]>([]);
   const [events, setEvents] = useState<GameStatEvent[]>([]);
   const [lockState, setLockState] = useState<LockState>({ kind: 'loading' });
   const [error, setError] = useState<string | null>(null);
@@ -51,12 +52,14 @@ export function GameStatsTracker() {
 
   const loadPlayersAndEvents = useCallback(async () => {
     if (!gameId) return;
-    const [playersRes, eventsRes] = await Promise.all([
+    const [playersRes, eventsRes, squadRes] = await Promise.all([
       supabase.from('players').select('*').eq('is_active', true).order('name'),
-      supabase.from('game_stat_events').select('*').eq('game_id', gameId).order('created_at')
+      supabase.from('game_stat_events').select('*').eq('game_id', gameId).order('created_at'),
+      supabase.from('game_squad').select('player_id').eq('game_id', gameId).eq('is_selected', true)
     ]);
     setPlayers((playersRes.data as Player[]) ?? []);
     setEvents((eventsRes.data as GameStatEvent[]) ?? []);
+    setSquadPlayerIds(((squadRes.data as { player_id: string }[]) ?? []).map((r) => r.player_id));
   }, [gameId]);
 
   const stopHeartbeat = useCallback(() => {
@@ -234,6 +237,11 @@ export function GameStatsTracker() {
 
   const playersById: Record<string, Player> = {};
   players.forEach((p) => (playersById[p.id] = p));
+  // Nur den veröffentlichten Kader dieses Spiels zum Tracken anbieten — ist
+  // (noch) keiner gesetzt, auf alle aktiven Spieler zurückfallen, damit das
+  // Tracken nicht blockiert, nur weil der Kader vergessen wurde.
+  const trackablePlayers =
+    squadPlayerIds.length > 0 ? players.filter((p) => squadPlayerIds.includes(p.id)) : players;
   const boxScore = computeBoxScore(events);
   const teamScore = computeTeamScore(events);
   const quarterScores = computeQuarterScores(events);
@@ -358,28 +366,37 @@ export function GameStatsTracker() {
               </div>
             </div>
 
-            <div className="card mt-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Spieler</p>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {players.map((p) => (
-                  <button
-                    key={p.id}
-                    className={`rounded-xl px-2 py-2.5 text-xs font-semibold ${
-                      selectedPlayerId === p.id ? 'bg-tbw-navy text-white' : 'bg-tbw-bg text-tbw-navyDark'
-                    }`}
-                    onClick={() => setSelectedPlayerId((cur) => (cur === p.id ? null : p.id))}
-                  >
-                    {p.name}
-                  </button>
-                ))}
+            {!selectedPlayerId && (
+              <div className="card mt-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Spieler</p>
+                {trackablePlayers.length === 0 ? (
+                  <p className="mt-2 text-sm text-tbw-ink/40">Kein Kader für dieses Spiel hinterlegt.</p>
+                ) : (
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {trackablePlayers.map((p) => (
+                      <button
+                        key={p.id}
+                        className="rounded-xl bg-tbw-bg px-2 py-2.5 text-xs font-semibold text-tbw-navyDark"
+                        onClick={() => setSelectedPlayerId(p.id)}
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
-            {selectedPlayerId ? (
+            {selectedPlayerId && (
               <div className="card mt-3 space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
-                  Aktion für {playersById[selectedPlayerId]?.name}
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
+                    Aktion für {playersById[selectedPlayerId]?.name}
+                  </p>
+                  <button className="text-xs font-bold text-tbw-navy" onClick={() => setSelectedPlayerId(null)}>
+                    ← Spieler wechseln
+                  </button>
+                </div>
                 {SCORING_BUTTONS.map(({ made, miss, label }) => (
                   <div key={made} className="flex gap-2">
                     <button
@@ -411,8 +428,6 @@ export function GameStatsTracker() {
                   ))}
                 </div>
               </div>
-            ) : (
-              <p className="mt-3 text-center text-sm text-tbw-ink/40">Zuerst einen Spieler oben auswählen.</p>
             )}
 
             <div className="card mt-3">
