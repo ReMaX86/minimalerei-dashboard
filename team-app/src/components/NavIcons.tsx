@@ -50,6 +50,15 @@ export function IconTeam(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconUser(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M3.5 20.6v-1a6.5 6.5 0 0 1 6.5-6.5h4a6.5 6.5 0 0 1 6.5 6.5v1a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1Z" />
+    </svg>
+  );
+}
+
 export function IconCalendar(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" {...props}>

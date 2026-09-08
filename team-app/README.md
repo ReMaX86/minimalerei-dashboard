@@ -202,6 +202,23 @@ hier die getroffenen Entscheidungen samt Begründung:
   Bedarf über die ohnehin vorhandene `is_trainer()`-Berechtigung in den RLS-Policies eingreifen.
   Nur mit eigenem Spieler-Login nutzbar (reines Trainer-Konto ohne verknüpften Spieler sieht die
   Liste nur lesend, siehe `CarpoolSection.tsx`).
+- **Spielerprofile (Migration `0014`).** Dritte schaltbare Zusatzfunktion — Foto, Position,
+  Größe, Geburtsdatum (Alter wird daraus berechnet, siehe `ageFromBirthDate()` in
+  `src/lib/format.ts`, statt separat gespeichert und dadurch potenziell veraltet) und ein paar
+  feste Skill-Tags pro Spieler. Im Gegensatz zu Meldungen/Mitfahrgelegenheit bekommt diese
+  Funktion einen eigenen Nav-Reiter ("Team", `/team`) statt in eine bestehende Seite integriert
+  zu werden — Team-Roster-Browsing ist ein eigenständiger Anwendungsfall, keine Randnotiz auf
+  einer anderen Seite. Für Fotos kommt erstmals Supabase Storage zum Einsatz (öffentlicher
+  Bucket `player-photos`, Schreibzugriff nur für Trainer über Storage-RLS-Policies); die
+  Basisdaten pflegt der Trainer weiterhin in Admin -> Spieler (erweitertes Formular je Spieler,
+  aufklappbar über "Profil bearbeiten"). Bewusst kein Zugriff für Betrachter (mehr persönliche
+  Daten als der ursprünglich vereinbarte Spielplan/Kampfgericht-Rahmen).
+
+  Beim Bauen aufgefallen und mitgefixt: `/team` (und jede künftige flag-gesteuerte Route) konnte
+  bei einem Direktaufruf/Reload kurz zur Startseite umleiten, weil die Routenentscheidung schon
+  vor dem ersten Laden der Feature-Flags getroffen wurde. `App.tsx` wartet jetzt zusätzlich zum
+  bestehenden `role === 'loading'`-Check auch auf `flags.loading`, bevor die Routen gerendert
+  werden.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche

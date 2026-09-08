@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { IconHome, IconJersey, IconClipboard, IconTeam, IconGear } from './NavIcons';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { IconHome, IconJersey, IconClipboard, IconTeam, IconUser, IconGear } from './NavIcons';
 
 const ITEMS = [
   { to: '/', label: 'Start', Icon: IconHome, end: true },
@@ -18,12 +19,15 @@ const VIEWER_ITEMS = [
 
 export function BottomNav() {
   const { role, isAdmin } = useAuth();
-  const items =
-    role === 'viewer'
-      ? VIEWER_ITEMS
-      : isAdmin
-        ? [...ITEMS, { to: '/admin', label: 'Admin', Icon: IconGear, end: false }]
-        : ITEMS;
+  const { flags } = useFeatureFlags();
+
+  let items = role === 'viewer' ? VIEWER_ITEMS : ITEMS;
+  if (role !== 'viewer' && flags.player_profiles) {
+    items = [...items, { to: '/team', label: 'Team', Icon: IconUser, end: false }];
+  }
+  if (isAdmin) {
+    items = [...items, { to: '/admin', label: 'Admin', Icon: IconGear, end: false }];
+  }
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">

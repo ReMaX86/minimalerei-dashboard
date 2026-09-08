@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { useFeatureFlags } from './context/FeatureFlagsContext';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { BottomNav } from './components/BottomNav';
 import { Header } from './components/Header';
@@ -11,6 +12,7 @@ import { Trikots } from './pages/Trikots';
 import { Kampfgericht } from './pages/Kampfgericht';
 import { Kader } from './pages/Kader';
 import { Admin } from './pages/Admin';
+import { PlayerProfiles } from './pages/PlayerProfiles';
 
 function Shell({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -24,6 +26,7 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
 
 export default function App() {
   const { role, isAdmin, passwordRecovery } = useAuth();
+  const { flags, loading: flagsLoading } = useFeatureFlags();
   const location = useLocation();
 
   // On mobile, logging in from the Onboarding form can leave the page
@@ -50,6 +53,18 @@ export default function App() {
 
   if (role === 'guest') {
     return <Onboarding />;
+  }
+
+  // Route decisions below depend on which optional features are enabled
+  // (e.g. /team only exists if player_profiles is on) — wait for the flags
+  // to load first, otherwise a direct link/refresh on such a route would
+  // redirect away before we actually know whether it should be visible.
+  if (flagsLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   return (
@@ -91,6 +106,18 @@ export default function App() {
             <Shell title="Kader">
               <Kader />
             </Shell>
+          )
+        }
+      />
+      <Route
+        path="/team"
+        element={
+          flags.player_profiles && role !== 'viewer' ? (
+            <Shell title="Team">
+              <PlayerProfiles />
+            </Shell>
+          ) : (
+            <Navigate to="/" replace />
           )
         }
       />
