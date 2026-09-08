@@ -176,6 +176,22 @@ hier die getroffenen Entscheidungen samt Begründung:
   Spiele. Angezeigt wird der Treffpunkt überall, wo auch Datum/Ort des Spiels stehen
   (Startseite, Kader-Seite, Admin-Spieleliste) über den gemeinsamen Helper `meetingPoints()`
   in `src/types/database.ts`.
+- **Schaltbare Zusatzfunktionen (Migration `0011`).** Auf Wunsch ergänzt: neue, optionale
+  Funktionen (aktuell nur "Meldungen") lassen sich pro Team über Admin -> Funktionen einzeln
+  an-/ausschalten, statt fest im Code für alle Teams aktiv zu sein — relevant sobald die App
+  für weitere Jahrgänge genutzt wird, die nicht jede Zusatzfunktion brauchen. Umgesetzt über
+  eine simple `feature_flags`-Tabelle (Key + Boolean) und `FeatureFlagsContext`
+  (`src/context/FeatureFlagsContext.tsx`), der die Flags einmal lädt und per `useFeatureFlags()`
+  überall verfügbar macht. Ein deaktiviertes Feature ist überall ausgeblendet (Startseite,
+  Admin-Reiter) außer im "Funktionen"-Reiter selbst, über den es wieder aktiviert wird. Neue
+  Zusatzfunktion hinzufügen: Key + Label/Beschreibung in `FEATURE_LABELS`
+  (`src/types/database.ts`) ergänzen, Zeile im Seed der Migration (oder eine neue Migration)
+  ergänzen — Admin-UI und Toggle-Persistenz funktionieren dann automatisch mit.
+- **Meldungen / Schwarzes Brett (Migration `0012`).** Erste schaltbare Zusatzfunktion: der
+  Trainer kann kurze Hinweise veröffentlichen (optional angeheftet, dann immer oben), die auf
+  der Startseite für alle Rollen erscheinen. Bewusst nur einseitig (Trainer -> Team, kein Chat)
+  — passt zur bisherigen "Self-Check beim Öffnen"-Logik der App und braucht keine
+  Push-Benachrichtigungen, um nützlich zu sein.
 - **Upload-Format für Spieltermine/Kampfgericht-Termine:** noch nicht implementiert; aktuell
   werden Spiele, Kampfgericht-Termine und Trainingszeiten einzeln über die Admin-Formulare
   angelegt (`/admin`). Ein Sammel-Import (PDF/Excel/ICS) lässt sich später als zusätzliche

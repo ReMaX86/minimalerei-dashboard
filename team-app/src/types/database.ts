@@ -1,6 +1,26 @@
 export type TrikotSetId = 'weiss' | 'schwarz';
 export type OfficiatingTaskType = 'uhr' | 'anschreiber' | 'zeit';
 
+// Optionale Zusatzfunktionen, die ein Trainer pro Team an-/ausschalten kann
+// (Admin -> Funktionen). Neuer Key hier + eine Zeile in Migration/Seed, dann
+// ist eine neue Funktion schaltbar.
+export type FeatureKey = 'announcements';
+
+export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: string }> = {
+  announcements: {
+    label: 'Meldungen',
+    description: 'Schwarzes Brett auf der Startseite für kurze Hinweise vom Trainer.'
+  }
+};
+
+export interface Announcement {
+  id: string;
+  message: string;
+  pinned: boolean;
+  author_name: string;
+  created_at: string;
+}
+
 export const OFFICIATING_TASK_LABELS: Record<OfficiatingTaskType, string> = {
   uhr: '24-Sekunden-Uhr',
   anschreiber: 'Anschreiben',
