@@ -657,6 +657,16 @@ hier die getroffenen Entscheidungen samt Begründung:
     sich der Status ausschließlich auf `squad_published` bezieht. Jetzt
     "Kader ausstehend"/"Kader veröffentlicht", macht also explizit, dass
     nur der Kader betroffen ist.
+  - **Dritter Nachtrag (Pill lief auf echten Geräten zweizeilig um):** der
+    längere Text ("Kader veröffentlicht") ist knapp zu breit für den
+    verbleibenden Platz neben den Spiel-Infos, wodurch die Pill auf
+    zweizeilig umgebrochen ist statt sich einzeilig einzureihen — sichtbar
+    erst im Screenshot vom echten iPhone, nicht im Playwright-Test mit
+    kürzerem Beispieltext. Pill jetzt `shrink-0 whitespace-nowrap` (bricht
+    nie um, wird vom Flex-Layout nicht mehr gestaucht) mit etwas kleinerer
+    Schrift (`!text-[10px]` statt der Standard-`text-xs` aus `.pill`); der
+    linken Spalte (Gegner/Datum/Ort) dafür `min-w-0` ergänzt, damit sie bei
+    Platzmangel wie gehabt selbst umbricht statt die Pill zu verdrängen.
 
 ## Projektstruktur
 

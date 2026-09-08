@@ -183,7 +183,7 @@ export function Spiele() {
     <div className="space-y-4">
       <section className="card">
         <div className="flex items-start justify-between gap-2">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">Nächster Spieltag</p>
             <p className="text-base font-bold text-tbw-navyDark">vs. {state.nextGame.opponent}</p>
             <p className="text-sm font-bold text-tbw-navyDark">
@@ -205,7 +205,11 @@ export function Spiele() {
               </div>
             )}
           </div>
-          <span className={state.nextGame.squad_published ? 'pill pill-ok' : 'pill pill-open'}>
+          <span
+            className={`pill shrink-0 whitespace-nowrap !text-[10px] ${
+              state.nextGame.squad_published ? 'pill-ok' : 'pill-open'
+            }`}
+          >
             {state.nextGame.squad_published ? 'Kader veröffentlicht' : 'Kader ausstehend'}
           </span>
         </div>
