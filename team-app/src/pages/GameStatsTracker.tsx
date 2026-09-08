@@ -68,12 +68,12 @@ function PlayerTile({
     <button
       disabled={disabled}
       onClick={onClick}
-      className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 p-2 text-center disabled:opacity-30 ${
+      className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-3 text-center disabled:opacity-30 ${
         selected ? 'border-status-ok bg-status-ok/5' : 'border-transparent bg-tbw-bg active:scale-[0.97]'
       }`}
     >
-      <Avatar player={player} size="sm" />
-      <span className="text-xs font-semibold leading-tight text-tbw-navyDark">{shortPlayerName(player.name)}</span>
+      <Avatar player={player} size="lg" />
+      <span className="text-sm font-semibold leading-tight text-tbw-navyDark">{shortPlayerName(player.name)}</span>
     </button>
   );
 }
@@ -86,10 +86,10 @@ function OpponentTile({ onClick, disabled }: { onClick: () => void; disabled?: b
     <button
       disabled={disabled}
       onClick={onClick}
-      className="flex flex-col items-center gap-1.5 rounded-2xl border-2 border-dashed border-tbw-ink/25 bg-transparent p-2 text-center disabled:opacity-30"
+      className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-tbw-ink/25 bg-transparent p-3 text-center disabled:opacity-30"
     >
-      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-tbw-ink/10 text-xl">🆚</span>
-      <span className="text-xs font-semibold leading-tight text-tbw-ink/60">Gegner</span>
+      <span className="flex h-24 w-24 items-center justify-center rounded-full bg-tbw-ink/10 text-3xl">🆚</span>
+      <span className="text-sm font-semibold leading-tight text-tbw-ink/60">Gegner</span>
     </button>
   );
 }
@@ -544,7 +544,7 @@ export function GameStatsTracker() {
                   Startaufstellung ({onCourtIds.length}/{COURT_SIZE})
                 </p>
                 <p className="mt-1 text-xs text-tbw-ink/50">Wer steht auf dem Feld?</p>
-                <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="mt-3 grid grid-cols-2 gap-3">
                   {trackablePlayers.map((p) => (
                     <PlayerTile
                       key={p.id}
@@ -568,7 +568,7 @@ export function GameStatsTracker() {
                     Abbrechen
                   </button>
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="mt-3 grid grid-cols-2 gap-3">
                   {(outgoingId ? benchPlayers : onCourtPlayers).map((p) => (
                     <PlayerTile
                       key={p.id}
@@ -593,7 +593,7 @@ export function GameStatsTracker() {
                       Abbrechen
                     </button>
                   </div>
-                  <div className="mt-3 grid grid-cols-3 gap-2">
+                  <div className="mt-3 grid grid-cols-2 gap-3">
                     {(useCourtSplit ? onCourtPlayers : trackablePlayers).map((p) => (
                       <PlayerTile key={p.id} player={p} disabled={busy} onClick={() => addStat('us', pendingAction, p.id)} />
                     ))}

@@ -610,6 +610,15 @@ hier die getroffenen Entscheidungen samt Begründung:
     "Wer?"-Picker je Aktion/Aktions-Raster); ändert sich dieser Wert,
     scrollt ein `useEffect` per `window.scrollTo(0, 0)` nach oben — analog
     zum bereits bestehenden Scroll-Reset bei Tab-Wechseln in `App.tsx`.
+  - **Achter Nachtrag (Spielerauswahl 2 statt 3 Spalten):** Startaufstellung,
+    Auswechseln und der "Wer?"-Picker zeigen die Spieler-Kacheln jetzt in
+    einem `grid-cols-2`-Raster statt `grid-cols-3` — bei 5 Spielern +
+    Gegner-Kachel ergibt das genau 3 Zeilen zu 2 Spalten. Die Kacheln
+    (`PlayerTile`/`OpponentTile`) sind dadurch spürbar größer und leichter
+    zu treffen: `Avatar`-Größe von "sm" (64px) auf "lg" (96px) hoch,
+    Innenabstand und Namensschrift ebenfalls vergrößert. Betrifft nur die
+    Spielerauswahl — das Aktions-Raster (2P/3P/FW + Rebound/Assist/...)
+    bleibt unverändert bei 2 bzw. 3 Spalten.
 
 ## Projektstruktur
 
