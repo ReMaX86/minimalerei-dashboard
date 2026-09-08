@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
+import { MeetingPointFields, EMPTY_MEETING_POINT } from '../../components/MeetingPointFields';
 import { fmtDate, fmtTime } from '../../lib/format';
-import type { Game, TrikotSetId } from '../../types/database';
+import { meetingPoints, type Game, type TrikotSetId } from '../../types/database';
 
 const EMPTY_FORM = {
   game_date: '',
@@ -11,7 +12,8 @@ const EMPTY_FORM = {
   opponent: '',
   is_home: true,
   trikot_override: '' as '' | TrikotSetId,
-  location: ''
+  location: '',
+  ...EMPTY_MEETING_POINT
 };
 
 export function GamesAdmin() {
@@ -43,7 +45,10 @@ export function GamesAdmin() {
       opponent: g.opponent,
       is_home: g.is_home,
       trikot_override: g.trikot_override ?? '',
-      location: g.location
+      location: g.location,
+      meeting_time_hall: g.meeting_time_hall?.slice(0, 5) ?? '',
+      meeting_time_carpool: g.meeting_time_carpool?.slice(0, 5) ?? '',
+      meeting_point_carpool: g.meeting_point_carpool ?? ''
     });
   }
 
@@ -62,7 +67,10 @@ export function GamesAdmin() {
       opponent: form.opponent.trim(),
       is_home: form.is_home,
       trikot_override: form.trikot_override || null,
-      location: form.location.trim()
+      location: form.location.trim(),
+      meeting_time_hall: form.meeting_time_hall || null,
+      meeting_time_carpool: form.is_home ? null : form.meeting_time_carpool || null,
+      meeting_point_carpool: form.is_home ? null : form.meeting_point_carpool.trim() || null
     };
     try {
       const { error: saveError } = editingId
@@ -146,6 +154,16 @@ export function GamesAdmin() {
             <option value="schwarz">Trikot: Schwarz erzwingen</option>
           </select>
         </div>
+        <div className="border-t border-black/5 pt-2">
+          <p className="text-xs font-semibold text-tbw-ink/50">Treffpunkt</p>
+          <div className="mt-2">
+            <MeetingPointFields
+              isHome={form.is_home}
+              value={form}
+              onChange={(next) => setForm((f) => ({ ...f, ...next }))}
+            />
+          </div>
+        </div>
         <div className="flex gap-2">
           <button className="btn-primary flex-1" disabled={busy}>
             {editingId ? 'Speichern' : 'Anlegen'}
@@ -173,6 +191,12 @@ export function GamesAdmin() {
                   Kader: {g.squad_published ? 'veröffentlicht' : 'Entwurf'}
                   {g.trikot_override ? ` · Trikot fix: ${g.trikot_override === 'weiss' ? 'Weiß' : 'Schwarz'}` : ''}
                 </p>
+                {meetingPoints(g).map((m) => (
+                  <p key={m.label} className="text-xs text-tbw-ink/40">
+                    Treffpunkt {m.label}: {m.time ? `${fmtTime(m.time)} Uhr` : ''}
+                    {m.place ? `${m.time ? ', ' : ''}${m.place}` : ''}
+                  </p>
+                ))}
               </div>
               <div className="flex shrink-0 gap-2">
                 <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => edit(g)}>

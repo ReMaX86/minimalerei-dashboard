@@ -40,6 +40,9 @@ export interface Game {
   trikot_override: TrikotSetId | null;
   location: string;
   squad_published: boolean;
+  meeting_time_hall: string | null;
+  meeting_time_carpool: string | null;
+  meeting_point_carpool: string | null;
   created_at: string;
 }
 
@@ -107,4 +110,34 @@ export interface TrainingRsvpRow {
 
 export function benoetigterSatz(game: Pick<Game, 'is_home' | 'trikot_override'>): TrikotSetId {
   return game.trikot_override ?? (game.is_home ? 'weiss' : 'schwarz');
+}
+
+export interface MeetingPoint {
+  label: string;
+  time: string | null;
+  place: string | null;
+}
+
+// Heimspiele haben nur einen Treffpunkt (die Halle). Auswärtsspiele können
+// zusätzlich einen Fahrgemeinschaft-Treffpunkt haben, für alle die nicht
+// direkt zur gegnerischen Halle fahren.
+export function meetingPoints(
+  game: Pick<Game, 'is_home' | 'meeting_time_hall' | 'meeting_time_carpool' | 'meeting_point_carpool'>
+): MeetingPoint[] {
+  const points: MeetingPoint[] = [];
+  if (game.meeting_time_carpool || game.meeting_point_carpool) {
+    points.push({
+      label: 'Fahrgemeinschaft',
+      time: game.meeting_time_carpool,
+      place: game.meeting_point_carpool
+    });
+  }
+  if (game.meeting_time_hall) {
+    points.push({
+      label: game.is_home ? 'Halle' : 'direkt an der Halle',
+      time: game.meeting_time_hall,
+      place: null
+    });
+  }
+  return points;
 }

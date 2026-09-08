@@ -3,8 +3,9 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
+import { MeetingPointFields, EMPTY_MEETING_POINT, type MeetingPointFormValue } from '../components/MeetingPointFields';
 import { fmtDate, fmtTime } from '../lib/format';
-import type { Game, GameSquadRow, Player } from '../types/database';
+import { meetingPoints, type Game, type GameSquadRow, type Player } from '../types/database';
 
 const MAX_SQUAD_SIZE = 12;
 
@@ -22,6 +23,9 @@ export function Kader() {
   const [showMore, setShowMore] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [meetingForm, setMeetingForm] = useState<MeetingPointFormValue>(EMPTY_MEETING_POINT);
+  const [savingMeeting, setSavingMeeting] = useState(false);
+  const [meetingSaved, setMeetingSaved] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -52,6 +56,16 @@ export function Kader() {
   useEffect(() => {
     load().catch(() => setError('Fehler beim Laden des Kaders.'));
   }, [load]);
+
+  useEffect(() => {
+    const g = state?.nextGame;
+    setMeetingForm({
+      meeting_time_hall: g?.meeting_time_hall?.slice(0, 5) ?? '',
+      meeting_time_carpool: g?.meeting_time_carpool?.slice(0, 5) ?? '',
+      meeting_point_carpool: g?.meeting_point_carpool ?? ''
+    });
+    setMeetingSaved(false);
+  }, [state?.nextGame?.id, state?.nextGame?.meeting_time_hall, state?.nextGame?.meeting_time_carpool, state?.nextGame?.meeting_point_carpool]);
 
   if (error) return <ErrorNote message={error} />;
   if (!state) return <LoadingSpinner />;
@@ -84,6 +98,30 @@ export function Kader() {
       setError('Änderung konnte nicht gespeichert werden.');
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function saveMeetingPoint() {
+    setSavingMeeting(true);
+    setError(null);
+    setMeetingSaved(false);
+    const isHome = state!.nextGame!.is_home;
+    try {
+      const { error: updError } = await supabase
+        .from('games')
+        .update({
+          meeting_time_hall: meetingForm.meeting_time_hall || null,
+          meeting_time_carpool: isHome ? null : meetingForm.meeting_time_carpool || null,
+          meeting_point_carpool: isHome ? null : meetingForm.meeting_point_carpool.trim() || null
+        })
+        .eq('id', state!.nextGame!.id);
+      if (updError) throw updError;
+      setMeetingSaved(true);
+      await load();
+    } catch {
+      setError('Treffpunkt konnte nicht gespeichert werden.');
+    } finally {
+      setSavingMeeting(false);
     }
   }
 
@@ -121,6 +159,13 @@ export function Kader() {
               {fmtDate(state.nextGame.game_date)} · {fmtTime(state.nextGame.game_time)} Uhr ·{' '}
               {state.nextGame.is_home ? 'Heim' : 'Auswärts'}
             </p>
+            {!isAdmin &&
+              meetingPoints(state.nextGame).map((m) => (
+                <p key={m.label} className="text-xs text-tbw-ink/50">
+                  Treffpunkt {m.label}: {m.time ? `${fmtTime(m.time)} Uhr` : ''}
+                  {m.place ? `${m.time ? ', ' : ''}${m.place}` : ''}
+                </p>
+              ))}
           </div>
           <span className={state.nextGame.squad_published ? 'pill pill-ok' : 'pill pill-open'}>
             {state.nextGame.squad_published ? 'veröffentlicht' : 'Entwurf'}
@@ -129,6 +174,28 @@ export function Kader() {
 
         {isAdmin && (
           <>
+            <div className="mt-3 border-t border-black/5 pt-3">
+              <p className="text-sm font-bold text-tbw-navyDark">Treffpunkt</p>
+              <div className="mt-2">
+                <MeetingPointFields
+                  isHome={state.nextGame.is_home}
+                  value={meetingForm}
+                  onChange={setMeetingForm}
+                />
+              </div>
+              <div className="mt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={saveMeetingPoint}
+                  disabled={savingMeeting}
+                  className="btn-secondary !px-3 !py-1.5 text-xs"
+                >
+                  {savingMeeting ? 'Speichere…' : 'Treffpunkt speichern'}
+                </button>
+                {meetingSaved && <span className="text-xs font-semibold text-status-ok">Gespeichert</span>}
+              </div>
+            </div>
+
             <ul className="mt-3 divide-y divide-black/5">
               {sortedForTrainer.map((p) => (
                 <li key={p.id} className="flex items-center justify-between py-2">
