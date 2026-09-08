@@ -50,6 +50,21 @@ export function IconTeam(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconCalendar(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path d="M4 8V6.3A1.3 1.3 0 0 1 5.3 5h13.4A1.3 1.3 0 0 1 20 6.3V8Z" />
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M4 8h16v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5V8Zm2.6 2.6h2.4v2.1H6.6Zm4.5 0h2.4v2.1h-2.4Zm4.5 0h2.4v2.1h-2.4ZM6.6 14.4h2.4v2.1H6.6Zm4.5 0h2.4v2.1h-2.4Z"
+      />
+      <rect x="7" y="3.3" width="2" height="3.2" rx="1" />
+      <rect x="15" y="3.3" width="2" height="3.2" rx="1" />
+    </svg>
+  );
+}
+
 export function IconGear(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
