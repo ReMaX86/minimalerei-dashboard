@@ -30,12 +30,14 @@ export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: st
   }
 };
 
-export type PlayerPosition = 'aufbau' | 'fluegel' | 'center';
+export type PlayerPosition = 'pg' | 'sg' | 'sf' | 'pf' | 'c';
 
 export const POSITION_LABELS: Record<PlayerPosition, string> = {
-  aufbau: 'Aufbau',
-  fluegel: 'Flügel',
-  center: 'Center'
+  pg: 'Point Guard (Aufbauspieler)',
+  sg: 'Shooting Guard (Wurfspieler)',
+  sf: 'Small Forward (kleiner Flügel)',
+  pf: 'Power Forward (großer Flügel)',
+  c: 'Center (Mittelspieler)'
 };
 
 export const SKILL_OPTIONS = ['Distanzwurf', 'Verteidigung', 'Athletik', 'Passspiel', 'Rebound'] as const;
