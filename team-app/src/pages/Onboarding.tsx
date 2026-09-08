@@ -14,7 +14,7 @@ const INTRO_SLIDES = [
   },
   {
     Icon: IconTeam,
-    title: 'Kader',
+    title: 'Spiele',
     text: 'Sofort sehen, ob du beim nächsten Spiel dabei bist.'
   },
   {
@@ -94,7 +94,7 @@ function Welcome({ onTrainer, onPlayer }: { onTrainer: () => void; onPlayer: () 
         {[
           { Icon: IconJersey, label: 'Trikots' },
           { Icon: IconClipboard, label: 'Kampfgericht' },
-          { Icon: IconTeam, label: 'Kader' }
+          { Icon: IconTeam, label: 'Spiele' }
         ].map((f) => (
           <div key={f.label} className="rounded-2xl bg-white/5 py-4 ring-1 ring-white/10">
             <f.Icon className="mx-auto h-5 w-5 text-tbw-gold" />

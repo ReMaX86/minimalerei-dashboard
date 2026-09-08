@@ -619,6 +619,22 @@ hier die getroffenen Entscheidungen samt Begründung:
     Innenabstand und Namensschrift ebenfalls vergrößert. Betrifft nur die
     Spielerauswahl — das Aktions-Raster (2P/3P/FW + Rebound/Assist/...)
     bleibt unverändert bei 2 bzw. 3 Spalten.
+- **"Kader"-Reiter zu "Spiele" umbenannt und umstrukturiert
+  (`src/pages/Kader.tsx` → `src/pages/Spiele.tsx`, Route `/kader` →
+  `/spiele` mit Redirect für alte Links, Shell-Titel "Spiele & Kader").**
+  Vorher stand das nächste Spiel direkt über dem (bei Spielern immer
+  sichtbaren, bei Trainern immer editierbaren) Kader, und alle weiteren
+  Spieltage waren komplett hinter einem Ausklapp-Button versteckt. Neue
+  Struktur für beide Rollen: oben das nächste Spiel prominent mit allen
+  Infos, darunter direkt die nächsten 3 Spieltage, erst danach ein
+  "Weitere Spieltage anzeigen"-Button für den Rest (blendet den Button
+  ganz aus, falls es keine weiteren gibt). Der Kader selbst ist jetzt in
+  beiden Rollen eingeklappt: Spieler sehen einen "Kader anzeigen"-Button
+  (nur sobald `squad_published`), Trainer/Admin zwei Buttons "Kader
+  festlegen" und "Treffpunkt hinterlegen", die die bisherige
+  Editier-Liste bzw. das `MeetingPointFields`-Formular erst bei Klick
+  einblenden — der Fokus liegt dadurch zuerst auf der Spielübersicht,
+  nicht mehr auf der Namensliste.
 
 ## Projektstruktur
 
