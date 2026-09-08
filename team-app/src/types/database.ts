@@ -4,12 +4,16 @@ export type OfficiatingTaskType = 'uhr' | 'anschreiber' | 'zeit';
 // Optionale Zusatzfunktionen, die ein Trainer pro Team an-/ausschalten kann
 // (Admin -> Funktionen). Neuer Key hier + eine Zeile in Migration/Seed, dann
 // ist eine neue Funktion schaltbar.
-export type FeatureKey = 'announcements';
+export type FeatureKey = 'announcements' | 'carpool';
 
 export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: string }> = {
   announcements: {
     label: 'Meldungen',
     description: 'Schwarzes Brett auf der Startseite für kurze Hinweise vom Trainer.'
+  },
+  carpool: {
+    label: 'Mitfahrgelegenheit',
+    description: 'Fahrgemeinschaften für Auswärtsspiele organisieren.'
   }
 };
 
@@ -18,6 +22,22 @@ export interface Announcement {
   message: string;
   pinned: boolean;
   author_name: string;
+  created_at: string;
+}
+
+export interface CarpoolOffer {
+  id: string;
+  game_id: string;
+  driver_player_id: string;
+  seats: number;
+  note: string | null;
+  created_at: string;
+}
+
+export interface CarpoolClaim {
+  offer_id: string;
+  game_id: string;
+  player_id: string;
   created_at: string;
 }
 
