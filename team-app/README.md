@@ -502,6 +502,16 @@ hier die getroffenen Entscheidungen samt Begründung:
   - **Alte Funktion entfernt:** `game_player_points`-Tabelle und
     `GamePointsEditor.tsx` gelöscht, das manuelle Endstand-Eingabefeld im
     "Neues Spiel"-Formular entfernt (Endstand ist jetzt reine Ableitung).
+  - **Nachtrag:** Spieler-Auswahl im Tracker auf den veröffentlichten Kader
+    des jeweiligen Spiels eingeschränkt (`game_squad` mit `is_selected =
+    true`) statt immer alle aktiven Spieler des Vereins zu zeigen — fällt
+    auf alle aktiven Spieler zurück, falls für ein Spiel (noch) kein Kader
+    hinterlegt ist, damit das Tracken nicht blockiert. Der Ablauf ist jetzt
+    zweistufig: Spieler-Raster wird nach der Auswahl ausgeblendet und durch
+    das Aktions-Panel für genau diesen Spieler ersetzt (mit "Spieler
+    wechseln"-Rücksprung), statt beides gleichzeitig anzuzeigen — die
+    Auswahl bleibt zwischen mehreren Aktionen desselben Spielers bestehen,
+    für schnelle Serien (z. B. zwei Körbe hintereinander).
 
 ## Projektstruktur
 
