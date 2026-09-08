@@ -202,7 +202,13 @@ export function Trikots() {
       <section className="grid grid-cols-2 gap-3">
         {state.sets.map((set) => (
           <div key={set.id} className="card">
-            <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">{set.label}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
+              {set.label.split(' · ').map((part, i) => (
+                <span key={i} className="block">
+                  {part}
+                </span>
+              ))}
+            </p>
             <p className="mt-1 font-bold text-tbw-navyDark">
               {set.current_holder_id ? playersById[set.current_holder_id]?.name ?? '—' : 'Niemand'}
             </p>
