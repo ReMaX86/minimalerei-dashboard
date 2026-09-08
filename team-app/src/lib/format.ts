@@ -12,6 +12,14 @@ export function fmtTime(time: string): string {
   return time.slice(0, 5);
 }
 
+// "Marc Rewald" -> "Marc R." — für die großen Spieler-Buttons im
+// Live-Stats-Tracker, wo der volle Name zu breit wäre.
+export function shortPlayerName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return fullName;
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+}
+
 export function isFuture(iso: string): boolean {
   const today = new Date();
   today.setHours(0, 0, 0, 0);

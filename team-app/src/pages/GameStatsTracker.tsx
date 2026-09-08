@@ -5,15 +5,18 @@ import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { computeBoxScore, computeQuarterScores, computeTeamScore, quarterLabel } from '../lib/gameStats';
-import { fmtDate, fmtTime } from '../lib/format';
+import { fmtDate, fmtTime, shortPlayerName } from '../lib/format';
 import {
   STAT_TYPE_LABELS,
   type Game,
+  type GameCourtState,
   type GameStatEvent,
   type GameStatSessionState,
   type Player,
   type StatType
 } from '../types/database';
+
+const COURT_SIZE = 5;
 
 const SCORING_BUTTONS: { made: StatType; miss: StatType; label: string }[] = [
   { made: 'fg2_made', miss: 'fg2_miss', label: '2er' },
@@ -41,6 +44,9 @@ export function GameStatsTracker() {
   const [game, setGame] = useState<Game | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [squadPlayerIds, setSquadPlayerIds] = useState<string[]>([]);
+  const [onCourtIds, setOnCourtIds] = useState<string[]>([]);
+  const [substituting, setSubstituting] = useState(false);
+  const [outgoingId, setOutgoingId] = useState<string | null>(null);
   const [events, setEvents] = useState<GameStatEvent[]>([]);
   const [lockState, setLockState] = useState<LockState>({ kind: 'loading' });
   const [error, setError] = useState<string | null>(null);
@@ -52,15 +58,58 @@ export function GameStatsTracker() {
 
   const loadPlayersAndEvents = useCallback(async () => {
     if (!gameId) return;
-    const [playersRes, eventsRes, squadRes] = await Promise.all([
+    const [playersRes, eventsRes, squadRes, courtRes] = await Promise.all([
       supabase.from('players').select('*').eq('is_active', true).order('name'),
       supabase.from('game_stat_events').select('*').eq('game_id', gameId).order('created_at'),
-      supabase.from('game_squad').select('player_id').eq('game_id', gameId).eq('is_selected', true)
+      supabase.from('game_squad').select('player_id').eq('game_id', gameId).eq('is_selected', true),
+      supabase.from('game_court_state').select('*').eq('game_id', gameId).maybeSingle()
     ]);
     setPlayers((playersRes.data as Player[]) ?? []);
     setEvents((eventsRes.data as GameStatEvent[]) ?? []);
     setSquadPlayerIds(((squadRes.data as { player_id: string }[]) ?? []).map((r) => r.player_id));
+    setOnCourtIds((courtRes.data as GameCourtState | null)?.on_court_player_ids ?? []);
   }, [gameId]);
+
+  // Optimistisch lokal setzen und im Hintergrund speichern — bleibt über
+  // eine Übernahme des Trackings hinweg erhalten (siehe Migration 0029).
+  const persistOnCourt = useCallback(
+    (next: string[]) => {
+      setOnCourtIds(next);
+      if (!gameId) return;
+      supabase
+        .from('game_court_state')
+        .upsert({ game_id: gameId, on_court_player_ids: next, updated_at: new Date().toISOString() }, { onConflict: 'game_id' })
+        .then(({ error: upsertError }) => {
+          if (upsertError) setError('Aufstellung konnte nicht gespeichert werden.');
+        });
+    },
+    [gameId]
+  );
+
+  function toggleStarter(id: string) {
+    if (onCourtIds.includes(id)) {
+      persistOnCourt(onCourtIds.filter((x) => x !== id));
+    } else if (onCourtIds.length < COURT_SIZE) {
+      persistOnCourt([...onCourtIds, id]);
+    }
+  }
+
+  function startSubstitution() {
+    setSubstituting(true);
+    setOutgoingId(null);
+  }
+
+  function cancelSubstitution() {
+    setSubstituting(false);
+    setOutgoingId(null);
+  }
+
+  function confirmSubstitution(incomingId: string) {
+    if (!outgoingId) return;
+    persistOnCourt(onCourtIds.map((id) => (id === outgoingId ? incomingId : id)));
+    setSubstituting(false);
+    setOutgoingId(null);
+  }
 
   const stopHeartbeat = useCallback(() => {
     if (heartbeatInterval.current) {
@@ -174,6 +223,7 @@ export function GameStatsTracker() {
       const row = data as GameStatEvent;
       insertedStack.current.push(row.id);
       setEvents((prev) => [...prev, row]);
+      setSelectedPlayerId(null);
     } catch {
       setError('Aktion konnte nicht gespeichert werden.');
     } finally {
@@ -242,6 +292,12 @@ export function GameStatsTracker() {
   // Tracken nicht blockiert, nur weil der Kader vergessen wurde.
   const trackablePlayers =
     squadPlayerIds.length > 0 ? players.filter((p) => squadPlayerIds.includes(p.id)) : players;
+  // Bei einem sehr kleinen Kader (z. B. beim Testen) ergibt eine
+  // Auf-dem-Feld/Bank-Unterscheidung keinen Sinn — dann direkt alle
+  // antippbar lassen.
+  const useCourtSplit = trackablePlayers.length > COURT_SIZE;
+  const onCourtPlayers = trackablePlayers.filter((p) => onCourtIds.includes(p.id));
+  const benchPlayers = trackablePlayers.filter((p) => !onCourtIds.includes(p.id));
   const boxScore = computeBoxScore(events);
   const teamScore = computeTeamScore(events);
   const quarterScores = computeQuarterScores(events);
@@ -366,24 +422,117 @@ export function GameStatsTracker() {
               </div>
             </div>
 
-            {!selectedPlayerId && (
+            {!selectedPlayerId && trackablePlayers.length === 0 && (
               <div className="card mt-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Spieler</p>
-                {trackablePlayers.length === 0 ? (
-                  <p className="mt-2 text-sm text-tbw-ink/40">Kein Kader für dieses Spiel hinterlegt.</p>
-                ) : (
-                  <div className="mt-2 grid grid-cols-3 gap-2">
-                    {trackablePlayers.map((p) => (
+                <p className="mt-2 text-sm text-tbw-ink/40">Kein Kader für dieses Spiel hinterlegt.</p>
+              </div>
+            )}
+
+            {!selectedPlayerId && trackablePlayers.length > 0 && !useCourtSplit && (
+              <div className="card mt-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Spieler</p>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {trackablePlayers.map((p) => (
+                    <button
+                      key={p.id}
+                      className="rounded-xl bg-tbw-bg px-2 py-2.5 text-xs font-semibold text-tbw-navyDark"
+                      onClick={() => setSelectedPlayerId(p.id)}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!selectedPlayerId && useCourtSplit && onCourtIds.length < COURT_SIZE && (
+              <div className="card mt-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
+                  Startaufstellung ({onCourtIds.length}/{COURT_SIZE})
+                </p>
+                <p className="mt-1 text-xs text-tbw-ink/50">Wer steht auf dem Feld?</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {trackablePlayers.map((p) => {
+                    const picked = onCourtIds.includes(p.id);
+                    return (
                       <button
                         key={p.id}
-                        className="rounded-xl bg-tbw-bg px-2 py-2.5 text-xs font-semibold text-tbw-navyDark"
-                        onClick={() => setSelectedPlayerId(p.id)}
+                        disabled={!picked && onCourtIds.length >= COURT_SIZE}
+                        className={`rounded-xl px-2 py-3 text-sm font-semibold disabled:opacity-30 ${
+                          picked ? 'bg-tbw-navy text-white' : 'bg-tbw-bg text-tbw-navyDark'
+                        }`}
+                        onClick={() => toggleStarter(p.id)}
                       >
-                        {p.name}
+                        {shortPlayerName(p.name)} {picked ? '✓' : ''}
                       </button>
-                    ))}
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {!selectedPlayerId && useCourtSplit && onCourtIds.length === COURT_SIZE && substituting && (
+              <div className="card mt-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
+                    {outgoingId ? 'Wer kommt rein?' : 'Wer geht raus?'}
+                  </p>
+                  <button className="text-xs font-bold text-tbw-red" onClick={cancelSubstitution}>
+                    Abbrechen
+                  </button>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {(outgoingId ? benchPlayers : onCourtPlayers).map((p) => (
+                    <button
+                      key={p.id}
+                      className="rounded-xl bg-tbw-bg px-2 py-3 text-sm font-semibold text-tbw-navyDark"
+                      onClick={() => (outgoingId ? confirmSubstitution(p.id) : setOutgoingId(p.id))}
+                    >
+                      {shortPlayerName(p.name)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!selectedPlayerId && useCourtSplit && onCourtIds.length === COURT_SIZE && !substituting && (
+              <div className="card mt-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Auf dem Feld</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {onCourtPlayers.slice(0, 4).map((p) => (
+                    <button
+                      key={p.id}
+                      className="rounded-2xl bg-tbw-navy py-5 text-base font-bold text-white active:scale-[0.97]"
+                      onClick={() => setSelectedPlayerId(p.id)}
+                    >
+                      {shortPlayerName(p.name)}
+                    </button>
+                  ))}
+                </div>
+                {onCourtPlayers[4] && (
+                  <button
+                    className="mt-2 w-full rounded-2xl bg-tbw-navy py-5 text-base font-bold text-white active:scale-[0.97]"
+                    onClick={() => setSelectedPlayerId(onCourtPlayers[4].id)}
+                  >
+                    {shortPlayerName(onCourtPlayers[4].name)}
+                  </button>
+                )}
+                {benchPlayers.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-ink/30">Bank</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {benchPlayers.map((p) => (
+                        <span key={p.id} className="rounded-full bg-tbw-bg px-2.5 py-1 text-xs text-tbw-ink/40">
+                          {shortPlayerName(p.name)}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
+                <button className="btn-secondary mt-3 w-full" onClick={startSubstitution}>
+                  🔄 Auswechseln
+                </button>
               </div>
             )}
 
