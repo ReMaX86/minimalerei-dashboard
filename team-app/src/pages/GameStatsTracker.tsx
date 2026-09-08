@@ -78,13 +78,15 @@ function ActionCircle({
   sublabel,
   tone,
   onClick,
-  disabled
+  disabled,
+  size = 'md'
 }: {
   label: string;
   sublabel?: string;
   tone: 'make' | 'miss' | 'neutral';
   onClick: () => void;
   disabled?: boolean;
+  size?: 'md' | 'sm';
 }) {
   const toneClasses =
     tone === 'make'
@@ -92,14 +94,18 @@ function ActionCircle({
       : tone === 'miss'
         ? 'border-tbw-red text-tbw-red'
         : 'border-tbw-navy/15 text-tbw-navyDark';
+  // Feste Größe statt an die Grid-Spalte gestreckt (aspect-square) — sonst
+  // werden die Kreise auf einem Handy riesig und die Aktionsliste passt
+  // nicht mehr auf einen Bildschirm.
+  const dims = size === 'md' ? 'h-16 w-16' : 'h-14 w-14';
   return (
     <button
       disabled={disabled}
       onClick={onClick}
-      className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-full border-2 bg-white text-center active:scale-95 disabled:opacity-30 ${toneClasses}`}
+      className={`flex ${dims} shrink-0 flex-col items-center justify-center gap-0.5 rounded-full border-2 bg-white text-center active:scale-95 disabled:opacity-30 ${toneClasses}`}
     >
-      <span className="text-base font-extrabold leading-none">{label}</span>
-      {sublabel && <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">{sublabel}</span>}
+      <span className="text-sm font-extrabold leading-none">{label}</span>
+      {sublabel && <span className="text-[8px] font-semibold uppercase tracking-wide opacity-70">{sublabel}</span>}
     </button>
   );
 }
@@ -568,6 +574,29 @@ export function GameStatsTracker() {
               !substituting &&
               !pendingAction && (
                 <>
+                  <div className="card mt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Aktion</p>
+                    <div className="mt-2 flex flex-col items-center gap-2">
+                      {SCORING_BUTTONS.map(({ made, miss, label }) => (
+                        <div key={made} className="flex gap-4">
+                          <ActionCircle label={label} sublabel="Treffer" tone="make" onClick={() => setPendingAction(made)} />
+                          <ActionCircle label={label} sublabel="Fehlwurf" tone="miss" onClick={() => setPendingAction(miss)} />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 justify-items-center gap-2">
+                      {OTHER_STATS.map((statType) => (
+                        <ActionCircle
+                          key={statType}
+                          size="sm"
+                          label={OTHER_STAT_SHORT[statType] ?? STAT_TYPE_LABELS[statType]}
+                          tone="neutral"
+                          onClick={() => setPendingAction(statType)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
                   {useCourtSplit && (
                     <div className="card mt-3">
                       <div className="flex items-center justify-between">
@@ -576,11 +605,11 @@ export function GameStatsTracker() {
                           🔄 Wechseln
                         </button>
                       </div>
-                      <div className="mt-2 flex gap-3 overflow-x-auto pb-1">
+                      <div className="mt-2 grid grid-cols-5 gap-1">
                         {onCourtPlayers.map((p) => (
-                          <div key={p.id} className="flex shrink-0 flex-col items-center gap-1">
-                            <Avatar player={p} size="sm" />
-                            <span className="text-[10px] font-semibold text-tbw-navyDark">
+                          <div key={p.id} className="flex flex-col items-center gap-1">
+                            <Avatar player={p} size="xs" />
+                            <span className="text-center text-[9px] font-semibold leading-tight text-tbw-navyDark">
                               {shortPlayerName(p.name)}
                             </span>
                           </div>
@@ -600,38 +629,6 @@ export function GameStatsTracker() {
                       )}
                     </div>
                   )}
-
-                  <div className="card mt-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Aktion</p>
-                    <div className="mt-3 grid grid-cols-2 gap-3">
-                      {SCORING_BUTTONS.flatMap(({ made, miss, label }) => [
-                        <ActionCircle
-                          key={made}
-                          label={label}
-                          sublabel="Treffer"
-                          tone="make"
-                          onClick={() => setPendingAction(made)}
-                        />,
-                        <ActionCircle
-                          key={miss}
-                          label={label}
-                          sublabel="Fehlwurf"
-                          tone="miss"
-                          onClick={() => setPendingAction(miss)}
-                        />
-                      ])}
-                    </div>
-                    <div className="mt-3 grid grid-cols-3 gap-2">
-                      {OTHER_STATS.map((statType) => (
-                        <ActionCircle
-                          key={statType}
-                          label={OTHER_STAT_SHORT[statType] ?? STAT_TYPE_LABELS[statType]}
-                          tone="neutral"
-                          onClick={() => setPendingAction(statType)}
-                        />
-                      ))}
-                    </div>
-                  </div>
                 </>
               )}
 

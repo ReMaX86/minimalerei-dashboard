@@ -556,6 +556,24 @@ hier die getroffenen Entscheidungen samt Begründung:
     als Fallback) für Startaufstellung, Auswechseln, den "Wer?"-Picker,
     den "Auf dem Feld"-Streifen, das "Zuletzt"-Log und die
     Box-Score-Tabelle — durchgängig statt nur an einzelnen Stellen.
+  - **Vierter Nachtrag (Layout-Feedback):** drei Anpassungen. (1) Die
+    "Auf dem Feld"-Karte steht jetzt unter statt über der Aktions-Karte,
+    damit die Aktionen — das, was man während des Spiels am häufigsten
+    braucht — zuerst kommen. (2) Der "Auf dem Feld"-Streifen war eine
+    horizontal scrollende Leiste (`overflow-x-auto`), auf der bei 5
+    Spielern seitlich gescrollt werden musste — jetzt ein festes
+    `grid-cols-5` mit kleineren Avataren (`size="xs"`), damit alle 5 auf
+    einen Blick sichtbar sind, ohne zu scrollen. (3) `ActionCircle` hatte
+    zuvor keine feste Größe (`aspect-square`, gestreckt auf die volle
+    Grid-Spaltenbreite) — auf einem Handy wurden die Kreise dadurch riesig
+    (2P/3P/FW allein brauchten ca. 550px Höhe). Jetzt eine feste, kleinere
+    Größe (`size`-Prop: "md" 64px für die Wurf-Paare, "sm" 56px für die
+    übrigen Stats) — auf einem gängigen iPhone (390×844) passen jetzt
+    wieder alle Aktionen ohne Scrollen auf den Bildschirm. Auf sehr
+    kleinen/älteren Geräten (z. B. iPhone SE, 375×667) bleibt ein kurzes
+    Scrollen für die letzte Stat-Reihe nötig — bewusst nicht noch weiter
+    verkleinert, um die Buttons unter Zeitdruck treffsicher antippbar zu
+    halten.
 
 ## Projektstruktur
 
