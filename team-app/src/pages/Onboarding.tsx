@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { ErrorNote } from '../components/ErrorNote';
@@ -45,10 +45,26 @@ export function Onboarding() {
   );
 }
 
+const INTRO_SLIDE_MS = 5000;
+
 function Intro({ onDone }: { onDone: () => void }) {
   const [index, setIndex] = useState(0);
   const slide = INTRO_SLIDES[index];
   const isLast = index === INTRO_SLIDES.length - 1;
+
+  // Läuft von allein durch, damit man auf einem ausgestellten/vorgeführten
+  // Gerät nicht ständig antippen muss — ein manuelles "Weiter" setzt den
+  // Timer für die neue Folie einfach über die index-Abhängigkeit zurück.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (isLast) onDone();
+      else setIndex((i) => i + 1);
+    }, INTRO_SLIDE_MS);
+    return () => clearTimeout(timer);
+    // onDone bewusst nicht in den Deps: Onboarding gibt bei jedem Rerender
+    // eine neue Closure rein, das würde den Timer sonst unnötig zurücksetzen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, isLast]);
 
   return (
     <div className="text-center">

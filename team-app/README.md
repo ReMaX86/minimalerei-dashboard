@@ -775,6 +775,16 @@ hier die getroffenen Entscheidungen samt Begründung:
     "Du bist dabei! (zugesagt)" ohne den Hinweis. Dashboard.tsx lädt dafür
     zusätzlich `confirmation` aus der eigenen `game_squad`-Zeile
     (vorher nur `is_selected`).
+- **Intro-Folien im Onboarding laufen jetzt automatisch durch**
+  (`Onboarding.tsx`, `Intro`-Komponente): alle 5 Sekunden (`INTRO_SLIDE_MS`)
+  blättert ein `useEffect`/`setTimeout` selbständig zur nächsten Folie
+  bzw. ruft nach der letzten Folie `onDone()` auf (identisches Verhalten
+  zum manuellen "Weiter"-Klick, der Effekt hängt an `index` und setzt sich
+  dadurch bei jedem — manuellen wie automatischen — Fortschritt neu auf).
+  "Weiter" und "Überspringen" funktionieren weiterhin normal. `onDone`
+  bewusst nicht in den Effekt-Deps, da `Onboarding.tsx` bei jedem Rerender
+  eine neue Closure übergibt, was den 5s-Timer sonst unnötig
+  zurückgesetzt hätte.
 
 ## Projektstruktur
 
