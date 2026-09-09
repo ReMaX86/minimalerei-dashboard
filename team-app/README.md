@@ -785,6 +785,14 @@ hier die getroffenen Entscheidungen samt Begründung:
   bewusst nicht in den Effekt-Deps, da `Onboarding.tsx` bei jedem Rerender
   eine neue Closure übergibt, was den 5s-Timer sonst unnötig
   zurückgesetzt hätte.
+- **"Aktuell abwesend" auf dem Dashboard zeigte auch zukünftige Abwesenheiten
+  mit an** (`Dashboard.tsx`): die Query filterte nur auf `end_date >= heute`,
+  wodurch auch noch nicht begonnene Urlaube in der Liste auftauchten. Die
+  bereits geladenen Zeilen werden jetzt clientseitig per `start_date` in
+  aktuell (`start_date <= heute`) und kommend (`start_date > heute`) getrennt
+  — aktuell laufende Abwesenheiten stehen direkt sichtbar, kommende sind über
+  einen Ausklapp-Button ("N kommende Abwesenheiten anzeigen") erreichbar. Kein
+  zusätzlicher Query nötig, die Daten waren schon vorhanden.
 
 ## Projektstruktur
 

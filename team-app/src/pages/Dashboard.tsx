@@ -52,6 +52,7 @@ export function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [absenceVersion, setAbsenceVersion] = useState(0);
+  const [showUpcomingAbsences, setShowUpcomingAbsences] = useState(false);
   // Trainers/admin-players get the full Kampfgericht overview so they can
   // plan; a read-only Betrachter (e.g. Abteilungsleiter) gets to see the
   // same overview, just with no way to assign/edit anything. Captains/
@@ -475,21 +476,57 @@ export function Dashboard() {
         </section>
       )}
 
-      {showAbsencesOverview && data.absencesOverview.length > 0 && (
-        <section className="card">
-          <SectionTitle icon="🌴" title="Aktuell abwesend" />
-          <ul className="mt-2 space-y-1">
-            {data.absencesOverview.map((a) => (
-              <li key={a.id} className="flex items-center justify-between text-sm">
-                <span className="font-medium text-tbw-navyDark">{data.players[a.player_id]?.name ?? '?'}</span>
-                <span className="text-tbw-ink/50">
-                  {fmtDateShort(a.start_date)} – {fmtDateShort(a.end_date)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {showAbsencesOverview && data.absencesOverview.length > 0 && (() => {
+        const today = new Date().toISOString().slice(0, 10);
+        const currentAbsences = data.absencesOverview.filter((a) => a.start_date <= today);
+        const upcomingAbsences = data.absencesOverview.filter((a) => a.start_date > today);
+        return (
+          <section className="card">
+            <SectionTitle icon="🌴" title="Aktuell abwesend" />
+            {currentAbsences.length > 0 ? (
+              <ul className="mt-2 space-y-1">
+                {currentAbsences.map((a) => (
+                  <li key={a.id} className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-tbw-navyDark">{data.players[a.player_id]?.name ?? '?'}</span>
+                    <span className="text-tbw-ink/50">
+                      {fmtDateShort(a.start_date)} – {fmtDateShort(a.end_date)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-tbw-ink/50">Aktuell ist niemand abwesend.</p>
+            )}
+
+            {upcomingAbsences.length > 0 && (
+              <div className="mt-3 border-t border-black/5 pt-2">
+                <button
+                  className="text-xs font-semibold text-tbw-ink/50"
+                  onClick={() => setShowUpcomingAbsences((v) => !v)}
+                >
+                  {showUpcomingAbsences
+                    ? '▲ Kommende Abwesenheiten ausblenden'
+                    : `▼ ${upcomingAbsences.length} kommende Abwesenheit${upcomingAbsences.length > 1 ? 'en' : ''} anzeigen`}
+                </button>
+                {showUpcomingAbsences && (
+                  <ul className="mt-2 space-y-1">
+                    {upcomingAbsences.map((a) => (
+                      <li key={a.id} className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-tbw-navyDark">
+                          {data.players[a.player_id]?.name ?? '?'}
+                        </span>
+                        <span className="text-tbw-ink/50">
+                          {fmtDateShort(a.start_date)} – {fmtDateShort(a.end_date)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </section>
+        );
+      })()}
 
       <section className="card">
         <SectionTitle icon="👕" title="Wer hat die Trikots?" />
