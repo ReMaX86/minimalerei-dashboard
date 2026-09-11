@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { UpcomingTrainings } from '../components/UpcomingTrainings';
 import { WeeklyTrainingTimes } from '../components/WeeklyTrainingTimes';
 import { AbsenceSection } from '../components/AbsenceSection';
+import { PushNotificationCard } from '../components/PushNotificationCard';
 import { fmtDate, fmtDateShort, fmtTime } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
 import { computeReminders, type ReminderItem } from '../lib/reminders';
@@ -393,6 +394,8 @@ export function Dashboard() {
   return (
     <div className="space-y-4">
       {player && <p className="headline text-3xl text-tbw-navyDark">Hi {firstName}!</p>}
+
+      {flags.push_notifications && <PushNotificationCard />}
 
       {role === 'player' && data.reminders.length > 0 && (
         <section className="card !bg-tbw-red/10 !ring-tbw-red/30">

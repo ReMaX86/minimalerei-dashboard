@@ -87,6 +87,49 @@ Wiederherstellung im Notfall: heruntergeladenes Artefakt entpacken, dann
 `psql "<Connection-String>" -f backup-YYYY-MM-DD.sql` gegen ein leeres/neues
 Supabase-Projekt laufen lassen.
 
+### 7. Push-Benachrichtigungen
+
+Optionale Zusatzfunktion (Feature-Flag `push_notifications`, siehe Admin -> Funktionen) —
+Spieler/Trainer/Betrachter können sich auf der Startseite für Benachrichtigungen anmelden und
+bekommen z. B. bei einer neuen Meldung eine Push-Benachrichtigung aufs Gerät, auch wenn die
+App gerade nicht offen ist (auf iPhone/iPad nur, wenn die App vorher per "Zum Home-Bildschirm"
+hinzugefügt wurde — im normalen Safari-Tab unterstützt iOS keine Web-Push-Benachrichtigungen).
+
+Läuft komplett kostenlos: kein Push-Dienst-Abo nötig (Web Push über VAPID-Schlüssel ist
+Standard und kostenlos), Versand läuft über eine Vercel-Serverless-Function
+(`api/send-push.ts`, im kostenlosen Hobby-Tarif enthalten) statt über eine Supabase Edge
+Function, damit kein zusätzlicher CLI-/Dashboard-Zugriff aufs Supabase-Projekt nötig ist.
+
+**Setup (mehrere Schritte, da drei verschiedene Dienste beteiligt sind):**
+
+1. **Migration ausführen**: `supabase/migrations/0035_push_subscriptions.sql` im
+   SQL-Editor laufen lassen (legt die Tabelle für die Geräte-Anmeldungen an und das
+   Feature-Flag, standardmäßig deaktiviert).
+2. **VAPID-Schlüsselpaar erzeugen** (einmalig, z. B. lokal mit
+   `npx web-push generate-vapid-keys`): liefert einen Public und einen Private Key.
+3. **Vercel Environment Variables** setzen (Project Settings -> Environment Variables):
+   - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` — das eben erzeugte Schlüsselpaar.
+   - `VAPID_SUBJECT` — `mailto:` + eine erreichbare Kontakt-E-Mail-Adresse (Pflichtangabe
+     der Push-Dienste, z. B. von Apple/Google, falls mal etwas schiefläuft).
+   - `SUPABASE_SERVICE_ROLE_KEY` — aus Supabase unter **Project Settings -> API ->
+     service_role** (geheim halten — dieser Key umgeht alle RLS-Policies, deshalb nur als
+     Server-Env-Var, nie im Frontend).
+   - `PUSH_WEBHOOK_SECRET` — ein selbst ausgedachtes langes Zufallspasswort, sichert den
+     `/api/send-push`-Endpunkt gegen fremde Aufrufe ab.
+4. **`VITE_VAPID_PUBLIC_KEY`** zusätzlich (!) als Vercel-Env-Var setzen, mit demselben
+   Public-Key-Wert aus Schritt 2 — landet ausdrücklich im Frontend-Bundle (der Public Key ist
+   dafür gedacht, ist also unbedenklich), wird beim Anmelden fürs Abonnieren gebraucht.
+5. **Supabase Database Webhook** einrichten (Database -> Webhooks -> Create a new hook):
+   - Table: `announcements`, Event: `Insert`.
+   - Type: `HTTP Request`, Method: `POST`.
+   - URL: `https://<deine-vercel-domain>/api/send-push`.
+   - Header hinzufügen: `x-webhook-secret` = derselbe Wert wie `PUSH_WEBHOOK_SECRET` oben.
+6. Danach im **Admin -> Funktionen** das Feature `Push-Benachrichtigungen` aktivieren — erst
+   jetzt taucht die Opt-in-Karte auf der Startseite überhaupt auf.
+
+Zum Testen: eine neue Meldung im Admin veröffentlichen, während mindestens ein Gerät
+Benachrichtigungen aktiviert hat.
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
@@ -1050,6 +1093,27 @@ hier die getroffenen Entscheidungen samt Begründung:
   "übernächsten" Dienstag) auf denselben `training_id`-Schlüssel gemappt
   und dadurch eine der beiden Zu-/Absage-Listen fälschlich geleert; jetzt
   wird nach `training_id` **und** Datum gefiltert.
+- **Push-Benachrichtigungen** (Migration `0035`, `src/sw.ts`, `src/lib/push.ts`,
+  `PushNotificationCard.tsx`, `api/send-push.ts`) — Sicherheitsnetz zuerst: bevor an diesem
+  Umbau gearbeitet wurde, wurde erst ein automatisches Datenbank-Backup eingerichtet (siehe
+  "Supabase Backup" oben), weil die App bereits live im Einsatz war. Größte technische
+  Änderung: `vite-plugin-pwa` läuft jetzt mit `strategies: 'injectManifest'` statt
+  `generateSW` — nur so kann der Service Worker eigene `push`/`notificationclick`-Listener
+  haben. Das bisher automatisch generierte Precaching + die `NetworkFirst`-Route für die
+  Supabase-API (siehe "Supabase Keep-Alive") wurden dafür 1:1 von Hand in `src/sw.ts`
+  nachgebaut, inklusive `skipWaiting()`/`clients.claim()`, damit sich am Update-/
+  Offline-Verhalten für bereits installierte Nutzer nichts ändert. `src/sw.ts` läuft in
+  einer eigenen Worker-Umgebung (kein DOM) und wird deshalb über eine eigene
+  `tsconfig.sw.json` typgeprüft statt über die App-weite `tsconfig.json`. Versand läuft
+  nicht über eine Supabase Edge Function (dafür fehlt CLI-/Dashboard-Zugriff aufs
+  Supabase-Projekt), sondern über eine Vercel-Serverless-Function (`api/send-push.ts`,
+  ebenfalls kostenlos im Hobby-Tarif, eigene `tsconfig.api.json`), die ein Supabase
+  Database Webhook bei jeder neuen Meldung aufruft. Aus demselben Vorsichtsgrund läuft die
+  komplette Funktion hinter dem neuen, standardmäßig deaktivierten Feature-Flag
+  `push_notifications` — die Opt-in-Karte auf der Startseite erscheint erst, wenn der
+  Trainer sie nach abgeschlossenem Setup (siehe "Push-Benachrichtigungen" oben) bewusst
+  einschaltet, statt dass allen Nutzern sofort eine halb eingerichtete Funktion angezeigt
+  wird. Erste (und bisher einzige) Benachrichtigungsart: neue Meldung im Schwarzen Brett.
 
 ## Projektstruktur
 
