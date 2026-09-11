@@ -82,7 +82,7 @@ export function AbsenceSection({ onChange }: { onChange: () => void }) {
 
   return (
     <section className="card">
-      <p className="text-sm font-bold text-tbw-navyDark">🌴 Urlaub / Abwesenheit</p>
+      <p className="text-sm font-bold text-tbw-navyDark">🌴 Dein Urlaub / Abwesenheit</p>
       <p className="mt-1 text-xs text-tbw-ink/50">
         Training in diesem Zeitraum wird automatisch abgesagt, beim Kader sieht der Trainer einen Hinweis.
       </p>
