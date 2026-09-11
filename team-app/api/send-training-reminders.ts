@@ -1,9 +1,27 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
-import { nextTrainingOccurrences } from '../src/lib/trainingSchedule';
-import { daysUntil, fmtDate, fmtTime } from '../src/lib/format';
+import { nextTrainingOccurrences } from './_lib/trainingSchedule';
 import type { Player, PlayerAbsence, ReminderSettings, Training, TrainingOverride } from '../src/types/database';
+
+// daysUntil/fmtDate/fmtTime sind hier statt aus src/lib/format importiert
+// bewusst als winzige, stabile Kopien inline gehalten — siehe Kommentar in
+// api/_lib/trainingSchedule.ts zum Grund (Cross-Verzeichnis-Import aus api/
+// nach src/lib/ scheiterte live bei Vercel mit ERR_MODULE_NOT_FOUND).
+function daysUntil(iso: string, today: Date): number {
+  const from = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const target = new Date(iso + 'T00:00:00');
+  return Math.round((target.getTime() - from.getTime()) / 86_400_000);
+}
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function fmtTime(time: string): string {
+  return time.slice(0, 5);
+}
 
 // Zweite Benachrichtigungsart nach "neue Meldung" (siehe send-push.ts):
 // erinnert Spieler, die für den nächsten Trainingstermin noch nicht
