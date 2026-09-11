@@ -30,6 +30,7 @@ export function OfficiatingAdmin() {
   const [newTeamName, setNewTeamName] = useState('');
   const [teamBusy, setTeamBusy] = useState(false);
   const [showTeams, setShowTeams] = useState(false);
+  const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -85,6 +86,7 @@ export function OfficiatingAdmin() {
       if (tasksError) throw tasksError;
       setForm(EMPTY_FORM);
       setTaskSelection(EMPTY_TASK_SELECTION);
+      setShowForm(false);
       await load();
     } catch {
       setError('Termin konnte nicht angelegt werden.');
@@ -195,66 +197,89 @@ export function OfficiatingAdmin() {
         )}
       </div>
 
-      <form onSubmit={addGame} className="card space-y-2">
-        <p className="text-sm font-bold text-tbw-navyDark">Neuer Kampfgericht-Termin</p>
-        <div className="space-y-2">
-          <DateField
-            label="Datum"
-            required
-            value={form.game_date}
-            onChange={(v) => setForm((f) => ({ ...f, game_date: v }))}
-          />
-          <TimeField label="Uhrzeit" value={form.game_time} onChange={(v) => setForm((f) => ({ ...f, game_time: v }))} />
+      {!showForm && (
+        <div className="flex justify-end">
+          <button className="text-xs font-bold text-tbw-navy" onClick={() => setShowForm(true)}>
+            + Neu
+          </button>
         </div>
-        <select
-          required
-          className="input"
-          value={form.opponent_teams}
-          onChange={(e) => setForm((f) => ({ ...f, opponent_teams: e.target.value }))}
-        >
-          <option value="" disabled>
-            Team wählen…
-          </option>
-          {teams.map((t) => (
-            <option key={t.id} value={t.name}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-        <input
-          placeholder="Gegner (optional), z. B. DJK Erkrath"
-          className="input"
-          value={form.opponent}
-          onChange={(e) => setForm((f) => ({ ...f, opponent: e.target.value }))}
-        />
-        <input
-          required
-          placeholder="Halle / Adresse"
-          className="input"
-          value={form.location}
-          onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-        />
-        <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
-            Welche Aufgaben müssen wir stellen?
-          </p>
-          <div className="flex flex-wrap gap-3">
-            {TASK_TYPES.map((type) => (
-              <label key={type} className="flex items-center gap-1.5 text-sm text-tbw-ink/80">
-                <input
-                  type="checkbox"
-                  checked={taskSelection[type]}
-                  onChange={(e) => setTaskSelection((s) => ({ ...s, [type]: e.target.checked }))}
-                />
-                {OFFICIATING_TASK_LABELS[type]}
-              </label>
-            ))}
+      )}
+
+      {showForm && (
+        <form onSubmit={addGame} className="card space-y-2">
+          <p className="text-sm font-bold text-tbw-navyDark">Neuer Kampfgericht-Termin</p>
+          <div className="space-y-2">
+            <DateField
+              label="Datum"
+              required
+              value={form.game_date}
+              onChange={(v) => setForm((f) => ({ ...f, game_date: v }))}
+            />
+            <TimeField label="Uhrzeit" value={form.game_time} onChange={(v) => setForm((f) => ({ ...f, game_time: v }))} />
           </div>
-        </div>
-        <button className="btn-primary w-full" disabled={busy}>
-          Anlegen
-        </button>
-      </form>
+          <select
+            required
+            className="input"
+            value={form.opponent_teams}
+            onChange={(e) => setForm((f) => ({ ...f, opponent_teams: e.target.value }))}
+          >
+            <option value="" disabled>
+              Team wählen…
+            </option>
+            {teams.map((t) => (
+              <option key={t.id} value={t.name}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          <input
+            placeholder="Gegner (optional), z. B. DJK Erkrath"
+            className="input"
+            value={form.opponent}
+            onChange={(e) => setForm((f) => ({ ...f, opponent: e.target.value }))}
+          />
+          <input
+            required
+            placeholder="Halle / Adresse"
+            className="input"
+            value={form.location}
+            onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+          />
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
+              Welche Aufgaben müssen wir stellen?
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {TASK_TYPES.map((type) => (
+                <label key={type} className="flex items-center gap-1.5 text-sm text-tbw-ink/80">
+                  <input
+                    type="checkbox"
+                    checked={taskSelection[type]}
+                    onChange={(e) => setTaskSelection((s) => ({ ...s, [type]: e.target.checked }))}
+                  />
+                  {OFFICIATING_TASK_LABELS[type]}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button className="btn-primary flex-1" disabled={busy}>
+              Anlegen
+            </button>
+            <button
+              type="button"
+              className="btn-secondary flex-1"
+              onClick={() => {
+                setShowForm(false);
+                setForm(EMPTY_FORM);
+                setTaskSelection(EMPTY_TASK_SELECTION);
+              }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </form>
+      )}
 
       <ul className="space-y-2">
         {games.map((g) => (

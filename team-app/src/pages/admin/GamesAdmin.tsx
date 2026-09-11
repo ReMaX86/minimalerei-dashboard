@@ -28,6 +28,7 @@ export function GamesAdmin() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -45,6 +46,7 @@ export function GamesAdmin() {
 
   function edit(g: Game) {
     setEditingId(g.id);
+    setShowForm(true);
     setForm({
       game_date: g.game_date,
       game_time: g.game_time.slice(0, 5),
@@ -60,6 +62,7 @@ export function GamesAdmin() {
 
   function resetForm() {
     setEditingId(null);
+    setShowForm(false);
     setForm(EMPTY_FORM);
   }
 
@@ -109,76 +112,84 @@ export function GamesAdmin() {
 
   return (
     <div className="space-y-4">
-      <form onSubmit={submit} className="card space-y-2">
-        <p className="text-sm font-bold text-tbw-navyDark">{editingId ? 'Spiel bearbeiten' : 'Neues Spiel'}</p>
-        <div className="space-y-2">
-          <DateField
-            label="Datum"
-            required
-            value={form.game_date}
-            onChange={(v) => setForm((f) => ({ ...f, game_date: v }))}
-          />
-          <TimeField
-            label="Uhrzeit"
-            required
-            value={form.game_time}
-            onChange={(v) => setForm((f) => ({ ...f, game_time: v }))}
-          />
+      {!showForm && (
+        <div className="flex justify-end">
+          <button className="text-xs font-bold text-tbw-navy" onClick={() => setShowForm(true)}>
+            + Neu
+          </button>
         </div>
-        <input
-          required
-          placeholder="Gegner"
-          className="input"
-          value={form.opponent}
-          onChange={(e) => setForm((f) => ({ ...f, opponent: e.target.value }))}
-        />
-        <input
-          required
-          placeholder="Halle / Adresse"
-          className="input"
-          value={form.location}
-          onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-        />
-        <div className="flex items-center gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={form.is_home}
-              onChange={(e) => setForm((f) => ({ ...f, is_home: e.target.checked }))}
+      )}
+
+      {showForm && (
+        <form onSubmit={submit} className="card space-y-2">
+          <p className="text-sm font-bold text-tbw-navyDark">{editingId ? 'Spiel bearbeiten' : 'Neues Spiel'}</p>
+          <div className="space-y-2">
+            <DateField
+              label="Datum"
+              required
+              value={form.game_date}
+              onChange={(v) => setForm((f) => ({ ...f, game_date: v }))}
             />
-            Heimspiel
-          </label>
-          <select
-            className="input !w-auto"
-            value={form.trikot_override}
-            onChange={(e) => setForm((f) => ({ ...f, trikot_override: e.target.value as '' | TrikotSetId }))}
-          >
-            <option value="">Trikot automatisch</option>
-            <option value="weiss">Trikot: Weiß erzwingen</option>
-            <option value="schwarz">Trikot: Schwarz erzwingen</option>
-          </select>
-        </div>
-        <div className="border-t border-black/5 pt-2">
-          <p className="text-xs font-semibold text-tbw-ink/50">Treffpunkt</p>
-          <div className="mt-2">
-            <MeetingPointFields
-              isHome={form.is_home}
-              value={form}
-              onChange={(next) => setForm((f) => ({ ...f, ...next }))}
+            <TimeField
+              label="Uhrzeit"
+              required
+              value={form.game_time}
+              onChange={(v) => setForm((f) => ({ ...f, game_time: v }))}
             />
           </div>
-        </div>
-        <div className="flex gap-2">
-          <button className="btn-primary flex-1" disabled={busy}>
-            {editingId ? 'Speichern' : 'Anlegen'}
-          </button>
-          {editingId && (
-            <button type="button" className="btn-secondary" onClick={resetForm}>
+          <input
+            required
+            placeholder="Gegner"
+            className="input"
+            value={form.opponent}
+            onChange={(e) => setForm((f) => ({ ...f, opponent: e.target.value }))}
+          />
+          <input
+            required
+            placeholder="Halle / Adresse"
+            className="input"
+            value={form.location}
+            onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+          />
+          <div className="flex items-center gap-4 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.is_home}
+                onChange={(e) => setForm((f) => ({ ...f, is_home: e.target.checked }))}
+              />
+              Heimspiel
+            </label>
+            <select
+              className="input !w-auto"
+              value={form.trikot_override}
+              onChange={(e) => setForm((f) => ({ ...f, trikot_override: e.target.value as '' | TrikotSetId }))}
+            >
+              <option value="">Trikot automatisch</option>
+              <option value="weiss">Trikot: Weiß erzwingen</option>
+              <option value="schwarz">Trikot: Schwarz erzwingen</option>
+            </select>
+          </div>
+          <div className="border-t border-black/5 pt-2">
+            <p className="text-xs font-semibold text-tbw-ink/50">Treffpunkt</p>
+            <div className="mt-2">
+              <MeetingPointFields
+                isHome={form.is_home}
+                value={form}
+                onChange={(next) => setForm((f) => ({ ...f, ...next }))}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button className="btn-primary flex-1" disabled={busy}>
+              {editingId ? 'Speichern' : 'Anlegen'}
+            </button>
+            <button type="button" className="btn-secondary flex-1" onClick={resetForm}>
               Abbrechen
             </button>
-          )}
-        </div>
-      </form>
+          </div>
+        </form>
+      )}
 
       <ul className="space-y-2">
         {games.map((g) => (
