@@ -417,6 +417,7 @@ export function Spiele() {
         )}
 
         {role === 'player' &&
+          !isAdmin &&
           (state.nextGame.squad_published ? (
             <div className="mt-3 border-t border-black/5 pt-3">
               <button

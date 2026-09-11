@@ -831,8 +831,16 @@ hier die getroffenen Entscheidungen samt Begründung:
   ansehen", nicht diesen zweiten. Die eigene Zeile in der
   Trainer-Kader-Bearbeitung (`sortedForTrainer`-Liste) zeigt jetzt zusätzlich
   direkt "Kannst du selbst?" mit ✓/✗-Buttons (bzw. "✓ Du hast zugesagt" +
-  "Doch nicht?"), sobald der eigene Spieler im Kader steht — unabhängig vom
-  separaten Abschnitt, der für normale Spieler weiterhin der einzige Weg ist.
+  "Doch nicht?"), sobald der eigene Spieler im Kader steht.
+- **Zwei parallele, ähnlich benannte Kader-Ansichten für admin-geflaggte
+  Spieler entfernt** (`Spiele.tsx`): nachdem die eigene Zu-/Absage direkt in
+  die Trainer-Kader-Bearbeitung eingebaut wurde (siehe vorheriger Punkt), war
+  der separate Spieler-Abschnitt ("👥 Kader anzeigen") für diese Nutzer nur
+  noch verwirrende Dopplung neben "👥 Kader ansehen" — beide taten für sie
+  praktisch dasselbe. Der separate Abschnitt ist jetzt wieder
+  `role === 'player' && !isAdmin` (wie ursprünglich vor PR #90), ein
+  admin-geflaggter Spieler sieht nur noch die eine Trainer-Ansicht, die
+  Verwaltung und eigene Zusage vereint.
 
 ## Projektstruktur
 
