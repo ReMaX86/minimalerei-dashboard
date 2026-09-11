@@ -5,11 +5,17 @@ import type { Player, PlayerAbsence, ReminderSettings, Training, TrainingOverrid
 
 // Zweite Benachrichtigungsart nach "neue Meldung" (siehe send-push.ts):
 // erinnert Spieler, die für den nächsten Trainingstermin noch nicht
-// geantwortet haben, zu drei festen Zeitpunkten vor Trainingsbeginn (1 Tag,
-// 1 Stunde, 30 Minuten) — unabhängig voneinander, ein Spieler kann also bis
-// zu drei Erinnerungen für denselben Termin bekommen, sofern er bis dahin
-// nicht geantwortet hat. training_reminder_log (Migration 0038) verhindert
-// Mehrfachversand derselben Erinnerungsart für denselben Termin.
+// geantwortet haben, zu bis zu drei Zeitpunkten vor Trainingsbeginn —
+// unabhängig voneinander, ein Spieler kann also mehrere Erinnerungen für
+// denselben Termin bekommen, sofern er bis dahin nicht geantwortet hat. Die
+// drei Zeitpunkte (in Minuten vor Trainingsbeginn, 0 = abgeschaltet) stehen
+// in reminder_settings.training_push_offset_{1,2,3}_min (Migration 0039,
+// Default 1440/60/30 = 1 Tag/1 Stunde/30 Minuten) und sind im Admin unter
+// Funktionen -> Erinnerungen änderbar. training_reminder_log (Migration
+// 0038) verhindert Mehrfachversand derselben Erinnerungsart für denselben
+// Termin — geloggt wird nach Position (slot_1/2/3), nicht nach dem
+// konkreten Minutenwert, damit eine spätere Änderung der Einstellung nicht
+// zu doppeltem Versand führt.
 //
 // Aufgerufen wird dieser Endpunkt NICHT mehr per täglichem GitHub-Actions-
 // Cron (zu grob für ein 30-Minuten-Fenster, und ein Free-Tier-Cron im
@@ -143,13 +149,22 @@ function fmtTime(time: string): string {
   return time.slice(0, 5);
 }
 
-// --- Die drei festen Erinnerungszeitpunkte ---
+// --- Die drei Erinnerungszeitpunkte (Minuten vor Trainingsbeginn, im Admin
+// unter Funktionen -> Erinnerungen änderbar — siehe reminder_settings) ---
 
-const REMINDER_OFFSETS: { type: '1_day' | '1_hour' | '30_min'; ms: number; label: string }[] = [
-  { type: '1_day', ms: 24 * 60 * 60 * 1000, label: 'morgen' },
-  { type: '1_hour', ms: 60 * 60 * 1000, label: 'in 1 Stunde' },
-  { type: '30_min', ms: 30 * 60 * 1000, label: 'in 30 Minuten' }
-];
+type ReminderSlot = 'slot_1' | 'slot_2' | 'slot_3';
+
+function offsetLabel(minutes: number): string {
+  if (minutes >= 1440 && minutes % 1440 === 0) {
+    const days = minutes / 1440;
+    return days === 1 ? '1 Tag' : `${days} Tagen`;
+  }
+  if (minutes >= 60 && minutes % 60 === 0) {
+    const hours = minutes / 60;
+    return hours === 1 ? '1 Stunde' : `${hours} Stunden`;
+  }
+  return `${minutes} Minuten`;
+}
 
 interface PushSubRow {
   id: string;
@@ -236,7 +251,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const dueTypes = REMINDER_OFFSETS.filter((o) => startsAt.getTime() - o.ms <= now.getTime());
+  const offsets = (
+    [
+      { type: 'slot_1', minutes: settings.training_push_offset_1_min },
+      { type: 'slot_2', minutes: settings.training_push_offset_2_min },
+      { type: 'slot_3', minutes: settings.training_push_offset_3_min }
+    ] satisfies { type: ReminderSlot; minutes: number }[]
+  ).filter((o) => o.minutes > 0);
+
+  const dueTypes = offsets
+    .map((o) => ({ type: o.type, ms: o.minutes * 60_000, label: offsetLabel(o.minutes) }))
+    .filter((o) => startsAt.getTime() - o.ms <= now.getTime());
   if (dueTypes.length === 0) {
     res.status(200).json({ skipped: 'not_due_yet', date: occurrence.date, startsAt: startsAt.toISOString() });
     return;
@@ -328,7 +353,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const subs = authUserId ? subsByAuthUser.get(authUserId) ?? [] : [];
 
       const payload = JSON.stringify({
-        title: `Training ${label} — noch nicht beantwortet`,
+        title: `Training in ${label} — noch nicht beantwortet`,
         body: `${fmtDate(occurrence.date)} um ${fmtTime(occurrence.training.start_time)} Uhr — bist du dabei?`,
         url: '/#training'
       });

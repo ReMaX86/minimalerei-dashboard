@@ -43,6 +43,11 @@ export interface ReminderSettings {
   squad_reminder_days_before: number;
   training_reminder_days_before: number;
   officiating_season_min: number;
+  // Zeitpunkte der Push-Erinnerung fürs Training (Minuten vor Beginn, siehe
+  // api/send-training-reminders.ts) — 0 schaltet den Zeitpunkt ab.
+  training_push_offset_1_min: number;
+  training_push_offset_2_min: number;
+  training_push_offset_3_min: number;
 }
 
 export type PlayerPosition = 'pg' | 'sg' | 'sf' | 'pf' | 'c';

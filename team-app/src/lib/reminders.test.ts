@@ -8,7 +8,10 @@ const SETTINGS: ReminderSettings = {
   enabled: true,
   squad_reminder_days_before: 3,
   training_reminder_days_before: 1,
-  officiating_season_min: 2
+  officiating_season_min: 2,
+  training_push_offset_1_min: 1440,
+  training_push_offset_2_min: 60,
+  training_push_offset_3_min: 30
 };
 
 describe('computeReminders', () => {
