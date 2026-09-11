@@ -3,22 +3,15 @@ import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
 import { DateField, TimeField } from '../../components/DateTimeField';
-import { fmtDateShort, fmtTime } from '../../lib/format';
+import { fmtDate, fmtDateShort, fmtTime } from '../../lib/format';
 import { weekdayIndex, WEEKDAY_ORDER } from '../../lib/weekdays';
 import type { Training, TrainingOverride } from '../../types/database';
 
 const EMPTY_FORM = { weekday: WEEKDAY_ORDER[0], start_time: '', end_time: '', location: '' };
 
-const EMPTY_OVERRIDE_FORM = {
-  start_date: '',
-  end_date: '',
-  weekday: '', // '' = alle Trainingstage
-  status: 'cancelled' as 'cancelled' | 'special',
-  start_time: '',
-  end_time: '',
-  location: '',
-  note: ''
-};
+const EMPTY_OVERRIDE_FORM = { start_date: '', end_date: '', mode: 'regular' as 'regular' | 'special', note: '' };
+
+const EMPTY_SESSION_FORM = { date: '', start_time: '', end_time: '', location: '' };
 
 export function TrainingsAdmin() {
   const [trainings, setTrainings] = useState<Training[] | null>(null);
@@ -33,10 +26,12 @@ export function TrainingsAdmin() {
       setError('Fehler beim Laden der Trainingszeiten.');
       return;
     }
+    // Sondertermine (specific_date gesetzt) gehören zu einer Ferienzeit und
+    // werden dort verwaltet, nicht in dieser wöchentlichen Liste.
     setTrainings(
-      [...((data as Training[]) ?? [])].sort(
-        (a, b) => weekdayIndex(a.weekday) - weekdayIndex(b.weekday) || a.start_time.localeCompare(b.start_time)
-      )
+      [...((data as Training[]) ?? [])]
+        .filter((t) => t.weekday !== null)
+        .sort((a, b) => weekdayIndex(a.weekday!) - weekdayIndex(b.weekday!) || a.start_time.localeCompare(b.start_time))
     );
   }, []);
 
@@ -77,18 +72,25 @@ export function TrainingsAdmin() {
   }
 
   const [overrides, setOverrides] = useState<TrainingOverride[] | null>(null);
+  const [sessions, setSessions] = useState<Training[] | null>(null);
   const [overrideForm, setOverrideForm] = useState(EMPTY_OVERRIDE_FORM);
   const [overrideBusy, setOverrideBusy] = useState(false);
   const [overrideError, setOverrideError] = useState<string | null>(null);
+  const [sessionForms, setSessionForms] = useState<Record<string, typeof EMPTY_SESSION_FORM>>({});
+  const [sessionBusy, setSessionBusy] = useState<string | null>(null);
 
   const loadOverrides = useCallback(async () => {
     setOverrideError(null);
-    const { data, error: loadError } = await supabase.from('training_overrides').select('*');
-    if (loadError) {
+    const [overridesRes, sessionsRes] = await Promise.all([
+      supabase.from('training_overrides').select('*'),
+      supabase.from('trainings').select('*').not('override_id', 'is', null)
+    ]);
+    if (overridesRes.error || sessionsRes.error) {
       setOverrideError('Fehler beim Laden der Ferienzeiten.');
       return;
     }
-    setOverrides([...((data as TrainingOverride[]) ?? [])].sort((a, b) => a.start_date.localeCompare(b.start_date)));
+    setOverrides([...((overridesRes.data as TrainingOverride[]) ?? [])].sort((a, b) => a.start_date.localeCompare(b.start_date)));
+    setSessions((sessionsRes.data as Training[]) ?? []);
   }, []);
 
   useEffect(() => {
@@ -100,22 +102,17 @@ export function TrainingsAdmin() {
     setOverrideBusy(true);
     setOverrideError(null);
     try {
-      const isSpecial = overrideForm.status === 'special';
       const { error: insertError } = await supabase.from('training_overrides').insert({
         start_date: overrideForm.start_date,
         end_date: overrideForm.end_date,
-        weekday: overrideForm.weekday || null,
-        status: overrideForm.status,
-        start_time: isSpecial ? overrideForm.start_time : null,
-        end_time: isSpecial ? overrideForm.end_time : null,
-        location: isSpecial && overrideForm.location.trim() ? overrideForm.location.trim() : null,
+        mode: overrideForm.mode,
         note: overrideForm.note.trim() || null
       });
       if (insertError) throw insertError;
       setOverrideForm(EMPTY_OVERRIDE_FORM);
       await loadOverrides();
     } catch {
-      setOverrideError('Ausnahme konnte nicht angelegt werden.');
+      setOverrideError('Ferienzeit konnte nicht angelegt werden.');
     } finally {
       setOverrideBusy(false);
     }
@@ -125,6 +122,49 @@ export function TrainingsAdmin() {
     setOverrideError(null);
     try {
       const { error: delError } = await supabase.from('training_overrides').delete().eq('id', id);
+      if (delError) throw delError;
+      await loadOverrides();
+    } catch {
+      setOverrideError('Löschen fehlgeschlagen.');
+    }
+  }
+
+  function sessionForm(overrideId: string) {
+    return sessionForms[overrideId] ?? EMPTY_SESSION_FORM;
+  }
+
+  function setSessionField(overrideId: string, patch: Partial<typeof EMPTY_SESSION_FORM>) {
+    setSessionForms((prev) => ({ ...prev, [overrideId]: { ...sessionForm(overrideId), ...patch } }));
+  }
+
+  async function addSession(overrideId: string, e: FormEvent) {
+    e.preventDefault();
+    const form = sessionForm(overrideId);
+    setSessionBusy(overrideId);
+    setOverrideError(null);
+    try {
+      const { error: insertError } = await supabase.from('trainings').insert({
+        weekday: null,
+        specific_date: form.date,
+        start_time: form.start_time,
+        end_time: form.end_time,
+        location: form.location.trim(),
+        override_id: overrideId
+      });
+      if (insertError) throw insertError;
+      setSessionForms((prev) => ({ ...prev, [overrideId]: EMPTY_SESSION_FORM }));
+      await loadOverrides();
+    } catch {
+      setOverrideError('Sondertermin konnte nicht angelegt werden.');
+    } finally {
+      setSessionBusy(null);
+    }
+  }
+
+  async function removeSession(id: string) {
+    setOverrideError(null);
+    try {
+      const { error: delError } = await supabase.from('trainings').delete().eq('id', id);
       if (delError) throw delError;
       await loadOverrides();
     } catch {
@@ -198,12 +238,12 @@ export function TrainingsAdmin() {
         Ferienzeiten &amp; Sonderregelungen
       </p>
       {overrideError && <ErrorNote message={overrideError} />}
-      {overrides === null ? (
+      {overrides === null || sessions === null ? (
         <LoadingSpinner />
       ) : (
         <>
           <form onSubmit={addOverride} className="card space-y-2">
-            <p className="text-sm font-bold text-tbw-navyDark">Neue Ausnahme</p>
+            <p className="text-sm font-bold text-tbw-navyDark">Neue Ferienzeit</p>
             <div className="grid grid-cols-2 gap-2">
               <DateField
                 label="Von"
@@ -219,96 +259,129 @@ export function TrainingsAdmin() {
                 onChange={(v) => setOverrideForm((f) => ({ ...f, end_date: v }))}
               />
             </div>
-            <select
-              className="input"
-              value={overrideForm.weekday}
-              onChange={(e) => setOverrideForm((f) => ({ ...f, weekday: e.target.value }))}
-            >
-              <option value="">Alle Trainingstage</option>
-              {WEEKDAY_ORDER.map((day) => (
-                <option key={day} value={day}>
-                  {day}
-                </option>
-              ))}
-            </select>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setOverrideForm((f) => ({ ...f, status: 'cancelled' }))}
-                className={`btn-secondary flex-1 !py-2 text-sm ${
-                  overrideForm.status === 'cancelled' ? '!bg-tbw-red/10 !text-tbw-red !ring-tbw-red/30' : ''
-                }`}
-              >
-                Fällt aus
-              </button>
-              <button
-                type="button"
-                onClick={() => setOverrideForm((f) => ({ ...f, status: 'special' }))}
-                className={`btn-secondary flex-1 !py-2 text-sm ${
-                  overrideForm.status === 'special' ? '!bg-tbw-gold/10 !text-tbw-navyDark !ring-tbw-gold/30' : ''
-                }`}
-              >
-                Sonderzeit
-              </button>
-            </div>
-            {overrideForm.status === 'special' && (
-              <div className="space-y-2 rounded-xl bg-tbw-bg p-3">
-                <TimeField
-                  label="Beginn"
-                  required
-                  value={overrideForm.start_time}
-                  onChange={(v) => setOverrideForm((f) => ({ ...f, start_time: v }))}
-                />
-                <TimeField
-                  label="Ende"
-                  required
-                  value={overrideForm.end_time}
-                  onChange={(v) => setOverrideForm((f) => ({ ...f, end_time: v }))}
-                />
-                <input
-                  placeholder="Halle / Adresse (leer = wie gewohnt)"
-                  className="input"
-                  value={overrideForm.location}
-                  onChange={(e) => setOverrideForm((f) => ({ ...f, location: e.target.value }))}
-                />
-              </div>
-            )}
             <input
               placeholder="Notiz (z. B. Herbstferien)"
               className="input"
               value={overrideForm.note}
               onChange={(e) => setOverrideForm((f) => ({ ...f, note: e.target.value }))}
             />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setOverrideForm((f) => ({ ...f, mode: 'regular' }))}
+                className={`btn-secondary flex-1 !py-2 text-sm ${
+                  overrideForm.mode === 'regular' ? '!bg-status-ok/10 !text-status-ok !ring-status-ok/30' : ''
+                }`}
+              >
+                Reguläres Training
+              </button>
+              <button
+                type="button"
+                onClick={() => setOverrideForm((f) => ({ ...f, mode: 'special' }))}
+                className={`btn-secondary flex-1 !py-2 text-sm ${
+                  overrideForm.mode === 'special' ? '!bg-tbw-gold/10 !text-tbw-navyDark !ring-tbw-gold/30' : ''
+                }`}
+              >
+                Sonderzeiten
+              </button>
+            </div>
+            <p className="text-xs text-tbw-ink/40">
+              {overrideForm.mode === 'regular'
+                ? 'Reguläres Training findet wie gewohnt statt — nur zur eigenen Notiz.'
+                : 'Die regulären Trainings entfallen im ganzen Zeitraum; einzelne Sondertermine trägst du nach dem Anlegen darunter ein.'}
+            </p>
             <button className="btn-primary w-full" disabled={overrideBusy}>
               Anlegen
             </button>
           </form>
 
           <ul className="space-y-2">
-            {overrides.map((o) => (
-              <li key={o.id} className="card flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-tbw-navyDark">
-                    {fmtDateShort(o.start_date)}–{fmtDateShort(o.end_date)} · {o.weekday ?? 'alle Tage'}
-                  </p>
-                  <p className="text-sm text-tbw-ink/60">
-                    {o.status === 'cancelled'
-                      ? 'Fällt aus'
-                      : `Sonderzeit ${fmtTime(o.start_time!)}–${fmtTime(o.end_time!)}${o.location ? ` · ${o.location}` : ''}`}
-                    {o.note ? ` · ${o.note}` : ''}
-                  </p>
-                </div>
-                <button
-                  className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red"
-                  onClick={() => removeOverride(o.id)}
-                >
-                  Löschen
-                </button>
-              </li>
-            ))}
-            {overrides.length === 0 && (
-              <p className="text-sm text-tbw-ink/50">Keine Ferienzeiten/Sonderregelungen eingetragen.</p>
-            )}
+            {overrides.map((o) => {
+              const ownSessions = sessions
+                .filter((s) => s.override_id === o.id)
+                .sort((a, b) => (a.specific_date ?? '').localeCompare(b.specific_date ?? ''));
+              const sform = sessionForm(o.id);
+
+              return (
+                <li key={o.id} className="card space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-tbw-navyDark">
+                        {fmtDateShort(o.start_date)}–{fmtDateShort(o.end_date)}
+                      </p>
+                      <p className="text-sm text-tbw-ink/60">
+                        {o.mode === 'regular' ? 'Reguläres Training' : 'Sonderzeiten'}
+                        {o.note ? ` · ${o.note}` : ''}
+                      </p>
+                    </div>
+                    <button
+                      className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red"
+                      onClick={() => removeOverride(o.id)}
+                    >
+                      Löschen
+                    </button>
+                  </div>
+
+                  {o.mode === 'special' && (
+                    <div className="space-y-2 border-t border-black/5 pt-3">
+                      {ownSessions.length > 0 ? (
+                        <ul className="space-y-1.5">
+                          {ownSessions.map((s) => (
+                            <li key={s.id} className="flex items-center justify-between rounded-xl bg-tbw-bg p-2 text-sm">
+                              <span className="text-tbw-navyDark">
+                                {fmtDate(s.specific_date!)} · {fmtTime(s.start_time)}–{fmtTime(s.end_time)} · {s.location}
+                              </span>
+                              <button className="text-xs font-bold text-tbw-red" onClick={() => removeSession(s.id)}>
+                                ✕
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-tbw-ink/40">Noch keine Sondertermine eingetragen.</p>
+                      )}
+
+                      <form onSubmit={(e) => addSession(o.id, e)} className="space-y-2 rounded-xl bg-tbw-bg p-3">
+                        <p className="text-xs font-bold text-tbw-ink/50">Sondertermin hinzufügen</p>
+                        <DateField
+                          label="Datum"
+                          required
+                          min={o.start_date}
+                          max={o.end_date}
+                          value={sform.date}
+                          onChange={(v) => setSessionField(o.id, { date: v })}
+                        />
+                        <div className="space-y-2">
+                          <TimeField
+                            label="Beginn"
+                            required
+                            value={sform.start_time}
+                            onChange={(v) => setSessionField(o.id, { start_time: v })}
+                          />
+                          <TimeField
+                            label="Ende"
+                            required
+                            value={sform.end_time}
+                            onChange={(v) => setSessionField(o.id, { end_time: v })}
+                          />
+                        </div>
+                        <input
+                          required
+                          placeholder="Halle / Adresse"
+                          className="input"
+                          value={sform.location}
+                          onChange={(e) => setSessionField(o.id, { location: e.target.value })}
+                        />
+                        <button className="btn-secondary w-full !py-2 text-sm" disabled={sessionBusy === o.id}>
+                          Hinzufügen
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+            {overrides.length === 0 && <p className="text-sm text-tbw-ink/50">Keine Ferienzeiten eingetragen.</p>}
           </ul>
         </>
       )}

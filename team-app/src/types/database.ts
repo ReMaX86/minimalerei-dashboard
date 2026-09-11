@@ -211,10 +211,17 @@ export interface OfficiatingTask {
 
 export interface Training {
   id: string;
-  weekday: string;
+  // Wiederkehrendes wöchentliches Training (weekday gesetzt, specific_date
+  // null) ODER ein einzelner Sondertermin innerhalb einer Ferienzeit
+  // (specific_date gesetzt, weekday null, override_id verweist auf die
+  // Ferienzeit) — nie beides zugleich, siehe Constraint
+  // trainings_weekday_or_date.
+  weekday: string | null;
   start_time: string;
   end_time: string;
   location: string;
+  specific_date: string | null;
+  override_id: string | null;
 }
 
 export interface TrainingRsvpRow {
@@ -225,20 +232,17 @@ export interface TrainingRsvpRow {
   created_at: string;
 }
 
-// Ferienzeiten/Sonderregelungen: ein berechneter Trainingstermin, dessen
-// Datum in [start_date, end_date] fällt (und dessen Wochentag zu `weekday`
-// passt, falls gesetzt — null gilt für alle Trainings), entfällt (status
-// 'cancelled') oder bekommt andere Zeiten/Ort (status 'special'). Siehe
-// applyTrainingOverride() in lib/trainingSchedule.ts.
+// Ferienzeiten/Sonderregelungen: ein Zeitraum mit Modus 'regular' (reine
+// Dokumentation, ändert nichts) oder 'special' — dann entfallen alle
+// regulären wöchentlichen Trainings in [start_date, end_date], und
+// stattdessen gelten die einzeln unter `trainings.override_id` verknüpften
+// Sondertermine (siehe Training.specific_date unten). Siehe
+// nextTrainingOccurrences() in lib/trainingSchedule.ts.
 export interface TrainingOverride {
   id: string;
   start_date: string;
   end_date: string;
-  weekday: string | null;
-  status: 'cancelled' | 'special';
-  start_time: string | null;
-  end_time: string | null;
-  location: string | null;
+  mode: 'regular' | 'special';
   note: string | null;
   created_at: string;
 }
