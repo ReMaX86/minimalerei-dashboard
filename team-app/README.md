@@ -802,6 +802,26 @@ hier die getroffenen Entscheidungen samt Begründung:
   entfernt; ein admin-geflaggter Spieler sieht jetzt wie vorgesehen beides:
   die Trainer-Werkzeuge und seine eigene Spieler-Ansicht mit
   Bestätigungs-Buttons.
+- **Automatische Erinnerungen auf der Spieler-Startseite (Migration
+  `0031_reminder_settings.sql`).** Neue Karte "Für dich zu erledigen" ganz
+  oben (optisch wie die Kader-Absage-Meldung beim Trainer), die drei
+  unabhängige Erinnerungen bündelt: Kader-Zusage noch offen, nächstes
+  Training noch nicht beantwortet, Kampfgericht-Mindesteinsätze der Saison
+  noch nicht erreicht (nur wenn es auch offene Kampfgericht-Termine gibt).
+  Reine Anzeige-Logik in `lib/reminders.ts` (`computeReminders`, mit
+  Tests) — jede der drei Quellen wird unabhängig geprüft und ist optional,
+  damit z. B. eine deaktivierte Kampfgericht-Funktion die anderen beiden
+  nicht blockiert. Die Fristen ("ab wie vielen Tagen vorher") sind pro
+  Team unter Admin → Funktionen → "Erinnerungen" einstellbar
+  (`reminder_settings`-Singleton-Tabelle statt weiterer `feature_flags`,
+  da hier Zahlenwerte statt an/aus gebraucht werden). U18-Spieler, die
+  schon über ihre eigene Mannschaft fürs Kampfgericht eingeteilt werden,
+  lassen sich pro Spieler unter Admin → Spieler von der
+  Kampfgericht-Erinnerung ausnehmen (`players.officiating_exempt`) — sie
+  können bei Bedarf trotzdem weiterhin Positionen übernehmen, nur die
+  Erinnerung entfällt. Der Training-Eintrag verlinkt per Anker (`#training`)
+  auf die schon vorhandene "Nächste Trainingseinheit"-Karte weiter unten auf
+  derselben Seite, statt eine eigene Seite zu öffnen.
 
 ## Projektstruktur
 

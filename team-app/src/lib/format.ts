@@ -26,6 +26,14 @@ export function isFuture(iso: string): boolean {
   return new Date(iso + 'T00:00:00') >= today;
 }
 
+// Ganze Kalendertage zwischen heute und `iso` (negativ, wenn `iso` in der
+// Vergangenheit liegt). `today` optional für testbare Aufrufe.
+export function daysUntil(iso: string, today: Date = new Date()): number {
+  const from = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const target = new Date(iso + 'T00:00:00');
+  return Math.round((target.getTime() - from.getTime()) / 86_400_000);
+}
+
 export function ageFromBirthDate(iso: string): number {
   const birth = new Date(iso + 'T00:00:00');
   const today = new Date();

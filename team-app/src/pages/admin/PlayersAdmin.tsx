@@ -85,7 +85,11 @@ export function PlayersAdmin() {
     }
   }
 
-  async function toggleFlag(p: Player, field: 'is_admin' | 'is_captain' | 'is_co_captain', errorMsg: string) {
+  async function toggleFlag(
+    p: Player,
+    field: 'is_admin' | 'is_captain' | 'is_co_captain' | 'officiating_exempt',
+    errorMsg: string
+  ) {
     setError(null);
     try {
       const { error: updError } = await supabase
@@ -190,6 +194,7 @@ export function PlayersAdmin() {
                 {p.is_admin && <span className="pill pill-warn">Trainer</span>}
                 {p.is_captain && <span className="pill pill-ok">Captain</span>}
                 {p.is_co_captain && <span className="pill pill-ok">Co-Captain</span>}
+                {p.officiating_exempt && <span className="pill pill-open">Kampfgericht befreit</span>}
               </p>
               <p className="text-xs text-tbw-ink/50">Code: {p.access_code}</p>
             </div>
@@ -217,6 +222,15 @@ export function PlayersAdmin() {
                 onClick={() => toggleFlag(p, 'is_co_captain', 'Co-Captain-Status konnte nicht geändert werden.')}
               >
                 {p.is_co_captain ? 'Co-Captain entfernen' : 'Zum Co-Captain machen'}
+              </button>
+              <button
+                className="btn-secondary !px-2 !py-1 text-xs"
+                title="Nimmt den Spieler von der Kampfgericht-Erinnerung aus, z. B. weil er schon über seine U18-Mannschaft eingeteilt wird."
+                onClick={() =>
+                  toggleFlag(p, 'officiating_exempt', 'Kampfgericht-Befreiung konnte nicht geändert werden.')
+                }
+              >
+                {p.officiating_exempt ? 'Kampfgericht-Befreiung aufheben' : 'Von Kampfgericht befreien (U18)'}
               </button>
               <button
                 className="btn-secondary !px-2 !py-1 text-xs"
