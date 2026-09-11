@@ -91,11 +91,28 @@ describe('computeReminders', () => {
     });
   });
 
-  it('combines all three independently', () => {
+  describe('trikot', () => {
+    it('reminds when the caller says the handover is pending', () => {
+      const result = computeReminders(TODAY, SETTINGS, null, null, null, { pending: true, opponent: 'BC Test' });
+      expect(result.map((r) => r.key)).toEqual(['trikot']);
+      expect(result[0].text).toContain('BC Test');
+    });
+
+    it('stays silent when not pending', () => {
+      expect(computeReminders(TODAY, SETTINGS, null, null, null, { pending: false, opponent: 'BC Test' })).toEqual([]);
+    });
+
+    it('is not included at all when omitted', () => {
+      expect(computeReminders(TODAY, SETTINGS, null, null, null)).toEqual([]);
+    });
+  });
+
+  it('combines all four independently', () => {
     const squad = { published: true, inSquad: true, confirmation: 'pending' as const, gameDate: '2026-09-11', opponent: 'BC Test' };
     const training = { date: '2026-09-11', hasResponded: false, onAbsence: false };
     const officiating = { exempt: false, count: 0, hasOpenFutureSlot: true };
-    const result = computeReminders(TODAY, SETTINGS, squad, training, officiating);
-    expect(result.map((r) => r.key)).toEqual(['squad', 'training', 'officiating']);
+    const trikot = { pending: true, opponent: 'BC Test' };
+    const result = computeReminders(TODAY, SETTINGS, squad, training, officiating, trikot);
+    expect(result.map((r) => r.key)).toEqual(['squad', 'training', 'officiating', 'trikot']);
   });
 });

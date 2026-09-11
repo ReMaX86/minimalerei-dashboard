@@ -9,6 +9,7 @@ import { AbsenceSection } from '../components/AbsenceSection';
 import { fmtDate, fmtDateShort, fmtTime } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
 import { computeReminders, type ReminderItem } from '../lib/reminders';
+import { pendingWasherFor } from '../lib/trikots';
 import {
   OFFICIATING_TASK_LABELS,
   STAT_POINT_VALUES,
@@ -20,6 +21,7 @@ import {
   type CarpoolClaim,
   type CarpoolOffer,
   type Game,
+  type GameSquadRow,
   type OfficiatingGame,
   type OfficiatingTask,
   type Player,
@@ -28,7 +30,8 @@ import {
   type SquadConfirmation,
   type StatType,
   type Training,
-  type TrikotSet
+  type TrikotSet,
+  type TrikotWashLogRow
 } from '../types/database';
 
 const RESULT_LABELS = { sieg: 'Sieg', niederlage: 'Niederlage', unentschieden: 'Unentschieden' } as const;
@@ -217,6 +220,43 @@ export function Dashboard() {
             trainingReminder = { date: nextOcc.date, hasResponded: !!rsvpRow, onAbsence };
           }
 
+          // Trikot-Übergabe: erst ab dem Spieltag relevant (vorher zeigt die
+          // Trikots-Seite den Vorschlag nur informativ ohne Bestätigen-
+          // Button an) — danach so lange, bis sie bestätigt wurde, auch
+          // rückwirkend fürs zuletzt gespielte Spiel.
+          let trikotReminder: Parameters<typeof computeReminders>[5] = null;
+          {
+            const { data: washRows } = await supabase.from('trikot_wash_log').select('*');
+            const washLog = (washRows as TrikotWashLogRow[] | null) ?? [];
+            const allPlayers = Object.values(playersById);
+
+            if (nextGame && nextGame.game_date === today) {
+              const { data: squadRows } = await supabase.from('game_squad').select('*').eq('game_id', nextGame.id);
+              const pending = pendingWasherFor(nextGame, (squadRows as GameSquadRow[]) ?? [], allPlayers, washLog);
+              if (pending?.player.id === player.id) {
+                trikotReminder = { pending: true, opponent: nextGame.opponent };
+              }
+            }
+
+            if (!trikotReminder) {
+              const { data: pastGameRow } = await supabase
+                .from('games')
+                .select('*')
+                .lt('game_date', today)
+                .order('game_date', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              const pastGame = pastGameRow as Game | null;
+              if (pastGame) {
+                const { data: pastSquadRows } = await supabase.from('game_squad').select('*').eq('game_id', pastGame.id);
+                const pending = pendingWasherFor(pastGame, (pastSquadRows as GameSquadRow[]) ?? [], allPlayers, washLog);
+                if (pending?.player.id === player.id) {
+                  trikotReminder = { pending: true, opponent: pastGame.opponent };
+                }
+              }
+            }
+          }
+
           reminders = computeReminders(
             new Date(),
             settings,
@@ -230,7 +270,8 @@ export function Dashboard() {
                 }
               : null,
             trainingReminder,
-            { exempt: player.officiating_exempt, count: myOfficiatingCount, hasOpenFutureSlot: hasOpenFutureOfficiatingSlot }
+            { exempt: player.officiating_exempt, count: myOfficiatingCount, hasOpenFutureSlot: hasOpenFutureOfficiatingSlot },
+            trikotReminder
           );
         }
       }
