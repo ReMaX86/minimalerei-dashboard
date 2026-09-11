@@ -1172,6 +1172,14 @@ hier die getroffenen Entscheidungen samt Begründung:
   holt das per explizitem `grant` nach. `api/send-push.ts` gibt bei einem Ladefehler seitdem
   auch Fehlerdetails (Message + Code) zurück statt nur einer generischen Meldung, was diese
   Fehlersuche über `select * from net._http_response` im SQL-Editor erst ermöglicht hat.
+- **Opt-in-Karte wandert nach unten, sobald aktiviert** (`hooks/usePushStatus.ts`,
+  `PushNotificationCard.tsx`, `Dashboard.tsx`): Der Status (`getPushStatus()`) wurde aus der
+  Karte selbst in einen eigenen Hook gezogen, den die Startseite jetzt vorab kennt — solange
+  noch nicht aktiviert (`unsubscribed`/`denied`), steht die Karte weiterhin oben als
+  Aufforderung; sobald aktiviert (`subscribed`), rutscht dieselbe Karte an den Boden der Seite,
+  jetzt nur noch als Verwalten-/Deaktivieren-Option statt weiter prominent oben zu stehen.
+  Die Karte selbst bekommt den Status per Prop statt ihn selbst zu laden, damit nicht beide
+  Stellen unabhängig voneinander pollen.
 
 ## Projektstruktur
 

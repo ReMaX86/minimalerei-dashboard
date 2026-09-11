@@ -1,27 +1,24 @@
-import { useEffect, useState } from 'react';
-import { getPushStatus, subscribeToPush, unsubscribeFromPush, type PushStatus } from '../lib/push';
+import { useState } from 'react';
+import { subscribeToPush, unsubscribeFromPush, type PushStatus } from '../lib/push';
 
-export function PushNotificationCard() {
-  const [status, setStatus] = useState<PushStatus | 'loading'>('loading');
+interface PushNotificationCardProps {
+  status: PushStatus | 'loading';
+  onChange: () => void;
+}
+
+export function PushNotificationCard({ status, onChange }: PushNotificationCardProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    getPushStatus()
-      .then(setStatus)
-      .catch(() => setStatus('unsupported'));
-  }, []);
 
   async function enable() {
     setBusy(true);
     setError(null);
     try {
       await subscribeToPush();
-      setStatus('subscribed');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Aktivieren fehlgeschlagen.');
-      setStatus(await getPushStatus());
     } finally {
+      onChange();
       setBusy(false);
     }
   }
@@ -31,10 +28,10 @@ export function PushNotificationCard() {
     setError(null);
     try {
       await unsubscribeFromPush();
-      setStatus('unsubscribed');
     } catch {
       setError('Deaktivieren fehlgeschlagen.');
     } finally {
+      onChange();
       setBusy(false);
     }
   }
