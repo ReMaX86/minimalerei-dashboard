@@ -13,11 +13,63 @@ const EMPTY_OVERRIDE_FORM = { start_date: '', end_date: '', mode: 'regular' as '
 
 const EMPTY_SESSION_FORM = { date: '', start_time: '', end_time: '', location: '' };
 
+function ModeToggle({
+  value,
+  onChange
+}: {
+  value: 'regular' | 'cancelled' | 'special';
+  onChange: (mode: 'regular' | 'cancelled' | 'special') => void;
+}) {
+  return (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={() => onChange('regular')}
+        className={`btn-secondary flex-1 !py-2 text-sm ${
+          value === 'regular' ? '!bg-status-ok/10 !text-status-ok !ring-status-ok/30' : ''
+        }`}
+      >
+        Regulär
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('cancelled')}
+        className={`btn-secondary flex-1 !py-2 text-sm ${
+          value === 'cancelled' ? '!bg-tbw-red/10 !text-tbw-red !ring-tbw-red/30' : ''
+        }`}
+      >
+        Fällt aus
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('special')}
+        className={`btn-secondary flex-1 !py-2 text-sm ${
+          value === 'special' ? '!bg-tbw-gold/10 !text-tbw-navyDark !ring-tbw-gold/30' : ''
+        }`}
+      >
+        Sonderzeiten
+      </button>
+    </div>
+  );
+}
+
+function ModeHint({ mode }: { mode: 'regular' | 'cancelled' | 'special' }) {
+  return (
+    <p className="text-xs text-tbw-ink/40">
+      {mode === 'regular' && 'Reguläres Training findet wie gewohnt statt — nur zur eigenen Notiz.'}
+      {mode === 'cancelled' && 'Alle regulären Trainings entfallen im ganzen Zeitraum, ohne Ersatztermine.'}
+      {mode === 'special' &&
+        'Die regulären Trainings entfallen im ganzen Zeitraum; einzelne Sondertermine trägst du nach dem Anlegen darunter ein.'}
+    </p>
+  );
+}
+
 export function TrainingsAdmin() {
   const [trainings, setTrainings] = useState<Training[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
+  const [showTrainingForm, setShowTrainingForm] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -52,6 +104,7 @@ export function TrainingsAdmin() {
       });
       if (insertError) throw insertError;
       setForm(EMPTY_FORM);
+      setShowTrainingForm(false);
       await load();
     } catch {
       setError('Trainingszeit konnte nicht angelegt werden.');
@@ -76,8 +129,13 @@ export function TrainingsAdmin() {
   const [overrideForm, setOverrideForm] = useState(EMPTY_OVERRIDE_FORM);
   const [overrideBusy, setOverrideBusy] = useState(false);
   const [overrideError, setOverrideError] = useState<string | null>(null);
+  const [showOverrideForm, setShowOverrideForm] = useState(false);
   const [sessionForms, setSessionForms] = useState<Record<string, typeof EMPTY_SESSION_FORM>>({});
   const [sessionBusy, setSessionBusy] = useState<string | null>(null);
+  const [openSessionForms, setOpenSessionForms] = useState<Set<string>>(new Set());
+  const [editingOverrideId, setEditingOverrideId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState(EMPTY_OVERRIDE_FORM);
+  const [editBusy, setEditBusy] = useState(false);
 
   const loadOverrides = useCallback(async () => {
     setOverrideError(null);
@@ -110,6 +168,7 @@ export function TrainingsAdmin() {
       });
       if (insertError) throw insertError;
       setOverrideForm(EMPTY_OVERRIDE_FORM);
+      setShowOverrideForm(false);
       await loadOverrides();
     } catch {
       setOverrideError('Ferienzeit konnte nicht angelegt werden.');
@@ -129,12 +188,49 @@ export function TrainingsAdmin() {
     }
   }
 
+  function startEditOverride(o: TrainingOverride) {
+    setEditingOverrideId(o.id);
+    setEditForm({ start_date: o.start_date, end_date: o.end_date, mode: o.mode, note: o.note ?? '' });
+  }
+
+  async function saveOverrideEdit(id: string, e: FormEvent) {
+    e.preventDefault();
+    setEditBusy(true);
+    setOverrideError(null);
+    try {
+      const { error: updateError } = await supabase
+        .from('training_overrides')
+        .update({
+          start_date: editForm.start_date,
+          end_date: editForm.end_date,
+          mode: editForm.mode,
+          note: editForm.note.trim() || null
+        })
+        .eq('id', id);
+      if (updateError) throw updateError;
+      setEditingOverrideId(null);
+      await loadOverrides();
+    } catch {
+      setOverrideError('Ferienzeit konnte nicht gespeichert werden.');
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
   function sessionForm(overrideId: string) {
     return sessionForms[overrideId] ?? EMPTY_SESSION_FORM;
   }
 
   function setSessionField(overrideId: string, patch: Partial<typeof EMPTY_SESSION_FORM>) {
     setSessionForms((prev) => ({ ...prev, [overrideId]: { ...sessionForm(overrideId), ...patch } }));
+  }
+
+  function toggleSessionForm(overrideId: string) {
+    setOpenSessionForms((prev) => {
+      const next = new Set(prev);
+      next.has(overrideId) ? next.delete(overrideId) : next.add(overrideId);
+      return next;
+    });
   }
 
   async function addSession(overrideId: string, e: FormEvent) {
@@ -152,6 +248,9 @@ export function TrainingsAdmin() {
         override_id: overrideId
       });
       if (insertError) throw insertError;
+      // Bleibt offen, damit mehrere Sondertermine hintereinander ohne
+      // erneutes Aufklappen eingetragen werden können — nur die Felder
+      // werden zurückgesetzt.
       setSessionForms((prev) => ({ ...prev, [overrideId]: EMPTY_SESSION_FORM }));
       await loadOverrides();
     } catch {
@@ -177,45 +276,67 @@ export function TrainingsAdmin() {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Wöchentliche Trainingszeiten</p>
-      <form onSubmit={addTraining} className="card space-y-2">
-        <p className="text-sm font-bold text-tbw-navyDark">Neue Trainingszeit</p>
-        <select
-          className="input"
-          value={form.weekday}
-          onChange={(e) => setForm((f) => ({ ...f, weekday: e.target.value }))}
-        >
-          {WEEKDAY_ORDER.map((day) => (
-            <option key={day} value={day}>
-              {day}
-            </option>
-          ))}
-        </select>
-        <div className="space-y-2">
-          <TimeField
-            label="Beginn"
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Wöchentliche Trainingszeiten</p>
+        {!showTrainingForm && (
+          <button className="text-xs font-bold text-tbw-navy" onClick={() => setShowTrainingForm(true)}>
+            + Neu
+          </button>
+        )}
+      </div>
+
+      {showTrainingForm && (
+        <form onSubmit={addTraining} className="card space-y-2">
+          <p className="text-sm font-bold text-tbw-navyDark">Neue Trainingszeit</p>
+          <select
+            className="input"
+            value={form.weekday}
+            onChange={(e) => setForm((f) => ({ ...f, weekday: e.target.value }))}
+          >
+            {WEEKDAY_ORDER.map((day) => (
+              <option key={day} value={day}>
+                {day}
+              </option>
+            ))}
+          </select>
+          <div className="space-y-2">
+            <TimeField
+              label="Beginn"
+              required
+              value={form.start_time}
+              onChange={(v) => setForm((f) => ({ ...f, start_time: v }))}
+            />
+            <TimeField
+              label="Ende"
+              required
+              value={form.end_time}
+              onChange={(v) => setForm((f) => ({ ...f, end_time: v }))}
+            />
+          </div>
+          <input
             required
-            value={form.start_time}
-            onChange={(v) => setForm((f) => ({ ...f, start_time: v }))}
+            placeholder="Halle / Adresse"
+            className="input"
+            value={form.location}
+            onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
           />
-          <TimeField
-            label="Ende"
-            required
-            value={form.end_time}
-            onChange={(v) => setForm((f) => ({ ...f, end_time: v }))}
-          />
-        </div>
-        <input
-          required
-          placeholder="Halle / Adresse"
-          className="input"
-          value={form.location}
-          onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-        />
-        <button className="btn-primary w-full" disabled={busy}>
-          Anlegen
-        </button>
-      </form>
+          <div className="flex gap-2">
+            <button className="btn-primary flex-1" disabled={busy}>
+              Anlegen
+            </button>
+            <button
+              type="button"
+              className="btn-secondary flex-1"
+              onClick={() => {
+                setShowTrainingForm(false);
+                setForm(EMPTY_FORM);
+              }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </form>
+      )}
 
       <ul className="space-y-2">
         {trainings.map((t) => (
@@ -234,78 +355,62 @@ export function TrainingsAdmin() {
         {trainings.length === 0 && <p className="text-sm text-tbw-ink/50">Noch keine Trainingszeiten eingetragen.</p>}
       </ul>
 
-      <p className="pt-2 text-xs font-bold uppercase tracking-wide text-tbw-ink/40">
-        Ferienzeiten &amp; Sonderregelungen
-      </p>
+      <div className="flex items-center justify-between pt-2">
+        <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Ferienzeiten &amp; Sonderregelungen</p>
+        {overrides !== null && !showOverrideForm && (
+          <button className="text-xs font-bold text-tbw-navy" onClick={() => setShowOverrideForm(true)}>
+            + Neu
+          </button>
+        )}
+      </div>
       {overrideError && <ErrorNote message={overrideError} />}
       {overrides === null || sessions === null ? (
         <LoadingSpinner />
       ) : (
         <>
-          <form onSubmit={addOverride} className="card space-y-2">
-            <p className="text-sm font-bold text-tbw-navyDark">Neue Ferienzeit</p>
-            <div className="grid grid-cols-2 gap-2">
-              <DateField
-                label="Von"
-                required
-                value={overrideForm.start_date}
-                onChange={(v) => setOverrideForm((f) => ({ ...f, start_date: v }))}
+          {showOverrideForm && (
+            <form onSubmit={addOverride} className="card space-y-2">
+              <p className="text-sm font-bold text-tbw-navyDark">Neue Ferienzeit</p>
+              <div className="grid grid-cols-2 gap-2">
+                <DateField
+                  label="Von"
+                  required
+                  value={overrideForm.start_date}
+                  onChange={(v) => setOverrideForm((f) => ({ ...f, start_date: v }))}
+                />
+                <DateField
+                  label="Bis"
+                  required
+                  min={overrideForm.start_date || undefined}
+                  value={overrideForm.end_date}
+                  onChange={(v) => setOverrideForm((f) => ({ ...f, end_date: v }))}
+                />
+              </div>
+              <input
+                placeholder="Notiz (z. B. Herbstferien)"
+                className="input"
+                value={overrideForm.note}
+                onChange={(e) => setOverrideForm((f) => ({ ...f, note: e.target.value }))}
               />
-              <DateField
-                label="Bis"
-                required
-                min={overrideForm.start_date || undefined}
-                value={overrideForm.end_date}
-                onChange={(v) => setOverrideForm((f) => ({ ...f, end_date: v }))}
-              />
-            </div>
-            <input
-              placeholder="Notiz (z. B. Herbstferien)"
-              className="input"
-              value={overrideForm.note}
-              onChange={(e) => setOverrideForm((f) => ({ ...f, note: e.target.value }))}
-            />
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setOverrideForm((f) => ({ ...f, mode: 'regular' }))}
-                className={`btn-secondary flex-1 !py-2 text-sm ${
-                  overrideForm.mode === 'regular' ? '!bg-status-ok/10 !text-status-ok !ring-status-ok/30' : ''
-                }`}
-              >
-                Regulär
-              </button>
-              <button
-                type="button"
-                onClick={() => setOverrideForm((f) => ({ ...f, mode: 'cancelled' }))}
-                className={`btn-secondary flex-1 !py-2 text-sm ${
-                  overrideForm.mode === 'cancelled' ? '!bg-tbw-red/10 !text-tbw-red !ring-tbw-red/30' : ''
-                }`}
-              >
-                Fällt aus
-              </button>
-              <button
-                type="button"
-                onClick={() => setOverrideForm((f) => ({ ...f, mode: 'special' }))}
-                className={`btn-secondary flex-1 !py-2 text-sm ${
-                  overrideForm.mode === 'special' ? '!bg-tbw-gold/10 !text-tbw-navyDark !ring-tbw-gold/30' : ''
-                }`}
-              >
-                Sonderzeiten
-              </button>
-            </div>
-            <p className="text-xs text-tbw-ink/40">
-              {overrideForm.mode === 'regular' &&
-                'Reguläres Training findet wie gewohnt statt — nur zur eigenen Notiz.'}
-              {overrideForm.mode === 'cancelled' &&
-                'Alle regulären Trainings entfallen im ganzen Zeitraum, ohne Ersatztermine.'}
-              {overrideForm.mode === 'special' &&
-                'Die regulären Trainings entfallen im ganzen Zeitraum; einzelne Sondertermine trägst du nach dem Anlegen darunter ein.'}
-            </p>
-            <button className="btn-primary w-full" disabled={overrideBusy}>
-              Anlegen
-            </button>
-          </form>
+              <ModeToggle value={overrideForm.mode} onChange={(mode) => setOverrideForm((f) => ({ ...f, mode }))} />
+              <ModeHint mode={overrideForm.mode} />
+              <div className="flex gap-2">
+                <button className="btn-primary flex-1" disabled={overrideBusy}>
+                  Anlegen
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary flex-1"
+                  onClick={() => {
+                    setShowOverrideForm(false);
+                    setOverrideForm(EMPTY_OVERRIDE_FORM);
+                  }}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </form>
+          )}
 
           <ul className="space-y-2">
             {overrides.map((o) => {
@@ -313,6 +418,53 @@ export function TrainingsAdmin() {
                 .filter((s) => s.override_id === o.id)
                 .sort((a, b) => (a.specific_date ?? '').localeCompare(b.specific_date ?? ''));
               const sform = sessionForm(o.id);
+              const isEditing = editingOverrideId === o.id;
+              const sessionFormOpen = openSessionForms.has(o.id);
+
+              if (isEditing) {
+                return (
+                  <li key={o.id} className="card">
+                    <form onSubmit={(e) => saveOverrideEdit(o.id, e)} className="space-y-2">
+                      <p className="text-sm font-bold text-tbw-navyDark">Ferienzeit bearbeiten</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <DateField
+                          label="Von"
+                          required
+                          value={editForm.start_date}
+                          onChange={(v) => setEditForm((f) => ({ ...f, start_date: v }))}
+                        />
+                        <DateField
+                          label="Bis"
+                          required
+                          min={editForm.start_date || undefined}
+                          value={editForm.end_date}
+                          onChange={(v) => setEditForm((f) => ({ ...f, end_date: v }))}
+                        />
+                      </div>
+                      <input
+                        placeholder="Notiz (z. B. Herbstferien)"
+                        className="input"
+                        value={editForm.note}
+                        onChange={(e) => setEditForm((f) => ({ ...f, note: e.target.value }))}
+                      />
+                      <ModeToggle value={editForm.mode} onChange={(mode) => setEditForm((f) => ({ ...f, mode }))} />
+                      <ModeHint mode={editForm.mode} />
+                      <div className="flex gap-2">
+                        <button className="btn-primary flex-1" disabled={editBusy}>
+                          Speichern
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary flex-1"
+                          onClick={() => setEditingOverrideId(null)}
+                        >
+                          Abbrechen
+                        </button>
+                      </div>
+                    </form>
+                  </li>
+                );
+              }
 
               return (
                 <li key={o.id} className="card space-y-3">
@@ -326,12 +478,17 @@ export function TrainingsAdmin() {
                         {o.note ? ` · ${o.note}` : ''}
                       </p>
                     </div>
-                    <button
-                      className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red"
-                      onClick={() => removeOverride(o.id)}
-                    >
-                      Löschen
-                    </button>
+                    <div className="flex shrink-0 gap-2">
+                      <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => startEditOverride(o)}>
+                        Bearbeiten
+                      </button>
+                      <button
+                        className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red"
+                        onClick={() => removeOverride(o.id)}
+                      >
+                        Löschen
+                      </button>
+                    </div>
                   </div>
 
                   {o.mode === 'special' && (
@@ -353,41 +510,59 @@ export function TrainingsAdmin() {
                         <p className="text-xs text-tbw-ink/40">Noch keine Sondertermine eingetragen.</p>
                       )}
 
-                      <form onSubmit={(e) => addSession(o.id, e)} className="space-y-2 rounded-xl bg-tbw-bg p-3">
-                        <p className="text-xs font-bold text-tbw-ink/50">Sondertermin hinzufügen</p>
-                        <DateField
-                          label="Datum"
-                          required
-                          min={o.start_date}
-                          max={o.end_date}
-                          value={sform.date}
-                          onChange={(v) => setSessionField(o.id, { date: v })}
-                        />
-                        <div className="space-y-2">
-                          <TimeField
-                            label="Beginn"
+                      {sessionFormOpen ? (
+                        <form onSubmit={(e) => addSession(o.id, e)} className="space-y-2 rounded-xl bg-tbw-bg p-3">
+                          <p className="text-xs font-bold text-tbw-ink/50">Sondertermin hinzufügen</p>
+                          <DateField
+                            label="Datum"
                             required
-                            value={sform.start_time}
-                            onChange={(v) => setSessionField(o.id, { start_time: v })}
+                            min={o.start_date}
+                            max={o.end_date}
+                            value={sform.date}
+                            onChange={(v) => setSessionField(o.id, { date: v })}
                           />
-                          <TimeField
-                            label="Ende"
+                          <div className="space-y-2">
+                            <TimeField
+                              label="Beginn"
+                              required
+                              value={sform.start_time}
+                              onChange={(v) => setSessionField(o.id, { start_time: v })}
+                            />
+                            <TimeField
+                              label="Ende"
+                              required
+                              value={sform.end_time}
+                              onChange={(v) => setSessionField(o.id, { end_time: v })}
+                            />
+                          </div>
+                          <input
                             required
-                            value={sform.end_time}
-                            onChange={(v) => setSessionField(o.id, { end_time: v })}
+                            placeholder="Halle / Adresse"
+                            className="input"
+                            value={sform.location}
+                            onChange={(e) => setSessionField(o.id, { location: e.target.value })}
                           />
-                        </div>
-                        <input
-                          required
-                          placeholder="Halle / Adresse"
-                          className="input"
-                          value={sform.location}
-                          onChange={(e) => setSessionField(o.id, { location: e.target.value })}
-                        />
-                        <button className="btn-secondary w-full !py-2 text-sm" disabled={sessionBusy === o.id}>
-                          Hinzufügen
+                          <div className="flex gap-2">
+                            <button className="btn-secondary flex-1 !py-2 text-sm" disabled={sessionBusy === o.id}>
+                              Hinzufügen
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-secondary flex-1 !py-2 text-sm"
+                              onClick={() => toggleSessionForm(o.id)}
+                            >
+                              Fertig
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <button
+                          className="text-xs font-bold text-tbw-navy"
+                          onClick={() => toggleSessionForm(o.id)}
+                        >
+                          + Sondertermin hinzufügen
                         </button>
-                      </form>
+                      )}
                     </div>
                   )}
                 </li>
