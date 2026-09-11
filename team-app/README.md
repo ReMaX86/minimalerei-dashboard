@@ -909,6 +909,27 @@ hier die getroffenen Entscheidungen samt Begründung:
   zusätzliche manuelle Wäscher-Zuweisung durch den Trainer wurde bewusst
   verzichtet, da das rote Banner samt Alternativ-Auswahl den Korrekturfall
   schon abdeckt.
+- **Ferienzeiten & Sonderregelungen fürs Training** (`training_overrides`,
+  `lib/trainingSchedule.ts`, `TrainingsAdmin.tsx`): in Schulferien ist die
+  Halle oft geschlossen, manchmal gibt es aber weiterhin die gewohnten
+  Zeiten oder sogar eigene Sonderzeiten vom Verband. Statt für jede
+  Ferienwoche einzelne Trainings an-/abzuschalten, trägt der Trainer unter
+  Admin → Training → "Ferienzeiten & Sonderregelungen" einen Zeitraum ein
+  (analog zu `player_absences`, siehe weiter oben) — optional eingegrenzt
+  auf einen einzelnen Wochentag (leer = gilt für alle wöchentlichen
+  Trainings im Zeitraum) — und wählt "Fällt aus" oder "Sonderzeit"
+  (eigene Beginn-/Endzeit + optional eigener Ort). Die Berechnung der
+  nächsten Termine (`nextTrainingOccurrences`) prüft für jeden
+  generierten Termin, ob eine Ausnahme greift: `cancelled` lässt den
+  Termin komplett entfallen (die Funktion läuft dann einfach weiter, bis
+  wieder genug echte Termine zusammenkommen, mit Sicherheitsgrenze gegen
+  eine Endlosschleife), `special` überschreibt Zeit/Ort und hängt eine
+  Notiz an (z. B. "Herbstferien-Sonderzeit"), die auf der Startseite als
+  🏖️-Hinweis unter der Trainingszeit erscheint. Bei mehreren passenden
+  Ausnahmen gewinnt `cancelled` vor `special`. Die reine Rotationslogik
+  ist in `applyTrainingOverride()` isoliert und separat getestet, sodass
+  Startseite und Erinnerungslogik (Dashboard.tsx) dieselbe Berechnung
+  nutzen und nie auseinanderlaufen können.
 
 ## Projektstruktur
 

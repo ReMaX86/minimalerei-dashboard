@@ -30,6 +30,7 @@ import {
   type SquadConfirmation,
   type StatType,
   type Training,
+  type TrainingOverride,
   type TrikotSet,
   type TrikotWashLogRow
 } from '../types/database';
@@ -191,8 +192,16 @@ export function Dashboard() {
           }
 
           let trainingReminder: Parameters<typeof computeReminders>[3] = null;
-          const { data: trainingRows } = await supabase.from('trainings').select('*');
-          const nextOcc = nextTrainingOccurrences((trainingRows as Training[]) ?? [], 1)[0];
+          const [{ data: trainingRows }, { data: overrideRows }] = await Promise.all([
+            supabase.from('trainings').select('*'),
+            supabase.from('training_overrides').select('*').gte('end_date', today)
+          ]);
+          const nextOcc = nextTrainingOccurrences(
+            (trainingRows as Training[]) ?? [],
+            1,
+            new Date(),
+            (overrideRows as TrainingOverride[]) ?? []
+          )[0];
           if (nextOcc) {
             // training_rsvps hat keine `id`-Spalte (zusammengesetzter Primary
             // Key aus training_id/session_date/player_id) — .select('id')

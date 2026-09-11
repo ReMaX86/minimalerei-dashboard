@@ -225,6 +225,24 @@ export interface TrainingRsvpRow {
   created_at: string;
 }
 
+// Ferienzeiten/Sonderregelungen: ein berechneter Trainingstermin, dessen
+// Datum in [start_date, end_date] fällt (und dessen Wochentag zu `weekday`
+// passt, falls gesetzt — null gilt für alle Trainings), entfällt (status
+// 'cancelled') oder bekommt andere Zeiten/Ort (status 'special'). Siehe
+// applyTrainingOverride() in lib/trainingSchedule.ts.
+export interface TrainingOverride {
+  id: string;
+  start_date: string;
+  end_date: string;
+  weekday: string | null;
+  status: 'cancelled' | 'special';
+  start_time: string | null;
+  end_time: string | null;
+  location: string | null;
+  note: string | null;
+  created_at: string;
+}
+
 export function benoetigterSatz(game: Pick<Game, 'is_home' | 'trikot_override'>): TrikotSetId {
   return game.trikot_override ?? (game.is_home ? 'weiss' : 'schwarz');
 }
