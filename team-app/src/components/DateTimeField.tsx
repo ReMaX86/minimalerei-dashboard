@@ -22,6 +22,7 @@ interface FieldProps {
   onChange: (value: string) => void;
   required?: boolean;
   min?: string;
+  max?: string;
 }
 
 function FieldShell({
@@ -48,7 +49,7 @@ function FieldShell({
   );
 }
 
-export function DateField({ label, value, onChange, required, min }: FieldProps) {
+export function DateField({ label, value, onChange, required, min, max }: FieldProps) {
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     onChange(e.target.value);
   }
@@ -59,6 +60,7 @@ export function DateField({ label, value, onChange, required, min }: FieldProps)
         type="date"
         required={required}
         min={min}
+        max={max}
         className="absolute inset-0 h-full w-full opacity-0"
         value={value}
         onChange={handleChange}

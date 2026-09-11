@@ -912,24 +912,35 @@ hier die getroffenen Entscheidungen samt Begründung:
 - **Ferienzeiten & Sonderregelungen fürs Training** (`training_overrides`,
   `lib/trainingSchedule.ts`, `TrainingsAdmin.tsx`): in Schulferien ist die
   Halle oft geschlossen, manchmal gibt es aber weiterhin die gewohnten
-  Zeiten oder sogar eigene Sonderzeiten vom Verband. Statt für jede
-  Ferienwoche einzelne Trainings an-/abzuschalten, trägt der Trainer unter
-  Admin → Training → "Ferienzeiten & Sonderregelungen" einen Zeitraum ein
-  (analog zu `player_absences`, siehe weiter oben) — optional eingegrenzt
-  auf einen einzelnen Wochentag (leer = gilt für alle wöchentlichen
-  Trainings im Zeitraum) — und wählt "Fällt aus" oder "Sonderzeit"
-  (eigene Beginn-/Endzeit + optional eigener Ort). Die Berechnung der
-  nächsten Termine (`nextTrainingOccurrences`) prüft für jeden
-  generierten Termin, ob eine Ausnahme greift: `cancelled` lässt den
-  Termin komplett entfallen (die Funktion läuft dann einfach weiter, bis
-  wieder genug echte Termine zusammenkommen, mit Sicherheitsgrenze gegen
-  eine Endlosschleife), `special` überschreibt Zeit/Ort und hängt eine
-  Notiz an (z. B. "Herbstferien-Sonderzeit"), die auf der Startseite als
-  🏖️-Hinweis unter der Trainingszeit erscheint. Bei mehreren passenden
-  Ausnahmen gewinnt `cancelled` vor `special`. Die reine Rotationslogik
-  ist in `applyTrainingOverride()` isoliert und separat getestet, sodass
-  Startseite und Erinnerungslogik (Dashboard.tsx) dieselbe Berechnung
-  nutzen und nie auseinanderlaufen können.
+  Zeiten oder sogar eigene Sonderzeiten vom Verband — auch an ganz anderen
+  Wochentagen als sonst üblich. Der Trainer trägt unter Admin → Training →
+  "Ferienzeiten & Sonderregelungen" einen Zeitraum ein (analog zu
+  `player_absences`, siehe weiter oben) und wählt einen Modus: "Reguläres
+  Training" (reine Dokumentation/Notiz, ändert nichts an der Berechnung)
+  oder "Sonderzeiten" — dann entfallen alle regulären wöchentlichen
+  Trainings im gesamten Zeitraum, und der Trainer trägt darunter beliebig
+  viele einzelne Sondertermine mit eigenem Datum, eigener Zeit und Ort
+  nach. Technisch ist ein Sondertermin eine ganz normale Zeile in
+  `trainings`, nur mit einem konkreten Datum (`specific_date`) statt
+  einem wiederkehrenden Wochentag (`weekday`) — dadurch funktioniert
+  Zu-/Absage (training_rsvps, FK auf `trainings.id`) ohne jede Änderung.
+  Auf der Startseite erscheinen Sondertermine wie normale Trainings mit
+  einem 🏖️-Hinweis (Notiz der Ferienzeit, z. B. "Herbstferien"). Die
+  Berechnung der nächsten Termine (`nextTrainingOccurrences`) interleaved
+  wiederkehrende und einzelne Termine chronologisch und überspringt
+  reguläre Termine, die in eine 'special'-Ferienzeit fallen (mit
+  Sicherheitsgrenze gegen eine Endlosschleife, falls dauerhaft alles
+  wegfällt).
+  **Nachtrag (Redesign nach Nutzer-Feedback):** die erste Version konnte
+  eine Sonderzeit nur auf einen bereits bestehenden wöchentlichen
+  Trainingstag anwenden (nur Zeit/Ort ändern) — ein komplett neuer
+  Wochentag (z. B. Dienstag statt Montag+Freitag in den Ferien) war damit
+  nicht abbildbar, weil es dafür keinen Termin gab, auf den sich die
+  Sonderzeit hätte beziehen können. Auf Vorschlag des Trainers umgebaut
+  auf das oben beschriebene zweistufige Modell (Zeitraum + Modus, mit frei
+  wählbaren Einzeltagen statt einer pauschalen Uhrzeit für den ganzen
+  Zeitraum) — die alte `training_overrides`-Tabelle aus der ersten Version
+  wurde dafür (noch ohne echte Nutzdaten) neu aufgesetzt statt migriert.
 
 ## Projektstruktur
 

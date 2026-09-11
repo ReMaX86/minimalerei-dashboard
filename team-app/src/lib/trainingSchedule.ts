@@ -13,42 +13,12 @@ const WEEKDAY_TO_JS_DAY: Record<string, number> = {
 export interface TrainingOccurrence {
   training: Training;
   date: string; // YYYY-MM-DD
-  // Gesetzt, wenn eine Ferien-/Sonderzeit-Ausnahme (training_overrides)
-  // auf diesen Termin angewendet wurde — z. B. "Sonderzeit (Ferien)".
+  // Gesetzt für Sondertermine (Training.specific_date) — z. B. "Herbstferien-
+  // Sondertermin", übernommen von der zugehörigen Ferienzeit-Notiz.
   note?: string;
 }
 
-type OverrideInput = Pick<
-  TrainingOverride,
-  'start_date' | 'end_date' | 'weekday' | 'status' | 'start_time' | 'end_time' | 'location' | 'note'
->;
-
-/**
- * Wendet Ferien-/Sonderzeit-Ausnahmen auf einen berechneten Termin an:
- * `cancelled` lässt den Termin entfallen (null), `special` überschreibt
- * Zeit/Ort mit den hinterlegten Werten. Bei mehreren passenden Ausnahmen
- * gewinnt `cancelled` vor `special`.
- */
-export function applyTrainingOverride(occ: TrainingOccurrence, overrides: OverrideInput[]): TrainingOccurrence | null {
-  const matching = overrides.filter(
-    (o) => occ.date >= o.start_date && occ.date <= o.end_date && (o.weekday === null || o.weekday === occ.training.weekday)
-  );
-  if (matching.some((o) => o.status === 'cancelled')) return null;
-
-  const special = matching.find((o) => o.status === 'special');
-  if (!special) return occ;
-
-  return {
-    training: {
-      ...occ.training,
-      start_time: special.start_time ?? occ.training.start_time,
-      end_time: special.end_time ?? occ.training.end_time,
-      location: special.location ?? occ.training.location
-    },
-    date: occ.date,
-    note: special.note ?? 'Sonderzeit (Ferien)'
-  };
-}
+type OverrideInput = Pick<TrainingOverride, 'id' | 'start_date' | 'end_date' | 'mode' | 'note'>;
 
 function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -59,7 +29,7 @@ function toDateKey(d: Date): string {
  * and hasn't started yet (relative to `from`).
  */
 function firstOccurrenceOnOrAfter(training: Training, from: Date): Date {
-  const targetDay = WEEKDAY_TO_JS_DAY[training.weekday];
+  const targetDay = WEEKDAY_TO_JS_DAY[training.weekday!];
   const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
   if (targetDay === undefined) return d;
 
@@ -74,12 +44,27 @@ function firstOccurrenceOnOrAfter(training: Training, from: Date): Date {
   return d;
 }
 
+// Ein Sondertermin (specific_date) hat höchstens eine einzige Vorkommnis —
+// "kommend", wenn sein Datum noch nicht erreicht ist, oder heute, solange
+// die Startzeit noch nicht begonnen hat (analog zu firstOccurrenceOnOrAfter
+// für wiederkehrende Trainings).
+function isOneOffUpcoming(training: Training, from: Date): boolean {
+  const today = toDateKey(from);
+  if (training.specific_date! > today) return true;
+  if (training.specific_date! < today) return false;
+  const [h, m] = training.start_time.split(':').map(Number);
+  const startsAt = new Date(from.getFullYear(), from.getMonth(), from.getDate(), h, m);
+  return startsAt > from;
+}
+
 /**
- * The next `count` concrete training sessions across all weekly training
- * slots, in chronological order. With a single weekly training this yields
- * its next `count` weeks; with several weekly trainings the slots are
- * interleaved by date (e.g. Tuesday, then Thursday, then the Tuesday
- * after).
+ * The next `count` concrete training sessions, in chronological order —
+ * both wiederkehrende wöchentliche Trainings (Training.weekday) und
+ * einzelne Sondertermine innerhalb einer Ferienzeit (Training.
+ * specific_date) werden interleaved. Eine Ferienzeit im Modus 'special'
+ * lässt alle wiederkehrenden Termine in ihrem Zeitraum entfallen — die
+ * Sondertermine selbst sind davon nie betroffen, sie sind ja schon die
+ * explizite Ausnahme.
  */
 export function nextTrainingOccurrences(
   trainings: Training[],
@@ -87,26 +72,55 @@ export function nextTrainingOccurrences(
   from: Date = new Date(),
   overrides: OverrideInput[] = []
 ): TrainingOccurrence[] {
-  if (trainings.length === 0 || count <= 0) return [];
+  if (count <= 0) return [];
 
-  const cursors = trainings.map((training) => ({
-    training,
-    next: firstOccurrenceOnOrAfter(training, from)
-  }));
+  const recurring = trainings.filter((t) => t.weekday !== null);
+  const oneOff = trainings.filter((t) => t.specific_date !== null && isOneOffUpcoming(t, from));
+
+  interface Cursor {
+    training: Training;
+    next: Date | null;
+    recurring: boolean;
+  }
+
+  const cursors: Cursor[] = [
+    ...recurring.map((training) => ({ training, next: firstOccurrenceOnOrAfter(training, from), recurring: true })),
+    ...oneOff.map((training) => ({
+      training,
+      next: new Date(training.specific_date! + 'T00:00:00'),
+      recurring: false
+    }))
+  ];
+
+  const specialRanges = overrides.filter((o) => o.mode === 'special');
 
   const result: TrainingOccurrence[] = [];
-  // Eine "fällt aus"-Ausnahme kann Termine überspringen (z. B. eine ganze
-  // Ferienwoche) — die Schleife muss dann über `count` Runden hinaus
-  // weiterlaufen, bis wieder `count` tatsächlich stattfindende Termine
-  // zusammenkommen. Sicherheitsgrenze gegen eine Endlosschleife, falls
-  // irgendwann mal dauerhaft alles ausfällt.
+  // Eine 'special'-Ferienzeit kann wiederkehrende Termine überspringen
+  // (z. B. eine ganze Ferienwoche) — die Schleife muss dann über `count`
+  // Runden hinaus weiterlaufen, bis wieder `count` tatsächlich
+  // stattfindende Termine zusammenkommen. Sicherheitsgrenze gegen eine
+  // Endlosschleife, falls irgendwann mal dauerhaft alles ausfällt.
   const maxRounds = Math.max(count * 10, 104);
   for (let round = 0; round < maxRounds && result.length < count; round++) {
-    cursors.sort((a, b) => a.next.getTime() - b.next.getTime());
-    const winner = cursors[0];
-    const applied = applyTrainingOverride({ training: winner.training, date: toDateKey(winner.next) }, overrides);
-    if (applied) result.push(applied);
-    winner.next = new Date(winner.next.getFullYear(), winner.next.getMonth(), winner.next.getDate() + 7);
+    const active = cursors.filter((c) => c.next !== null);
+    if (active.length === 0) break;
+    active.sort((a, b) => a.next!.getTime() - b.next!.getTime());
+    const winner = active[0];
+    const date = toDateKey(winner.next!);
+
+    const cancelled = winner.recurring && specialRanges.some((o) => date >= o.start_date && date <= o.end_date);
+    if (!cancelled) {
+      let note: string | undefined;
+      if (!winner.recurring) {
+        const override = winner.training.override_id ? overrides.find((o) => o.id === winner.training.override_id) : undefined;
+        note = override?.note ?? 'Sondertermin (Ferien)';
+      }
+      result.push({ training: winner.training, date, note });
+    }
+
+    winner.next = winner.recurring
+      ? new Date(winner.next!.getFullYear(), winner.next!.getMonth(), winner.next!.getDate() + 7)
+      : null;
   }
   return result;
 }
