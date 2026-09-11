@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextTrainingOccurrences } from './trainingSchedule';
+import { cancelledOccurrencesUntil, nextTrainingOccurrences } from './trainingSchedule';
 import type { Training } from '../types/database';
 
 const dienstag: Training = {
@@ -141,5 +141,55 @@ describe('nextTrainingOccurrences', () => {
         ['t-di', '2026-09-15']
       ]);
     });
+  });
+});
+
+describe('cancelledOccurrencesUntil', () => {
+  it('returns nothing when there are no cancelled/special overrides', () => {
+    expect(cancelledOccurrencesUntil([dienstag], new Date('2026-09-07T10:00:00'), '2026-09-30', [])).toEqual([]);
+  });
+
+  it('returns nothing when until is undefined', () => {
+    const overrides = [{ id: 'ov-1', start_date: '2026-09-08', end_date: '2026-09-08', mode: 'cancelled' as const, note: null }];
+    expect(cancelledOccurrencesUntil([dienstag], new Date('2026-09-07T10:00:00'), undefined, overrides)).toEqual([]);
+  });
+
+  it('returns a single-day cancellation within the window, with the override reference', () => {
+    const overrides = [{ id: 'ov-1', start_date: '2026-09-08', end_date: '2026-09-08', mode: 'cancelled' as const, note: 'Trainer krank' }];
+    const result = cancelledOccurrencesUntil([dienstag], new Date('2026-09-07T10:00:00'), '2026-09-30', overrides);
+    expect(result).toEqual([{ training: dienstag, date: '2026-09-08', cancelled: true, cancelledBy: overrides[0] }]);
+  });
+
+  it('excludes occurrences beyond the given until date', () => {
+    const overrides = [{ id: 'ov-1', start_date: '2026-09-15', end_date: '2026-09-15', mode: 'cancelled' as const, note: null }];
+    const result = cancelledOccurrencesUntil([dienstag], new Date('2026-09-07T10:00:00'), '2026-09-08', overrides);
+    expect(result).toEqual([]);
+  });
+
+  it('interleaves cancellations across multiple weekly trainings, sorted by date', () => {
+    const overrides = [
+      { id: 'ov-1', start_date: '2026-09-10', end_date: '2026-09-10', mode: 'cancelled' as const, note: null },
+      { id: 'ov-2', start_date: '2026-09-08', end_date: '2026-09-08', mode: 'cancelled' as const, note: null }
+    ];
+    const result = cancelledOccurrencesUntil([dienstag, donnerstag], new Date('2026-09-07T10:00:00'), '2026-09-11', overrides);
+    expect(result.map((r) => [r.training.id, r.date])).toEqual([
+      ['t-di', '2026-09-08'],
+      ['t-do', '2026-09-10']
+    ]);
+  });
+
+  it('ignores one-off Sondertermine (specific_date)', () => {
+    const sonder: Training = {
+      id: 't-sonder',
+      weekday: null,
+      start_time: '17:00',
+      end_time: '18:00',
+      location: 'Halle C',
+      specific_date: '2026-09-08',
+      override_id: null
+    };
+    const overrides = [{ id: 'ov-1', start_date: '2026-09-08', end_date: '2026-09-08', mode: 'cancelled' as const, note: null }];
+    const result = cancelledOccurrencesUntil([sonder], new Date('2026-09-07T10:00:00'), '2026-09-30', overrides);
+    expect(result).toEqual([]);
   });
 });

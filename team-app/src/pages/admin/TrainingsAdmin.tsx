@@ -5,6 +5,7 @@ import { ErrorNote } from '../../components/ErrorNote';
 import { DateField, TimeField } from '../../components/DateTimeField';
 import { fmtDate, fmtDateShort, fmtTime } from '../../lib/format';
 import { weekdayIndex, WEEKDAY_ORDER } from '../../lib/weekdays';
+import { cancelledOccurrencesUntil, nextTrainingOccurrences } from '../../lib/trainingSchedule';
 import type { Training, TrainingOverride } from '../../types/database';
 
 const EMPTY_FORM = { weekday: WEEKDAY_ORDER[0], start_time: '', end_time: '', location: '' };
@@ -12,6 +13,11 @@ const EMPTY_FORM = { weekday: WEEKDAY_ORDER[0], start_time: '', end_time: '', lo
 const EMPTY_OVERRIDE_FORM = { start_date: '', end_date: '', mode: 'regular' as 'regular' | 'cancelled' | 'special', note: '' };
 
 const EMPTY_SESSION_FORM = { date: '', start_time: '', end_time: '', location: '' };
+
+// Anzahl der als "anstehend" gezeigten (echten + abgesagten) Termine im
+// Schnell-Absagen-Bereich — bei 1-2 Trainings pro Woche deckt das grob die
+// nächsten zwei Wochen ab.
+const UPCOMING_PREVIEW_COUNT = 4;
 
 function ModeToggle({
   value,
@@ -188,6 +194,35 @@ export function TrainingsAdmin() {
     }
   }
 
+  const [cancelingKey, setCancelingKey] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelBusy, setCancelBusy] = useState(false);
+
+  // Einzelne Trainingseinheit absagen: technisch derselbe Mechanismus wie
+  // eine Ferienzeit, nur mit start_date === end_date für genau diesen einen
+  // Tag — dadurch entfällt der reguläre Termin auf der Startseite sichtbar
+  // ("❌ Fällt aus"), statt einfach zu verschwinden.
+  async function cancelSingleDay(date: string) {
+    setCancelBusy(true);
+    setOverrideError(null);
+    try {
+      const { error: insertError } = await supabase.from('training_overrides').insert({
+        start_date: date,
+        end_date: date,
+        mode: 'cancelled',
+        note: cancelReason.trim() || null
+      });
+      if (insertError) throw insertError;
+      setCancelingKey(null);
+      setCancelReason('');
+      await loadOverrides();
+    } catch {
+      setOverrideError('Absage konnte nicht gespeichert werden.');
+    } finally {
+      setCancelBusy(false);
+    }
+  }
+
   function startEditOverride(o: TrainingOverride) {
     setEditingOverrideId(o.id);
     setEditForm({ start_date: o.start_date, end_date: o.end_date, mode: o.mode, note: o.note ?? '' });
@@ -274,6 +309,16 @@ export function TrainingsAdmin() {
   if (error) return <ErrorNote message={error} />;
   if (!trainings) return <LoadingSpinner />;
 
+  const upcomingOccurrences = overrides
+    ? (() => {
+        const real = nextTrainingOccurrences(trainings, UPCOMING_PREVIEW_COUNT, new Date(), overrides);
+        const cancelled = cancelledOccurrencesUntil(trainings, new Date(), real[real.length - 1]?.date, overrides);
+        return [...real, ...cancelled].sort(
+          (a, b) => a.date.localeCompare(b.date) || a.training.id.localeCompare(b.training.id)
+        );
+      })()
+    : [];
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -354,6 +399,83 @@ export function TrainingsAdmin() {
         ))}
         {trainings.length === 0 && <p className="text-sm text-tbw-ink/50">Noch keine Trainingszeiten eingetragen.</p>}
       </ul>
+
+      <p className="pt-2 text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Anstehende Termine</p>
+      {upcomingOccurrences.length === 0 ? (
+        <p className="text-sm text-tbw-ink/50">Keine anstehenden Termine.</p>
+      ) : (
+        <ul className="space-y-2">
+          {upcomingOccurrences.map((occ) => {
+            const key = occ.training.id + occ.date;
+
+            if (occ.cancelled) {
+              const isSingleDay = occ.cancelledBy?.start_date === occ.cancelledBy?.end_date;
+              return (
+                <li key={key} className="card !bg-tbw-red/10 !ring-tbw-red/30">
+                  <p className="text-sm font-semibold text-tbw-red">
+                    {fmtDate(occ.date)} · {occ.training.weekday} · ❌ Fällt aus
+                  </p>
+                  {occ.cancelledBy?.note && <p className="mt-1 text-xs text-tbw-red/70">{occ.cancelledBy.note}</p>}
+                  {isSingleDay && occ.cancelledBy && (
+                    <button
+                      className="btn-secondary mt-2 !px-2 !py-1 text-xs"
+                      onClick={() => removeOverride(occ.cancelledBy!.id)}
+                    >
+                      Absage zurücknehmen
+                    </button>
+                  )}
+                </li>
+              );
+            }
+
+            const isCanceling = cancelingKey === key;
+            return (
+              <li key={key} className="card">
+                <p className="text-sm font-semibold text-tbw-navyDark">
+                  {fmtDate(occ.date)} · {fmtTime(occ.training.start_time)}–{fmtTime(occ.training.end_time)} ·{' '}
+                  {occ.training.location}
+                </p>
+                {!isCanceling ? (
+                  <button
+                    className="btn-secondary mt-2 !px-2 !py-1 text-xs !text-tbw-red"
+                    onClick={() => {
+                      setCancelingKey(key);
+                      setCancelReason('');
+                    }}
+                  >
+                    Absagen
+                  </button>
+                ) : (
+                  <div className="mt-2 space-y-2 rounded-xl bg-tbw-bg p-3">
+                    <input
+                      placeholder="Grund (optional, z. B. Trainer krank)"
+                      className="input"
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        className="btn-primary flex-1 !py-1.5 text-sm"
+                        disabled={cancelBusy}
+                        onClick={() => cancelSingleDay(occ.date)}
+                      >
+                        Bestätigen
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary flex-1 !py-1.5 text-sm"
+                        onClick={() => setCancelingKey(null)}
+                      >
+                        Abbrechen
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       <div className="flex items-center justify-between pt-2">
         <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Ferienzeiten &amp; Sonderregelungen</p>

@@ -5,7 +5,7 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { LoadingSpinner } from './LoadingSpinner';
 import { ErrorNote } from './ErrorNote';
 import { fmtDate, fmtTime } from '../lib/format';
-import { nextTrainingOccurrences, type TrainingOccurrence } from '../lib/trainingSchedule';
+import { cancelledOccurrencesUntil, nextTrainingOccurrences, type TrainingOccurrence } from '../lib/trainingSchedule';
 import {
   playerAbsenceOn,
   type Player,
@@ -53,8 +53,20 @@ export function UpcomingTrainings({
 
     const trainings = (trainingsRes.data as Training[]) ?? [];
     const overrides = (overridesRes.data as TrainingOverride[]) ?? [];
-    const occurrences = nextTrainingOccurrences(trainings, UPCOMING_COUNT, new Date(), overrides);
-    const trainingIds = [...new Set(occurrences.map((o) => o.training.id))];
+    const realOccurrences = nextTrainingOccurrences(trainings, UPCOMING_COUNT, new Date(), overrides);
+    // Ein sonst anstehendes Training, das der Trainer abgesagt hat (einzelner
+    // Tag oder eine ganze Ferienzeit), soll hier sichtbar als "fällt aus"
+    // stehen bleiben statt kommentarlos zu verschwinden — daher zusätzlich
+    // zu den `UPCOMING_COUNT` echten Terminen alle Absagen bis zum letzten
+    // davon mit anzeigen.
+    const cancelled = cancelledOccurrencesUntil(
+      trainings,
+      new Date(),
+      realOccurrences[realOccurrences.length - 1]?.date,
+      overrides
+    );
+    const occurrences = [...realOccurrences, ...cancelled].sort((a, b) => a.date.localeCompare(b.date));
+    const trainingIds = [...new Set(realOccurrences.map((o) => o.training.id))];
 
     let rsvps: TrainingRsvpRow[] = [];
     if (trainingIds.length > 0) {
@@ -66,10 +78,13 @@ export function UpcomingTrainings({
         setError('Fehler beim Laden der Trainingszeiten.');
         return;
       }
-      const dateByTraining = new Map(occurrences.map((o) => [o.training.id, o.date]));
-      rsvps = ((rsvpRows as TrainingRsvpRow[]) ?? []).filter(
-        (r) => dateByTraining.get(r.training_id) === r.session_date
-      );
+      // Schlüssel aus training_id+date statt nur training_id, da ein Team
+      // mit nur einem wöchentlichen Termin sonst zwei verschiedene Daten für
+      // dieselbe training_id anzeigen könnte (z. B. nur Dienstags-Training)
+      // — ein reines training_id-Mapping würde dann eine der beiden
+      // Zu-/Absagen fälschlich verwerfen.
+      const allowedKeys = new Set(realOccurrences.map((o) => `${o.training.id}|${o.date}`));
+      rsvps = ((rsvpRows as TrainingRsvpRow[]) ?? []).filter((r) => allowedKeys.has(`${r.training_id}|${r.session_date}`));
     }
 
     setState({
@@ -133,6 +148,17 @@ export function UpcomingTrainings({
     <div className="space-y-3">
       {state.occurrences.map((occ) => {
         const key = occ.training.id + occ.date;
+
+        if (occ.cancelled) {
+          return (
+            <div key={key} className="rounded-2xl bg-tbw-red/10 p-3">
+              <p className="text-sm font-bold text-tbw-red">{fmtDate(occ.date)}</p>
+              <p className="mt-0.5 text-sm font-semibold text-tbw-red">❌ Training fällt aus</p>
+              {occ.cancelledBy?.note && <p className="mt-0.5 text-xs text-tbw-red/70">{occ.cancelledBy.note}</p>}
+            </div>
+          );
+        }
+
         const rsvpsForOcc = state.rsvps.filter(
           (r) => r.training_id === occ.training.id && r.session_date === occ.date
         );
