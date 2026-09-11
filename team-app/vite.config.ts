@@ -6,6 +6,13 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // injectManifest statt generateSW: nur so kann src/sw.ts eigene
+      // push/notificationclick-Listener registrieren (Push-Benachrichtigungen).
+      // Precaching + Runtime-Caching (siehe workbox-Optionen unten) werden
+      // dafür jetzt manuell in src/sw.ts nachgebildet statt hier generiert.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icons/apple-touch-icon.png', 'icons/favicon-32.png'],
       manifest: {
@@ -23,22 +30,11 @@ export default defineConfig({
           { src: 'icons/icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       },
-      workbox: {
-        // Cache the app shell + API GET responses so the dashboard still
-        // renders (with last-known data) when offline or right after a
-        // Supabase free-tier project wakes up from its pause.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }) => url.hostname.endsWith('.supabase.co'),
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'supabase-api',
-              networkTimeoutSeconds: 8,
-              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 7 }
-            }
-          }
-        ]
+      // Precaching + Runtime-Caching (App-Shell + NetworkFirst für die
+      // Supabase-API) stehen jetzt in src/sw.ts — hier nur noch, welche
+      // Build-Dateien in den Precache-Manifest aufgenommen werden.
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,svg,png,ico}']
       }
     })
   ],

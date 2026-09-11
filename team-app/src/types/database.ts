@@ -4,9 +4,14 @@ export type OfficiatingTaskType = 'uhr' | 'anschreiber' | 'zeit';
 // Optionale Zusatzfunktionen, die ein Trainer pro Team an-/ausschalten kann
 // (Admin -> Funktionen). Neuer Key hier + eine Zeile in Migration/Seed, dann
 // ist eine neue Funktion schaltbar.
-export type FeatureKey = 'announcements' | 'carpool' | 'player_profiles' | 'absences' | 'stats';
+export type FeatureKey = 'announcements' | 'carpool' | 'player_profiles' | 'absences' | 'stats' | 'push_notifications';
 
 export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: string }> = {
+  push_notifications: {
+    label: 'Push-Benachrichtigungen',
+    description:
+      'Zeigt die Karte zum Aktivieren von Benachrichtigungen (z. B. bei neuen Meldungen). Erst einschalten, wenn Versand serverseitig eingerichtet ist (siehe README).'
+  },
   announcements: {
     label: 'Meldungen',
     description: 'Schwarzes Brett auf der Startseite für kurze Hinweise vom Trainer.'
