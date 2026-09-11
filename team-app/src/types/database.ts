@@ -30,6 +30,16 @@ export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: st
   }
 };
 
+// Konfigurierbare Fristen für die "Für dich zu erledigen"-Erinnerungen auf
+// der Spieler-Startseite (Admin -> Funktionen -> Erinnerungen). Singleton-
+// Zeile, siehe Migration 0031_reminder_settings.sql.
+export interface ReminderSettings {
+  enabled: boolean;
+  squad_reminder_days_before: number;
+  training_reminder_days_before: number;
+  officiating_season_min: number;
+}
+
 export type PlayerPosition = 'pg' | 'sg' | 'sf' | 'pf' | 'c';
 
 export const POSITION_LABELS: Record<PlayerPosition, string> = {
@@ -108,6 +118,7 @@ export interface Player {
   is_admin: boolean;
   is_captain: boolean;
   is_co_captain: boolean;
+  officiating_exempt: boolean;
   position: PlayerPosition | null;
   height_cm: number | null;
   birth_date: string | null;

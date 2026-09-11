@@ -7,6 +7,8 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { UpcomingTrainings } from '../components/UpcomingTrainings';
 import { AbsenceSection } from '../components/AbsenceSection';
 import { fmtDate, fmtDateShort, fmtTime } from '../lib/format';
+import { nextTrainingOccurrences } from '../lib/trainingSchedule';
+import { computeReminders, type ReminderItem } from '../lib/reminders';
 import {
   OFFICIATING_TASK_LABELS,
   STAT_POINT_VALUES,
@@ -22,8 +24,10 @@ import {
   type OfficiatingTask,
   type Player,
   type PlayerAbsence,
+  type ReminderSettings,
   type SquadConfirmation,
   type StatType,
+  type Training,
   type TrikotSet
 } from '../types/database';
 
@@ -44,6 +48,7 @@ interface DashboardData {
   lastResult: Game | null;
   myTotalPoints: number | null;
   declinedNames: string[];
+  reminders: ReminderItem[];
 }
 
 export function Dashboard() {
@@ -127,6 +132,7 @@ export function Dashboard() {
         myConfirmation = playerInSquad ? (squadRow?.confirmation as SquadConfirmation) ?? 'pending' : null;
       }
 
+      let myOfficiatingCount = 0;
       if (role === 'player' && player) {
         const { data: taskRows, error: taskErr } = await supabase
           .from('officiating_tasks')
@@ -134,21 +140,92 @@ export function Dashboard() {
           .eq('assigned_player_id', player.id);
         if (taskErr) {
           console.error('officiating_tasks fetch failed', taskErr);
-        } else if (taskRows && taskRows.length > 0) {
-          const gameIds = [...new Set((taskRows as OfficiatingTask[]).map((t) => t.officiating_game_id))];
-          const { data: gameRows, error: gamesErr } = await supabase
-            .from('officiating_games')
-            .select('*')
-            .in('id', gameIds)
-            .gte('game_date', today)
-            .order('game_date');
-          if (gamesErr) {
-            console.error('officiating_games fetch failed', gamesErr);
-          } else if (gameRows && gameRows.length > 0) {
-            const soonestGame = gameRows[0] as OfficiatingGame;
-            const task = (taskRows as OfficiatingTask[]).find((t) => t.officiating_game_id === soonestGame.id);
-            if (task) playerNextTask = { ...task, officiating_games: soonestGame };
+        } else {
+          myOfficiatingCount = (taskRows as OfficiatingTask[] | null)?.length ?? 0;
+          if (taskRows && taskRows.length > 0) {
+            const gameIds = [...new Set((taskRows as OfficiatingTask[]).map((t) => t.officiating_game_id))];
+            const { data: gameRows, error: gamesErr } = await supabase
+              .from('officiating_games')
+              .select('*')
+              .in('id', gameIds)
+              .gte('game_date', today)
+              .order('game_date');
+            if (gamesErr) {
+              console.error('officiating_games fetch failed', gamesErr);
+            } else if (gameRows && gameRows.length > 0) {
+              const soonestGame = gameRows[0] as OfficiatingGame;
+              const task = (taskRows as OfficiatingTask[]).find((t) => t.officiating_game_id === soonestGame.id);
+              if (task) playerNextTask = { ...task, officiating_games: soonestGame };
+            }
           }
+        }
+      }
+
+      // "Für dich zu erledigen": bündelt Kader-Zusage, Training-Zusage und
+      // Kampfgericht-Mindesteinsätze in einer Erinnerung auf der Startseite
+      // (Admin -> Funktionen -> Erinnerungen legt die Fristen fest). Reine
+      // Spieler-Sicht — für Trainer/Betrachter irrelevant.
+      let reminders: ReminderItem[] = [];
+      if (role === 'player' && player) {
+        const { data: settingsRow } = await supabase.from('reminder_settings').select('*').limit(1).maybeSingle();
+        const settings = settingsRow as ReminderSettings | null;
+
+        if (settings?.enabled) {
+          let hasOpenFutureOfficiatingSlot = false;
+          if (!player.officiating_exempt && myOfficiatingCount < settings.officiating_season_min) {
+            const { data: futureGames } = await supabase.from('officiating_games').select('id').gte('game_date', today);
+            const futureGameIds = ((futureGames as { id: string }[] | null) ?? []).map((g) => g.id);
+            if (futureGameIds.length > 0) {
+              const { data: openTasks } = await supabase
+                .from('officiating_tasks')
+                .select('id')
+                .in('officiating_game_id', futureGameIds)
+                .is('assigned_player_id', null)
+                .limit(1);
+              hasOpenFutureOfficiatingSlot = ((openTasks as { id: string }[] | null) ?? []).length > 0;
+            }
+          }
+
+          let trainingReminder: Parameters<typeof computeReminders>[3] = null;
+          const { data: trainingRows } = await supabase.from('trainings').select('*');
+          const nextOcc = nextTrainingOccurrences((trainingRows as Training[]) ?? [], 1)[0];
+          if (nextOcc) {
+            const { data: rsvpRow } = await supabase
+              .from('training_rsvps')
+              .select('id')
+              .eq('training_id', nextOcc.training.id)
+              .eq('session_date', nextOcc.date)
+              .eq('player_id', player.id)
+              .maybeSingle();
+            let onAbsence = false;
+            if (flags.absences) {
+              const { data: absenceRow } = await supabase
+                .from('player_absences')
+                .select('id')
+                .eq('player_id', player.id)
+                .lte('start_date', nextOcc.date)
+                .gte('end_date', nextOcc.date)
+                .maybeSingle();
+              onAbsence = !!absenceRow;
+            }
+            trainingReminder = { date: nextOcc.date, hasResponded: !!rsvpRow, onAbsence };
+          }
+
+          reminders = computeReminders(
+            new Date(),
+            settings,
+            nextGame
+              ? {
+                  published: nextGame.squad_published,
+                  inSquad: !!playerInSquad,
+                  confirmation: myConfirmation,
+                  gameDate: nextGame.game_date,
+                  opponent: nextGame.opponent
+                }
+              : null,
+            trainingReminder,
+            { exempt: player.officiating_exempt, count: myOfficiatingCount, hasOpenFutureSlot: hasOpenFutureOfficiatingSlot }
+          );
         }
       }
 
@@ -227,6 +304,7 @@ export function Dashboard() {
         absencesOverview,
         lastResult,
         myTotalPoints,
+        reminders,
         declinedNames
       });
     }
@@ -248,6 +326,43 @@ export function Dashboard() {
   return (
     <div className="space-y-4">
       {player && <p className="headline text-3xl text-tbw-navyDark">Hi {firstName}!</p>}
+
+      {role === 'player' && data.reminders.length > 0 && (
+        <section className="card !bg-tbw-red/10 !ring-tbw-red/30">
+          <SectionTitle icon="⚠️" title="Für dich zu erledigen" />
+          <ul className="mt-2 space-y-2">
+            {data.reminders.map((r) =>
+              r.to.startsWith('#') ? (
+                <li key={r.key}>
+                  <a
+                    href={r.to}
+                    className="flex items-center justify-between gap-2 rounded-xl bg-white/70 p-3 text-sm font-semibold text-tbw-navyDark"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>{r.icon}</span>
+                      {r.text}
+                    </span>
+                    <span className="text-tbw-red">→</span>
+                  </a>
+                </li>
+              ) : (
+                <li key={r.key}>
+                  <Link
+                    to={r.to}
+                    className="flex items-center justify-between gap-2 rounded-xl bg-white/70 p-3 text-sm font-semibold text-tbw-navyDark"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>{r.icon}</span>
+                      {r.text}
+                    </span>
+                    <span className="text-tbw-red">→</span>
+                  </Link>
+                </li>
+              )
+            )}
+          </ul>
+        </section>
+      )}
 
       {flags.announcements && data.announcements.length > 0 && (
         <section className="card !bg-tbw-gold/10 !ring-tbw-gold/30">
@@ -553,7 +668,7 @@ export function Dashboard() {
         </div>
       </section>
 
-      <section className="card">
+      <section id="training" className="card scroll-mt-20">
         <SectionTitle icon="🕒" title="Nächste Trainingseinheit" />
         <div className="mt-2">
           <UpcomingTrainings refreshKey={absenceVersion} />
