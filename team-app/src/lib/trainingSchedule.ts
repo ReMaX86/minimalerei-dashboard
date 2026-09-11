@@ -61,10 +61,10 @@ function isOneOffUpcoming(training: Training, from: Date): boolean {
  * The next `count` concrete training sessions, in chronological order —
  * both wiederkehrende wöchentliche Trainings (Training.weekday) und
  * einzelne Sondertermine innerhalb einer Ferienzeit (Training.
- * specific_date) werden interleaved. Eine Ferienzeit im Modus 'special'
- * lässt alle wiederkehrenden Termine in ihrem Zeitraum entfallen — die
- * Sondertermine selbst sind davon nie betroffen, sie sind ja schon die
- * explizite Ausnahme.
+ * specific_date) werden interleaved. Eine Ferienzeit im Modus 'cancelled'
+ * oder 'special' lässt alle wiederkehrenden Termine in ihrem Zeitraum
+ * entfallen — die Sondertermine selbst sind davon nie betroffen, sie sind
+ * ja schon die explizite Ausnahme.
  */
 export function nextTrainingOccurrences(
   trainings: Training[],
@@ -92,10 +92,13 @@ export function nextTrainingOccurrences(
     }))
   ];
 
-  const specialRanges = overrides.filter((o) => o.mode === 'special');
+  // 'cancelled' und 'special' lassen beide die regulären Trainings im
+  // Zeitraum entfallen — 'special' ersetzt sie zusätzlich durch die
+  // verknüpften Sondertermine, 'cancelled' lässt sie ersatzlos ausfallen.
+  const cancelledRanges = overrides.filter((o) => o.mode === 'cancelled' || o.mode === 'special');
 
   const result: TrainingOccurrence[] = [];
-  // Eine 'special'-Ferienzeit kann wiederkehrende Termine überspringen
+  // Eine 'cancelled'/'special'-Ferienzeit kann wiederkehrende Termine überspringen
   // (z. B. eine ganze Ferienwoche) — die Schleife muss dann über `count`
   // Runden hinaus weiterlaufen, bis wieder `count` tatsächlich
   // stattfindende Termine zusammenkommen. Sicherheitsgrenze gegen eine
@@ -108,7 +111,7 @@ export function nextTrainingOccurrences(
     const winner = active[0];
     const date = toDateKey(winner.next!);
 
-    const cancelled = winner.recurring && specialRanges.some((o) => date >= o.start_date && date <= o.end_date);
+    const cancelled = winner.recurring && cancelledRanges.some((o) => date >= o.start_date && date <= o.end_date);
     if (!cancelled) {
       let note: string | undefined;
       if (!winner.recurring) {

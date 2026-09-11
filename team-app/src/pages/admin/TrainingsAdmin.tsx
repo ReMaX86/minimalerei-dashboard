@@ -9,7 +9,7 @@ import type { Training, TrainingOverride } from '../../types/database';
 
 const EMPTY_FORM = { weekday: WEEKDAY_ORDER[0], start_time: '', end_time: '', location: '' };
 
-const EMPTY_OVERRIDE_FORM = { start_date: '', end_date: '', mode: 'regular' as 'regular' | 'special', note: '' };
+const EMPTY_OVERRIDE_FORM = { start_date: '', end_date: '', mode: 'regular' as 'regular' | 'cancelled' | 'special', note: '' };
 
 const EMPTY_SESSION_FORM = { date: '', start_time: '', end_time: '', location: '' };
 
@@ -273,7 +273,16 @@ export function TrainingsAdmin() {
                   overrideForm.mode === 'regular' ? '!bg-status-ok/10 !text-status-ok !ring-status-ok/30' : ''
                 }`}
               >
-                Reguläres Training
+                Regulär
+              </button>
+              <button
+                type="button"
+                onClick={() => setOverrideForm((f) => ({ ...f, mode: 'cancelled' }))}
+                className={`btn-secondary flex-1 !py-2 text-sm ${
+                  overrideForm.mode === 'cancelled' ? '!bg-tbw-red/10 !text-tbw-red !ring-tbw-red/30' : ''
+                }`}
+              >
+                Fällt aus
               </button>
               <button
                 type="button"
@@ -286,9 +295,12 @@ export function TrainingsAdmin() {
               </button>
             </div>
             <p className="text-xs text-tbw-ink/40">
-              {overrideForm.mode === 'regular'
-                ? 'Reguläres Training findet wie gewohnt statt — nur zur eigenen Notiz.'
-                : 'Die regulären Trainings entfallen im ganzen Zeitraum; einzelne Sondertermine trägst du nach dem Anlegen darunter ein.'}
+              {overrideForm.mode === 'regular' &&
+                'Reguläres Training findet wie gewohnt statt — nur zur eigenen Notiz.'}
+              {overrideForm.mode === 'cancelled' &&
+                'Alle regulären Trainings entfallen im ganzen Zeitraum, ohne Ersatztermine.'}
+              {overrideForm.mode === 'special' &&
+                'Die regulären Trainings entfallen im ganzen Zeitraum; einzelne Sondertermine trägst du nach dem Anlegen darunter ein.'}
             </p>
             <button className="btn-primary w-full" disabled={overrideBusy}>
               Anlegen
@@ -310,7 +322,7 @@ export function TrainingsAdmin() {
                         {fmtDateShort(o.start_date)}–{fmtDateShort(o.end_date)}
                       </p>
                       <p className="text-sm text-tbw-ink/60">
-                        {o.mode === 'regular' ? 'Reguläres Training' : 'Sonderzeiten'}
+                        {o.mode === 'regular' ? 'Reguläres Training' : o.mode === 'cancelled' ? 'Fällt aus' : 'Sonderzeiten'}
                         {o.note ? ` · ${o.note}` : ''}
                       </p>
                     </div>
