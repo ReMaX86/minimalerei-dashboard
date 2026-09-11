@@ -67,6 +67,26 @@ Dafür in den GitHub-Repo-Settings unter **Secrets and variables -> Actions** an
 - `TBW_SUPABASE_URL`
 - `TBW_SUPABASE_ANON_KEY`
 
+### 6. Supabase Backup
+
+Automatische Backups gibt es bei Supabase erst ab einem bezahlten Tarif — der Workflow
+`.github/workflows/supabase-backup.yml` zieht deshalb täglich einen vollständigen
+`pg_dump` (Schema + Daten) und legt ihn als GitHub-Actions-Artefakt ab (30 Tage
+Aufbewahrung, danach automatisch gelöscht, kein zusätzlicher Dienst nötig). Dafür in den
+GitHub-Repo-Settings unter **Secrets and variables -> Actions** anlegen:
+
+- `TBW_SUPABASE_DB_URL` — der Verbindungsstring aus Supabase unter **Project Settings ->
+  Database -> Connection string -> Session pooler** (nicht "Direct connection" — die ist
+  von GitHub-Actions-Runnern aus oft nicht erreichbar, da nur per IPv6).
+
+Manuell anstoßen: im Reiter **Actions** des Repos den Workflow "Supabase Database Backup
+(TBW Team App)" auswählen und **Run workflow** klicken. Die fertigen Dumps liegen danach
+im jeweiligen Workflow-Lauf unter "Artifacts" zum Download bereit.
+
+Wiederherstellung im Notfall: heruntergeladenes Artefakt entpacken, dann
+`psql "<Connection-String>" -f backup-YYYY-MM-DD.sql` gegen ein leeres/neues
+Supabase-Projekt laufen lassen.
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
