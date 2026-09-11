@@ -191,13 +191,18 @@ export function Dashboard() {
           const { data: trainingRows } = await supabase.from('trainings').select('*');
           const nextOcc = nextTrainingOccurrences((trainingRows as Training[]) ?? [], 1)[0];
           if (nextOcc) {
-            const { data: rsvpRow } = await supabase
+            // training_rsvps hat keine `id`-Spalte (zusammengesetzter Primary
+            // Key aus training_id/session_date/player_id) — .select('id')
+            // schlägt serverseitig fehl und rsvpRow bleibt sonst stumm immer
+            // null, egal ob schon geantwortet wurde.
+            const { data: rsvpRow, error: rsvpErr } = await supabase
               .from('training_rsvps')
-              .select('id')
+              .select('is_attending')
               .eq('training_id', nextOcc.training.id)
               .eq('session_date', nextOcc.date)
               .eq('player_id', player.id)
               .maybeSingle();
+            if (rsvpErr) console.error('training_rsvps fetch failed', rsvpErr);
             let onAbsence = false;
             if (flags.absences) {
               const { data: absenceRow } = await supabase

@@ -862,6 +862,23 @@ hier die getroffenen Entscheidungen samt Begründung:
   `trainingVersion`-State hoch, der in den Abhängigkeiten des
   Lade-Effekts steht — die Erinnerung verschwindet dadurch sofort, ganz
   ohne Reload.
+- **Training-Erinnerung erschien trotz bereits erfolgter Zusage, auch nach
+  vollständigem Neustart** (`Dashboard.tsx`): der eigentliche Bug — anders als
+  der vorherige Punkt, der nur das Live-Update betraf. Die Abfrage der
+  eigenen RSVP für die Erinnerung nutzte `.select('id')` auf
+  `training_rsvps` — diese Tabelle hat aber gar keine `id`-Spalte, sondern
+  einen zusammengesetzten Primary Key aus
+  `(training_id, session_date, player_id)` (siehe Migration
+  `0005_training_rsvps.sql`). Die Abfrage schlug dadurch serverseitig mit
+  einem "column does not exist"-Fehler fehl; da der Fehler nicht geprüft
+  wurde, blieb `rsvpRow` immer `null` — die Erinnerung hielt eine
+  Zu-/Absage für nicht vorhanden, egal was wirklich in der Datenbank stand.
+  Jetzt `.select('is_attending')` (ein Feld, das dort tatsächlich existiert)
+  plus Fehlerprotokollierung, falls sowas nochmal passiert. Im
+  Playwright-Mock-Testing dieser Session fiel das nicht auf, weil die Mocks
+  Tabellen-Antworten frei erfinden, statt wie echtes PostgREST tatsächliche
+  Spalten zu validieren — ein struktureller blinder Fleck des bisherigen
+  Test-Ansatzes für diese Art Fehler.
 
 ## Projektstruktur
 
