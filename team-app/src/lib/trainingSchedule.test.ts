@@ -66,6 +66,12 @@ describe('nextTrainingOccurrences', () => {
       expect(result[0].date).toBe('2026-09-08');
     });
 
+    it('cancels all regular occurrences for a cancelled-mode Ferienzeit, ersatzlos', () => {
+      const overrides = [{ id: 'ov-1', start_date: '2026-09-08', end_date: '2026-09-08', mode: 'cancelled' as const, note: 'Ferien' }];
+      const result = nextTrainingOccurrences([dienstag], 2, new Date('2026-09-07T10:00:00'), overrides);
+      expect(result.map((r) => r.date)).toEqual(['2026-09-15', '2026-09-22']);
+    });
+
     it('leaves occurrences outside the range untouched', () => {
       const overrides = [{ id: 'ov-1', start_date: '2026-10-01', end_date: '2026-10-10', mode: 'special' as const, note: null }];
       const result = nextTrainingOccurrences([dienstag], 2, new Date('2026-09-07T10:00:00'), overrides);

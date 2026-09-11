@@ -941,6 +941,16 @@ hier die getroffenen Entscheidungen samt Begründung:
   wählbaren Einzeltagen statt einer pauschalen Uhrzeit für den ganzen
   Zeitraum) — die alte `training_overrides`-Tabelle aus der ersten Version
   wurde dafür (noch ohne echte Nutzdaten) neu aufgesetzt statt migriert.
+  **Zweiter Nachtrag (dritter Modus "Fällt aus"):** "Sonderzeiten" ganz
+  ohne eingetragene Sondertermine hätte technisch schon einen kompletten
+  Ausfall ohne Ersatz bewirkt, war als Option aber weder erkennbar noch
+  eindeutig — sah in der Liste wie ein unvollständiger Eintrag aus. Dritter
+  expliziter Modus `cancelled` ergänzt (Migration `0034`, erweitert nur den
+  Check-Constraint auf `mode`): lässt in der Terminberechnung genauso wie
+  `special` alle regulären Trainings im Zeitraum ersatzlos entfallen, ohne
+  die Möglichkeit oder Erwartung, Sondertermine einzutragen. Der Trainer
+  wählt jetzt zwischen drei klar benannten Buttons: "Regulär", "Fällt aus",
+  "Sonderzeiten".
 
 ## Projektstruktur
 

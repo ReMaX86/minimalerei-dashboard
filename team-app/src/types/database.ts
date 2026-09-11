@@ -232,17 +232,18 @@ export interface TrainingRsvpRow {
   created_at: string;
 }
 
-// Ferienzeiten/Sonderregelungen: ein Zeitraum mit Modus 'regular' (reine
-// Dokumentation, ändert nichts) oder 'special' — dann entfallen alle
-// regulären wöchentlichen Trainings in [start_date, end_date], und
-// stattdessen gelten die einzeln unter `trainings.override_id` verknüpften
-// Sondertermine (siehe Training.specific_date unten). Siehe
-// nextTrainingOccurrences() in lib/trainingSchedule.ts.
+// Ferienzeiten/Sonderregelungen: ein Zeitraum mit einem Modus —
+// 'regular' (reine Dokumentation, ändert nichts), 'cancelled' (alle
+// regulären wöchentlichen Trainings in [start_date, end_date] entfallen
+// ersatzlos) oder 'special' (dasselbe, aber es gelten stattdessen die
+// einzeln unter `trainings.override_id` verknüpften Sondertermine, siehe
+// Training.specific_date unten). Siehe nextTrainingOccurrences() in
+// lib/trainingSchedule.ts.
 export interface TrainingOverride {
   id: string;
   start_date: string;
   end_date: string;
-  mode: 'regular' | 'special';
+  mode: 'regular' | 'cancelled' | 'special';
   note: string | null;
   created_at: string;
 }
