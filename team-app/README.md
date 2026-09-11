@@ -850,6 +850,18 @@ hier die getroffenen Entscheidungen samt Begründung:
   Ohne Datum im Text wirkte das aber wie ein Bug, wenn man den erstgenannten
   (bereits beantworteten) Termin schon zugesagt hatte. Text jetzt z. B.
   "Training am Mo., 14.09.2026 noch nicht beantwortet".
+- **Training-Erinnerung blieb nach dem Zusagen sichtbar, bis man die Seite
+  neu lud** (`UpcomingTrainings.tsx`, `Dashboard.tsx`): Zu-/Absagen zu einem
+  Training passiert direkt in der `UpcomingTrainings`-Komponente auf der
+  Startseite, aber die "Für dich zu erledigen"-Karte lebt im umgebenden
+  `Dashboard.tsx` mit eigenem, unabhängigem Ladezustand — eine Zusage dort
+  hat den nie neu ausgelöst. Analog zum bereits bestehenden
+  `AbsenceSection`/`absenceVersion`-Muster bekommt `UpcomingTrainings` jetzt
+  einen optionalen `onChange`-Callback, der nach jeder erfolgreichen
+  Zu-/Absage feuert; `Dashboard.tsx` zählt darüber einen neuen
+  `trainingVersion`-State hoch, der in den Abhängigkeiten des
+  Lade-Effekts steht — die Erinnerung verschwindet dadurch sofort, ganz
+  ohne Reload.
 
 ## Projektstruktur
 

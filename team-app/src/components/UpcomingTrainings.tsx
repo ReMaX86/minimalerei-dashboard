@@ -17,7 +17,10 @@ interface State {
   absences: PlayerAbsence[];
 }
 
-export function UpcomingTrainings({ refreshKey }: { refreshKey?: number } = {}) {
+export function UpcomingTrainings({
+  refreshKey,
+  onChange
+}: { refreshKey?: number; onChange?: () => void } = {}) {
   const { role, player } = useAuth();
   const { flags } = useFeatureFlags();
   const [state, setState] = useState<State | null>(null);
@@ -98,6 +101,10 @@ export function UpcomingTrainings({ refreshKey }: { refreshKey?: number } = {}) 
       );
       if (upsertError) throw upsertError;
       await load();
+      // Die Startseite zeigt ggf. eine Erinnerung "Training noch nicht
+      // beantwortet" — die muss nach einer Zu-/Absage hier sofort
+      // verschwinden, nicht erst nach einem Reload.
+      onChange?.();
     } catch {
       setError('Zu-/Absage konnte nicht gespeichert werden.');
     } finally {
