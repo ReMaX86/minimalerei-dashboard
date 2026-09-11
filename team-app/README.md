@@ -102,33 +102,80 @@ Function, damit kein zusätzlicher CLI-/Dashboard-Zugriff aufs Supabase-Projekt 
 
 **Setup (mehrere Schritte, da drei verschiedene Dienste beteiligt sind):**
 
-1. **Migration ausführen**: `supabase/migrations/0035_push_subscriptions.sql` im
-   SQL-Editor laufen lassen (legt die Tabelle für die Geräte-Anmeldungen an und das
-   Feature-Flag, standardmäßig deaktiviert).
+1. **Migrationen ausführen**: `supabase/migrations/0035_push_subscriptions.sql` und
+   `0036_push_subscriptions_grants.sql` im SQL-Editor laufen lassen (legen die Tabelle für die
+   Geräte-Anmeldungen, das Feature-Flag und die nötigen Zugriffsrechte für die service_role an
+   — ohne `0036` schlägt der Versand später mit `permission denied for table
+   push_subscriptions` fehl, das war beim ersten Live-Test der Fall).
 2. **VAPID-Schlüsselpaar erzeugen** (einmalig, z. B. lokal mit
    `npx web-push generate-vapid-keys`): liefert einen Public und einen Private Key.
 3. **Vercel Environment Variables** setzen (Project Settings -> Environment Variables):
    - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` — das eben erzeugte Schlüsselpaar.
    - `VAPID_SUBJECT` — `mailto:` + eine erreichbare Kontakt-E-Mail-Adresse (Pflichtangabe
      der Push-Dienste, z. B. von Apple/Google, falls mal etwas schiefläuft).
-   - `SUPABASE_SERVICE_ROLE_KEY` — aus Supabase unter **Project Settings -> API ->
-     service_role** (geheim halten — dieser Key umgeht alle RLS-Policies, deshalb nur als
-     Server-Env-Var, nie im Frontend).
+   - `SUPABASE_SERVICE_ROLE_KEY` — aus Supabase unter **Project Settings -> API Keys** (bei
+     neueren Projekten der `sb_secret_...`-Wert unter "Secret keys"; alternativ der klassische
+     `service_role`-Key unter dem Tab "Legacy anon, service_role API keys" — beide
+     funktionieren, entscheidend ist Schritt 1/Migration `0036`). Geheim halten — dieser Key
+     umgeht alle RLS-Policies, deshalb nur als Server-Env-Var, nie im Frontend.
    - `PUSH_WEBHOOK_SECRET` — ein selbst ausgedachtes langes Zufallspasswort, sichert den
      `/api/send-push`-Endpunkt gegen fremde Aufrufe ab.
 4. **`VITE_VAPID_PUBLIC_KEY`** zusätzlich (!) als Vercel-Env-Var setzen, mit demselben
    Public-Key-Wert aus Schritt 2 — landet ausdrücklich im Frontend-Bundle (der Public Key ist
-   dafür gedacht, ist also unbedenklich), wird beim Anmelden fürs Abonnieren gebraucht.
-5. **Supabase Database Webhook** einrichten (Database -> Webhooks -> Create a new hook):
-   - Table: `announcements`, Event: `Insert`.
-   - Type: `HTTP Request`, Method: `POST`.
-   - URL: `https://<deine-vercel-domain>/api/send-push`.
-   - Header hinzufügen: `x-webhook-secret` = derselbe Wert wie `PUSH_WEBHOOK_SECRET` oben.
-6. Danach im **Admin -> Funktionen** das Feature `Push-Benachrichtigungen` aktivieren — erst
+   dafür gedacht, ist also unbedenklich), wird beim Anmelden fürs Abonnieren gebraucht. Vercel
+   warnt bei einem `VITE_`-Namen, dass er öffentlich sichtbar wird ("change the variable to
+   Config") — das ist hier gewollt, Präfix nicht entfernen.
+5. **Vercel Deployment Protection prüfen** (Settings -> Deployment Protection): Falls
+   "Require Log In" / "Vercel Authentication" aktiv ist und keine eigene Domain (Custom Domain)
+   eingerichtet ist, blockiert das auch Aufrufe von außen (z. B. vom Trigger in Schritt 6) mit
+   einem 401 — ohne eigene Domain den Schalter **ausschalten**. Mit eigener Domain reicht
+   "Standard Protection" (schützt nur die `*.vercel.app`-Adresse, nicht die Custom Domain).
+6. **Datenbank-Trigger anlegen**, der bei jeder neuen Meldung `api/send-push.ts` aufruft. Die
+   naheliegende Supabase-UI dafür (Database -> Webhooks -> Create a new hook) schlug beim
+   ersten Live-Test mit `ERROR: 3F000: schema "supabase_functions" does not exist` fehl (ein
+   Supabase-seitiges Infrastruktur-Problem, nicht projektspezifisch behebbar) — funktioniert hat
+   stattdessen derselbe Effekt direkt per SQL über die `pg_net`-Extension (im SQL-Editor prüfen,
+   ob `pg_net` unter Database -> Extensions aktiviert ist, dann):
+   ```sql
+   create or replace function public.notify_new_announcement()
+   returns trigger
+   language plpgsql
+   security definer
+   set search_path = public
+   as $$
+   begin
+     perform net.http_post(
+       url := 'https://<deine-vercel-domain>/api/send-push',
+       headers := jsonb_build_object(
+         'Content-Type', 'application/json',
+         'x-webhook-secret', '<derselbe Wert wie PUSH_WEBHOOK_SECRET>'
+       ),
+       body := jsonb_build_object(
+         'type', 'INSERT',
+         'table', 'announcements',
+         'record', to_jsonb(new)
+       )
+     );
+     return new;
+   end;
+   $$;
+
+   create trigger announcements_notify_push
+   after insert on public.announcements
+   for each row execute function public.notify_new_announcement();
+   ```
+   Achtung: die Vercel-Domain hier ist die tatsächlich genutzte Produktions-Domain (in Vercel
+   unter dem Projekt sichtbar) — nicht zwangsläufig identisch mit der ersten/automatisch
+   vergebenen `*.vercel.app`-Adresse, davon kann es pro Projekt mehrere geben.
+7. Danach im **Admin -> Funktionen** das Feature `Push-Benachrichtigungen` aktivieren — erst
    jetzt taucht die Opt-in-Karte auf der Startseite überhaupt auf.
 
 Zum Testen: eine neue Meldung im Admin veröffentlichen, während mindestens ein Gerät
-Benachrichtigungen aktiviert hat.
+Benachrichtigungen aktiviert hat. Zum Debuggen zeigt
+```sql
+select status_code, content, created from net._http_response order by created desc limit 5;
+```
+im SQL-Editor die letzten Aufrufe von Schritt 6 inkl. etwaiger Fehlermeldungen.
 
 ## Design
 
@@ -184,9 +231,6 @@ hier die getroffenen Entscheidungen samt Begründung:
   Policy anzufassen. Im Frontend steuert `AuthContext`'s `isAdmin` (= echter Trainer ODER
   admin-geflaggter Spieler) den Zugriff, während `role` bestimmt, welche Ansicht (Trainer-
   Aggregat vs. persönliche Spieler-Sicht) angezeigt wird.
-- **Push-Benachrichtigungen** sind (noch) nicht umgesetzt — die App zeigt alle relevanten
-  Termine/Zuweisungen beim Öffnen an ("Self-Check"). Ließe sich später über die Web Push API
-  ergänzen, ohne am Datenmodell etwas zu ändern.
 - **Warnschwelle Kampfgericht:** aktuell fest bei < 2 Einsätzen (Saison-Soll 2–3) über
   `SEASON_TARGET_MIN`/`SEASON_TARGET_MAX` in `src/pages/Kampfgericht.tsx`. Bei Bedarf mit dem
   Trainer final abstimmen und dort anpassen.
@@ -1114,6 +1158,20 @@ hier die getroffenen Entscheidungen samt Begründung:
   Trainer sie nach abgeschlossenem Setup (siehe "Push-Benachrichtigungen" oben) bewusst
   einschaltet, statt dass allen Nutzern sofort eine halb eingerichtete Funktion angezeigt
   wird. Erste (und bisher einzige) Benachrichtigungsart: neue Meldung im Schwarzen Brett.
+- **Nachtrag zum Live-Setup von Push-Benachrichtigungen** (Migration `0036`, `api/send-push.ts`):
+  beim ersten Durchlauf gegen die echte Produktionsumgebung kamen drei unabhängige Stolpersteine
+  zusammen, alle jetzt in der Setup-Anleitung oben berücksichtigt. (1) Supabase Database Webhooks
+  (die naheliegende UI dafür) schlugen mit `schema "supabase_functions" does not exist` fehl —
+  ein plattformseitiges Problem, nicht am Projekt behebbar; funktioniert hat stattdessen derselbe
+  Effekt über einen von Hand angelegten Trigger, der direkt die `pg_net`-Extension nutzt (siehe
+  Setup-Schritt 6). (2) Vercel "Deployment Protection" (Require Log In) blockierte externe
+  Aufrufe an `/api/send-push` mit 401, weil keine eigene Domain eingerichtet ist — für Projekte
+  ohne Custom Domain muss das ausgeschaltet werden. (3) Die neu angelegte `push_subscriptions`-
+  Tabelle bekam nicht automatisch die sonst üblichen Standard-Rechte für die `service_role`,
+  was zu `permission denied for table push_subscriptions` (42501) führte — Migration `0036`
+  holt das per explizitem `grant` nach. `api/send-push.ts` gibt bei einem Ladefehler seitdem
+  auch Fehlerdetails (Message + Code) zurück statt nur einer generischen Meldung, was diese
+  Fehlersuche über `select * from net._http_response` im SQL-Editor erst ermöglicht hat.
 
 ## Projektstruktur
 
