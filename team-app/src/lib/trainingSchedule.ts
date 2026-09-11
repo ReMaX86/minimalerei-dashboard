@@ -16,6 +16,12 @@ export interface TrainingOccurrence {
   // Gesetzt für Sondertermine (Training.specific_date) — z. B. "Herbstferien-
   // Sondertermin", übernommen von der zugehörigen Ferienzeit-Notiz.
   note?: string;
+  // Gesetzt von cancelledOccurrencesUntil() für einen sonst stattfindenden
+  // Termin, der durch eine 'cancelled'/'special'-Ferienzeit oder eine
+  // einzelne Tages-Absage entfällt — nextTrainingOccurrences() selbst lässt
+  // solche Termine weiterhin einfach aus (siehe dort).
+  cancelled?: boolean;
+  cancelledBy?: OverrideInput;
 }
 
 type OverrideInput = Pick<TrainingOverride, 'id' | 'start_date' | 'end_date' | 'mode' | 'note'>;
@@ -126,4 +132,45 @@ export function nextTrainingOccurrences(
       : null;
   }
   return result;
+}
+
+/**
+ * Wiederkehrende Termine, die zwischen `from` und `until` (inklusive)
+ * durch eine 'cancelled'/'special'-Ferienzeit — oder eine einzelne
+ * Tages-Absage, technisch derselbe Mechanismus mit start_date === end_date
+ * — entfallen. Anders als nextTrainingOccurrences() werden diese Termine
+ * hier nicht einfach übersprungen, sondern explizit zurückgegeben (mit
+ * `cancelled: true` und einer Referenz auf die auslösende Ferienzeit unter
+ * `cancelledBy`), damit sie z. B. auf der Startseite sichtbar als "fällt
+ * aus" markiert bleiben können, statt kommentarlos zu verschwinden.
+ * Sondertermine (specific_date) sind hiervon nie betroffen — sie sind ja
+ * schon die explizite Ausnahme einer Ferienzeit.
+ */
+export function cancelledOccurrencesUntil(
+  trainings: Training[],
+  from: Date,
+  until: string | undefined,
+  overrides: OverrideInput[]
+): TrainingOccurrence[] {
+  if (!until) return [];
+
+  const recurring = trainings.filter((t) => t.weekday !== null);
+  const cancelledRanges = overrides.filter((o) => o.mode === 'cancelled' || o.mode === 'special');
+  if (cancelledRanges.length === 0) return [];
+
+  const result: TrainingOccurrence[] = [];
+  for (const training of recurring) {
+    let next = firstOccurrenceOnOrAfter(training, from);
+    // Sicherheitsgrenze gegen eine Endlosschleife bei einem unplausibel
+    // weit in der Zukunft liegenden `until` (~5 Jahre wöchentlich).
+    for (let round = 0; round < 260 && toDateKey(next) <= until; round++) {
+      const date = toDateKey(next);
+      const match = cancelledRanges.find((o) => date >= o.start_date && date <= o.end_date);
+      if (match) {
+        result.push({ training, date, cancelled: true, cancelledBy: match });
+      }
+      next = new Date(next.getFullYear(), next.getMonth(), next.getDate() + 7);
+    }
+  }
+  return result.sort((a, b) => a.date.localeCompare(b.date) || a.training.id.localeCompare(b.training.id));
 }

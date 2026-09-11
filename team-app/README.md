@@ -996,6 +996,40 @@ hier die getroffenen Entscheidungen samt Begründung:
   Der `id="training"`-Anker für den Sprunglink aus der Erinnerung
   (`lib/reminders.ts`, `to: '#training'`) wanderte mit der Zu-/Absage-
   Karte an ihre neue Position nach oben.
+- **Einzelne Trainingseinheit spontan absagen** (`lib/trainingSchedule.ts`,
+  `TrainingsAdmin.tsx`, `UpcomingTrainings.tsx`): bisher gab es keine
+  schnelle Möglichkeit, nur einen einzelnen Termin ausfallen zu lassen
+  (z. B. Trainer krank, Halle kurzfristig belegt) — nur den Umweg über eine
+  ganze "Ferienzeit". Technisch ist eine Einzelabsage derselbe Mechanismus
+  wie eine Ferienzeit im Modus "Fällt aus", nur mit `start_date === end_date`
+  für genau diesen einen Tag — keine neue Tabelle/Migration nötig. Neuer
+  Abschnitt "Anstehende Termine" im Training-Admin (zwischen der
+  wöchentlichen Liste und den Ferienzeiten) zeigt die nächsten vier
+  anstehenden Termine mit einem direkten "Absagen"-Button (optionaler
+  Grund, z. B. "Trainer krank") — kein Umweg über die Ferienzeiten-UI
+  nötig, auch wenn dort derselbe Eintrag dann ebenfalls auftaucht und
+  bearbeitet werden kann. Bereits abgesagte Termine erscheinen in dieser
+  Liste weiterhin (rot markiert) mit "Absage zurücknehmen", sofern es sich
+  um eine reine Einzeltages-Absage handelt (mehrtägige Ferienzeiten werden
+  dort nur informativ angezeigt, ihre Bearbeitung bleibt der
+  Ferienzeiten-Sektion vorbehalten, da ein "Rückgängig" sonst versehentlich
+  eine ganze Ferienwoche aufheben könnte).
+  Wichtiger Unterschied zur bestehenden Ferienzeiten-Logik:
+  `nextTrainingOccurrences()` selbst überspringt abgesagte Termine weiterhin
+  einfach (unverändert, damit z. B. die "Training noch nicht
+  beantwortet"-Erinnerung korrekt den nächsten *echten* Termin nennt) —
+  eine neue, separate Funktion `cancelledOccurrencesUntil()` liefert
+  zusätzlich genau die abgesagten Termine bis zu einem Stichtag, damit sie
+  auf der Startseite (`UpcomingTrainings.tsx`) sichtbar als "❌ Training
+  fällt aus" zwischen den echten Terminen stehen bleiben, statt
+  kommentarlos zu verschwinden und den Eindruck eines Fehlers zu erwecken.
+  **Nebenbei behobener Bug:** die RSVP-Filterung in `UpcomingTrainings.tsx`
+  ordnete Zu-/Absagen bisher nur nach `training_id` einem angezeigten
+  Termin zu — bei einem Team mit nur einem einzigen wöchentlichen Training
+  hätte das zwei verschiedene angezeigte Termine (z. B. "nächsten" und
+  "übernächsten" Dienstag) auf denselben `training_id`-Schlüssel gemappt
+  und dadurch eine der beiden Zu-/Absage-Listen fälschlich geleert; jetzt
+  wird nach `training_id` **und** Datum gefiltert.
 
 ## Projektstruktur
 
