@@ -326,35 +326,76 @@ export function Spiele() {
                     const declined = !selectedByPlayer[p.id] && confirmationByPlayer[p.id] === 'declined';
                     const confirmed = selectedByPlayer[p.id] && confirmationByPlayer[p.id] === 'confirmed';
                     const awaitingResponse = selectedByPlayer[p.id] && confirmationByPlayer[p.id] === 'pending';
+                    const isMe = player?.id === p.id;
                     return (
-                      <li key={p.id} className="flex items-center justify-between py-2">
-                        <span className="flex items-center gap-1.5 text-sm font-medium text-tbw-navyDark">
-                          {p.name}
-                          {confirmed && (
-                            <span className="font-bold text-status-ok" title="Hat zugesagt">
-                              ✓
-                            </span>
-                          )}
-                          {awaitingResponse && (
-                            <span className="text-tbw-ink/40" title="Hat noch nicht geantwortet">
-                              🕐
-                            </span>
-                          )}
-                          {flags.absences && playerAbsenceOn(state.absences, p.id, state.nextGame!.game_date) && (
-                            <span className="pill pill-warn" title="Im Urlaub eingetragen">
-                              🌴
-                            </span>
-                          )}
-                        </span>
-                        <button
-                          disabled={togglingId === p.id || (atCap && !selectedByPlayer[p.id])}
-                          onClick={() => toggle(p.id)}
-                          className={`pill ${
-                            selectedByPlayer[p.id] ? 'pill-ok' : declined ? 'pill-warn' : 'pill-open'
-                          } disabled:opacity-40`}
-                        >
-                          {selectedByPlayer[p.id] ? 'im Kader' : declined ? 'abgesagt' : 'nicht im Kader'}
-                        </button>
+                      <li key={p.id} className="py-2">
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 text-sm font-medium text-tbw-navyDark">
+                            {p.name}
+                            {isMe && ' (Du)'}
+                            {confirmed && (
+                              <span className="font-bold text-status-ok" title="Hat zugesagt">
+                                ✓
+                              </span>
+                            )}
+                            {awaitingResponse && (
+                              <span className="text-tbw-ink/40" title="Hat noch nicht geantwortet">
+                                🕐
+                              </span>
+                            )}
+                            {flags.absences && playerAbsenceOn(state.absences, p.id, state.nextGame!.game_date) && (
+                              <span className="pill pill-warn" title="Im Urlaub eingetragen">
+                                🌴
+                              </span>
+                            )}
+                          </span>
+                          <button
+                            disabled={togglingId === p.id || (atCap && !selectedByPlayer[p.id])}
+                            onClick={() => toggle(p.id)}
+                            className={`pill ${
+                              selectedByPlayer[p.id] ? 'pill-ok' : declined ? 'pill-warn' : 'pill-open'
+                            } disabled:opacity-40`}
+                          >
+                            {selectedByPlayer[p.id] ? 'im Kader' : declined ? 'abgesagt' : 'nicht im Kader'}
+                          </button>
+                        </div>
+                        {isMe && selectedByPlayer[p.id] && (
+                          <div className="mt-1.5 flex items-center gap-2">
+                            {confirmed ? (
+                              <>
+                                <span className="pill pill-ok">✓ Du hast zugesagt</span>
+                                <button
+                                  type="button"
+                                  disabled={responding}
+                                  onClick={() => respond(false)}
+                                  className="text-xs font-semibold text-tbw-ink/40 underline disabled:opacity-40"
+                                >
+                                  Doch nicht?
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-xs text-tbw-ink/50">Kannst du selbst?</span>
+                                <button
+                                  type="button"
+                                  disabled={responding}
+                                  onClick={() => respond(true)}
+                                  className="pill pill-ok disabled:opacity-40"
+                                >
+                                  ✓ Kann
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={responding}
+                                  onClick={() => respond(false)}
+                                  className="pill pill-open disabled:opacity-40"
+                                >
+                                  ✗ Kann nicht
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </li>
                     );
                   })}
