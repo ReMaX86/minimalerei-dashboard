@@ -822,6 +822,17 @@ hier die getroffenen Entscheidungen samt Begründung:
   Erinnerung entfällt. Der Training-Eintrag verlinkt per Anker (`#training`)
   auf die schon vorhandene "Nächste Trainingseinheit"-Karte weiter unten auf
   derselben Seite, statt eine eigene Seite zu öffnen.
+- **Eigene Kader-Bestätigung für admin-geflaggte Spieler war trotz Fix aus
+  PR #90 in der Praxis nicht auffindbar** (`Spiele.tsx`): PR #90 hatte den
+  Sichtbarkeits-Bug behoben, aber die Bestätigungs-Buttons standen weiterhin
+  nur in einem separaten, zweiten "👥 Kader anzeigen"-Abschnitt unterhalb der
+  Trainer-Kader-Bearbeitung — und ein admin-geflaggter Spieler öffnet als
+  Erstes praktisch immer den (ähnlich benannten) Trainer-Button "👥 Kader
+  ansehen", nicht diesen zweiten. Die eigene Zeile in der
+  Trainer-Kader-Bearbeitung (`sortedForTrainer`-Liste) zeigt jetzt zusätzlich
+  direkt "Kannst du selbst?" mit ✓/✗-Buttons (bzw. "✓ Du hast zugesagt" +
+  "Doch nicht?"), sobald der eigene Spieler im Kader steht — unabhängig vom
+  separaten Abschnitt, der für normale Spieler weiterhin der einzige Weg ist.
 
 ## Projektstruktur
 
