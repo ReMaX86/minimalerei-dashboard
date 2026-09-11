@@ -46,7 +46,11 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          pg_dump "${TBW_SUPABASE_DB_URL}" \
+          # Der GitHub-Actions-Runner bringt bereits einen älteren pg_dump
+          # mit, der unter dem einfachen Befehl "pg_dump" Vorrang vor dem
+          # gerade installierten Client 17 hat — deshalb hier den
+          # versionierten Pfad direkt ansprechen statt nur "pg_dump".
+          /usr/lib/postgresql/17/bin/pg_dump "${TBW_SUPABASE_DB_URL}" \
             --no-owner --no-privileges \
             -f "backup-$(date +%Y-%m-%d).sql"
         env:
