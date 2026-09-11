@@ -178,11 +178,13 @@ select status_code, content, created from net._http_response order by created de
 im SQL-Editor die letzten Aufrufe von Schritt 6 inkl. etwaiger Fehlermeldungen.
 
 **Weitere Benachrichtigungsart: Training-Erinnerung.** Erinnert Spieler per Push, die für den
-nächsten Trainingstermin noch nicht geantwortet haben — zu drei festen Zeitpunkten vor
-Trainingsbeginn (1 Tag, 1 Stunde, 30 Minuten vorher), unabhängig voneinander: ein Spieler kann
-bis zu drei Erinnerungen für denselben Termin bekommen, sofern er bis dahin nicht geantwortet
-hat. `training_reminder_log` (Migration `0038`) verhindert Mehrfachversand derselben
-Erinnerungsart für denselben Termin, auch wenn der Check mehrfach läuft.
+nächsten Trainingstermin noch nicht geantwortet haben — zu bis zu drei Zeitpunkten vor
+Trainingsbeginn (Default: 1 Tag, 1 Stunde, 30 Minuten vorher; **im Admin unter Funktionen ->
+Erinnerungen -> "Push-Erinnerung fürs Training" in Minuten änderbar, 0 = abgeschaltet**),
+unabhängig voneinander: ein Spieler kann bis zu drei Erinnerungen für denselben Termin
+bekommen, sofern er bis dahin nicht geantwortet hat. `training_reminder_log` (Migration `0038`)
+verhindert Mehrfachversand derselben Erinnerungsart für denselben Termin, auch wenn der Check
+mehrfach läuft.
 
 Anders als "neue Meldung" gibt es hier keine einzelne auslösende Zeile — der Versand läuft über
 `api/send-training-reminders.ts`, aufgerufen von **`pg_cron`** direkt in Supabase (nicht per
@@ -1252,6 +1254,15 @@ hier die getroffenen Entscheidungen samt Begründung:
   30-Minuten-Fenster reicht das nicht, ein GitHub-Actions-Cron im 10-Minuten-Takt hätte aber auf
   Dauer das kostenlose Minutenkontingent gesprengt; `pg_cron` läuft stattdessen kostenlos direkt
   in der Datenbank.
+- **Die drei Erinnerungszeitpunkte im Admin änderbar** (Migration `0039`,
+  `FeatureFlagsAdmin.tsx`): auf Wunsch nachgezogen, nachdem die drei Zeitpunkte zunächst fest im
+  Code standen. `reminder_settings.training_push_offset_{1,2,3}_min` (Minuten vor
+  Trainingsbeginn, 0 = aus) ersetzen die vorherige feste `REMINDER_OFFSETS`-Konstante in
+  `api/send-training-reminders.ts`. `training_reminder_log.reminder_type` protokolliert dafür
+  bewusst nach Position (`slot_1`/`2`/`3`) statt nach dem konkreten Zeitwert (z. B. `1_hour`) —
+  sonst hätte eine spätere Änderung des Abstands (z. B. von 60 auf 90 Minuten) denselben Slot
+  wie einen neuen, noch nie verschickten Zeitpunkt aussehen lassen und zu einem doppelten
+  Versand geführt.
 
 ## Projektstruktur
 

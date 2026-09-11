@@ -9,6 +9,9 @@ interface ReminderForm {
   squad_reminder_days_before: string;
   training_reminder_days_before: string;
   officiating_season_min: string;
+  training_push_offset_1_min: string;
+  training_push_offset_2_min: string;
+  training_push_offset_3_min: string;
 }
 
 function reminderFormFromSettings(row: ReminderSettings): ReminderForm {
@@ -16,7 +19,10 @@ function reminderFormFromSettings(row: ReminderSettings): ReminderForm {
     enabled: row.enabled,
     squad_reminder_days_before: String(row.squad_reminder_days_before),
     training_reminder_days_before: String(row.training_reminder_days_before),
-    officiating_season_min: String(row.officiating_season_min)
+    officiating_season_min: String(row.officiating_season_min),
+    training_push_offset_1_min: String(row.training_push_offset_1_min),
+    training_push_offset_2_min: String(row.training_push_offset_2_min),
+    training_push_offset_3_min: String(row.training_push_offset_3_min)
   };
 }
 
@@ -68,7 +74,10 @@ export function FeatureFlagsAdmin() {
           enabled: reminderForm.enabled,
           squad_reminder_days_before: Math.max(0, Number(reminderForm.squad_reminder_days_before) || 0),
           training_reminder_days_before: Math.max(0, Number(reminderForm.training_reminder_days_before) || 0),
-          officiating_season_min: Math.max(0, Number(reminderForm.officiating_season_min) || 0)
+          officiating_season_min: Math.max(0, Number(reminderForm.officiating_season_min) || 0),
+          training_push_offset_1_min: Math.max(0, Number(reminderForm.training_push_offset_1_min) || 0),
+          training_push_offset_2_min: Math.max(0, Number(reminderForm.training_push_offset_2_min) || 0),
+          training_push_offset_3_min: Math.max(0, Number(reminderForm.training_push_offset_3_min) || 0)
         })
         .eq('id', 1);
       if (updError) throw updError;
@@ -188,6 +197,51 @@ export function FeatureFlagsAdmin() {
               U18-Spieler, die schon über ihre eigene Mannschaft eingeteilt werden, lassen sich unter
               "Admin → Spieler" von der Kampfgericht-Erinnerung ausnehmen.
             </p>
+          </div>
+
+          <div className="space-y-2 border-t border-black/5 pt-3">
+            <p className="text-sm font-semibold text-tbw-navyDark">Push-Erinnerung fürs Training</p>
+            <p className="text-xs text-tbw-ink/50">
+              Bis zu drei Zeitpunkte vor Trainingsbeginn, zu denen Spieler ohne Antwort per
+              Push erinnert werden (in Minuten, 0 = aus). Wirkt nur, wenn "Push-Benachrichtigungen"
+              unter Funktionen aktiviert ist.
+            </p>
+            <label className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-tbw-ink/70">1. Erinnerung (z. B. 1440 = 1 Tag vorher)</span>
+              <input
+                type="number"
+                min={0}
+                className="input !w-20 text-center"
+                value={reminderForm.training_push_offset_1_min}
+                onChange={(e) =>
+                  setReminderForm({ ...reminderForm, training_push_offset_1_min: e.target.value })
+                }
+              />
+            </label>
+            <label className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-tbw-ink/70">2. Erinnerung (z. B. 60 = 1 Stunde vorher)</span>
+              <input
+                type="number"
+                min={0}
+                className="input !w-20 text-center"
+                value={reminderForm.training_push_offset_2_min}
+                onChange={(e) =>
+                  setReminderForm({ ...reminderForm, training_push_offset_2_min: e.target.value })
+                }
+              />
+            </label>
+            <label className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-tbw-ink/70">3. Erinnerung (z. B. 30 = 30 Minuten vorher)</span>
+              <input
+                type="number"
+                min={0}
+                className="input !w-20 text-center"
+                value={reminderForm.training_push_offset_3_min}
+                onChange={(e) =>
+                  setReminderForm({ ...reminderForm, training_push_offset_3_min: e.target.value })
+                }
+              />
+            </label>
           </div>
 
           <div className="flex items-center gap-3 border-t border-black/5 pt-3">
