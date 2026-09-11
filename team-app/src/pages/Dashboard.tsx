@@ -8,6 +8,7 @@ import { UpcomingTrainings } from '../components/UpcomingTrainings';
 import { WeeklyTrainingTimes } from '../components/WeeklyTrainingTimes';
 import { AbsenceSection } from '../components/AbsenceSection';
 import { PushNotificationCard } from '../components/PushNotificationCard';
+import { usePushStatus } from '../hooks/usePushStatus';
 import { fmtDate, fmtDateShort, fmtTime } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
 import { computeReminders, type ReminderItem } from '../lib/reminders';
@@ -60,6 +61,7 @@ interface DashboardData {
 export function Dashboard() {
   const { role, player, isAdmin } = useAuth();
   const { flags } = useFeatureFlags();
+  const { status: pushStatus, refresh: refreshPushStatus } = usePushStatus();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [absenceVersion, setAbsenceVersion] = useState(0);
@@ -395,7 +397,9 @@ export function Dashboard() {
     <div className="space-y-4">
       {player && <p className="headline text-3xl text-tbw-navyDark">Hi {firstName}!</p>}
 
-      {flags.push_notifications && <PushNotificationCard />}
+      {flags.push_notifications && (pushStatus === 'unsubscribed' || pushStatus === 'denied') && (
+        <PushNotificationCard status={pushStatus} onChange={refreshPushStatus} />
+      )}
 
       {role === 'player' && data.reminders.length > 0 && (
         <section className="card !bg-tbw-red/10 !ring-tbw-red/30">
@@ -751,6 +755,10 @@ export function Dashboard() {
           <WeeklyTrainingTimes />
         </div>
       </section>
+
+      {flags.push_notifications && pushStatus === 'subscribed' && (
+        <PushNotificationCard status={pushStatus} onChange={refreshPushStatus} />
+      )}
     </div>
   );
 }
