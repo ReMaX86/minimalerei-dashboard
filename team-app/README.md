@@ -841,6 +841,15 @@ hier die getroffenen Entscheidungen samt Begründung:
   `role === 'player' && !isAdmin` (wie ursprünglich vor PR #90), ein
   admin-geflaggter Spieler sieht nur noch die eine Trainer-Ansicht, die
   Verwaltung und eigene Zusage vereint.
+- **Training-Erinnerung nennt jetzt das konkrete Datum** (`lib/reminders.ts`):
+  der Text war generisch "Nächstes Training noch nicht beantwortet". Ist die
+  Startzeit des heutigen Trainings schon vorbei, rutscht der intern geprüfte
+  "nächste" Termin korrekt auf den übernächsten Tag weiter (z. B. Montag bei
+  zwei Trainingstagen pro Woche) — die Erinnerung selbst hat also immer nur
+  einen einzigen Termin im Blick, nie beide auf der Startseite angezeigten.
+  Ohne Datum im Text wirkte das aber wie ein Bug, wenn man den erstgenannten
+  (bereits beantworteten) Termin schon zugesagt hatte. Text jetzt z. B.
+  "Training am Mo., 14.09.2026 noch nicht beantwortet".
 
 ## Projektstruktur
 

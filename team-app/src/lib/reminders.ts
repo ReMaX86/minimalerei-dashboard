@@ -1,4 +1,4 @@
-import { daysUntil } from './format';
+import { daysUntil, fmtDate } from './format';
 import type { ReminderSettings, SquadConfirmation } from '../types/database';
 
 export interface ReminderItem {
@@ -68,7 +68,12 @@ export function computeReminders(
     items.push({
       key: 'training',
       icon: '🕒',
-      text: 'Nächstes Training noch nicht beantwortet',
+      // Nennt bewusst das genaue Datum statt nur "nächstes Training" — sonst
+      // wirkt die Erinnerung so, als ginge es nochmal um ein bereits
+      // beantwortetes Training, wenn in Wirklichkeit schon der übernächste
+      // Termin gemeint ist (z. B. weil die Startzeit des heutigen Trainings
+      // schon vorbei ist und der Termin danach zum "nächsten" wird).
+      text: `Training am ${fmtDate(training.date)} noch nicht beantwortet`,
       to: '#training'
     });
   }

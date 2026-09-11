@@ -49,6 +49,11 @@ describe('computeReminders', () => {
     it('reminds when unanswered and within the window', () => {
       const result = computeReminders(TODAY, SETTINGS, null, base, null);
       expect(result.map((r) => r.key)).toEqual(['training']);
+      // Nennt das konkrete Datum, damit klar ist, welches Training gemeint
+      // ist — falls "heute" schon läuft/vorbei ist und ein späterer Termin
+      // zum "nächsten unbeantworteten" wurde, wäre sonst nicht ersichtlich,
+      // dass es sich nicht um ein bereits beantwortetes Training handelt.
+      expect(result[0].text).toContain('11.09');
     });
 
     it('stays silent once answered', () => {
