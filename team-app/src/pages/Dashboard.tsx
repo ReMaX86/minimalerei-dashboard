@@ -57,6 +57,7 @@ export function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [absenceVersion, setAbsenceVersion] = useState(0);
+  const [trainingVersion, setTrainingVersion] = useState(0);
   const [showUpcomingAbsences, setShowUpcomingAbsences] = useState(false);
   // Trainers/admin-players get the full Kampfgericht overview so they can
   // plan; a read-only Betrachter (e.g. Abteilungsleiter) gets to see the
@@ -313,7 +314,17 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [role, player, isAdmin, flags.announcements, flags.carpool, flags.absences, flags.stats, absenceVersion]);
+  }, [
+    role,
+    player,
+    isAdmin,
+    flags.announcements,
+    flags.carpool,
+    flags.absences,
+    flags.stats,
+    absenceVersion,
+    trainingVersion
+  ]);
 
   if (error) return <div className="card text-sm text-tbw-red">{error}</div>;
   if (!data) return <LoadingSpinner />;
@@ -671,7 +682,7 @@ export function Dashboard() {
       <section id="training" className="card scroll-mt-20">
         <SectionTitle icon="🕒" title="Nächste Trainingseinheit" />
         <div className="mt-2">
-          <UpcomingTrainings refreshKey={absenceVersion} />
+          <UpcomingTrainings refreshKey={absenceVersion} onChange={() => setTrainingVersion((v) => v + 1)} />
         </div>
       </section>
     </div>
