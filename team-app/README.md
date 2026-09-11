@@ -793,6 +793,15 @@ hier die getroffenen Entscheidungen samt Begründung:
   — aktuell laufende Abwesenheiten stehen direkt sichtbar, kommende sind über
   einen Ausklapp-Button ("N kommende Abwesenheiten anzeigen") erreichbar. Kein
   zusätzlicher Query nötig, die Daten waren schon vorhanden.
+- **Admin-geflaggte Spieler sahen ihre eigene Kader-Bestätigung
+  (✓ Kann / ✗ Kann nicht) nicht** (`Spiele.tsx`): der Block war an
+  `role === 'player' && !isAdmin` geknüpft, wodurch jeder Spieler mit
+  Trainer-Rechten (z. B. ein spielender Co-Trainer) komplett ausgeschlossen
+  war — er sah nur noch die Trainer-Kader-Bearbeitung, aber keine Möglichkeit
+  mehr, für sich selbst zu- oder abzusagen. Die `!isAdmin`-Ausnahme wurde
+  entfernt; ein admin-geflaggter Spieler sieht jetzt wie vorgesehen beides:
+  die Trainer-Werkzeuge und seine eigene Spieler-Ansicht mit
+  Bestätigungs-Buttons.
 
 ## Projektstruktur
 
