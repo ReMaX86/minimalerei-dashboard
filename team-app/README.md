@@ -976,6 +976,26 @@ hier die getroffenen Entscheidungen samt Begründung:
   beiden Fällen wieder ein. Die schon vorhandene "Jahrgänge / Teams"-
   Ablage im Kampfgericht-Admin (eigener ▲/▼-Toggle) blieb unverändert, da
   sie bereits demselben "erst auf Wunsch aufklappen"-Prinzip folgt.
+- **Startseite neu sortiert + reine Trainingszeiten-Übersicht**
+  (`Dashboard.tsx`, `WeeklyTrainingTimes.tsx`, `AbsenceSection.tsx`): bisher
+  zeigte die Startseite die nächsten beiden Trainingstermine zum
+  Zu-/Absagen erst weit unten bei den Teaminformationen, und es gab gar
+  keine reine Übersicht über die regulären wöchentlichen Trainingszeiten.
+  Auf Wunsch neu sortiert: der persönliche Bereich oben ist jetzt
+  Erinnerungen/Meldungen → Nächstes Spiel → **Nächste Trainingseinheit
+  (Zu-/Absage, von weiter unten hochgezogen)** → Dein nächster
+  Kampfgericht-Termin → Dein Urlaub / Abwesenheit (Überschrift von "🌴
+  Urlaub / Abwesenheit" auf "🌴 Dein Urlaub / Abwesenheit" präzisiert, da
+  jetzt direkt neben anderen "Dein …"-Karten). Im Teaminformationen-
+  Bereich (Trainer-/Captain-Übersichtskarten bleiben unverändert an ihrer
+  bisherigen Stelle) folgt auf "Wer hat die Trikots?" jetzt eine neue,
+  rein informative "Trainingszeiten"-Karte (`WeeklyTrainingTimes.tsx`,
+  Wochentag + Uhrzeit + Halle, ohne Zu-/Absage-Buttons) — sie filtert
+  bewusst nur reguläre wöchentliche Trainings (`weekday` gesetzt) heraus,
+  Sondertermine einer Ferienzeit gehören nicht in diese Dauer-Übersicht.
+  Der `id="training"`-Anker für den Sprunglink aus der Erinnerung
+  (`lib/reminders.ts`, `to: '#training'`) wanderte mit der Zu-/Absage-
+  Karte an ihre neue Position nach oben.
 
 ## Projektstruktur
 

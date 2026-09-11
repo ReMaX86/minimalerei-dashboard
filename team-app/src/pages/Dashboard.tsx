@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { UpcomingTrainings } from '../components/UpcomingTrainings';
+import { WeeklyTrainingTimes } from '../components/WeeklyTrainingTimes';
 import { AbsenceSection } from '../components/AbsenceSection';
 import { fmtDate, fmtDateShort, fmtTime } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
@@ -600,6 +601,13 @@ export function Dashboard() {
         </section>
       )}
 
+      <section id="training" className="card scroll-mt-20">
+        <SectionTitle icon="🕒" title="Nächste Trainingseinheit" />
+        <div className="mt-2">
+          <UpcomingTrainings refreshKey={absenceVersion} onChange={() => setTrainingVersion((v) => v + 1)} />
+        </div>
+      </section>
+
       {role === 'player' && (
         <section className="card">
           <SectionTitle icon="📋" title="Dein nächster Kampfgericht Termin" />
@@ -734,10 +742,10 @@ export function Dashboard() {
         </div>
       </section>
 
-      <section id="training" className="card scroll-mt-20">
-        <SectionTitle icon="🕒" title="Nächste Trainingseinheit" />
+      <section className="card">
+        <SectionTitle icon="🕒" title="Trainingszeiten" />
         <div className="mt-2">
-          <UpcomingTrainings refreshKey={absenceVersion} onChange={() => setTrainingVersion((v) => v + 1)} />
+          <WeeklyTrainingTimes />
         </div>
       </section>
     </div>
