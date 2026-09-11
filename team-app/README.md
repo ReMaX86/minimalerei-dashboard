@@ -177,6 +177,31 @@ select status_code, content, created from net._http_response order by created de
 ```
 im SQL-Editor die letzten Aufrufe von Schritt 6 inkl. etwaiger Fehlermeldungen.
 
+**Weitere Benachrichtigungsart: Training-Erinnerung.** Erinnert Spieler per Push, die für den
+nächsten Trainingstermin noch nicht geantwortet haben, sobald die unter Admin -> Funktionen ->
+Erinnerungen eingestellte Frist erreicht ist (dieselbe Logik wie die "Für dich zu
+erledigen"-Karte auf der Startseite). Anders als "neue Meldung" gibt es hier keine einzelne
+auslösende Zeile — der Versand läuft über `api/send-training-reminders.ts`, täglich aufgerufen
+vom Workflow `.github/workflows/training-reminders.yml`. Setup zusätzlich zu den Schritten oben:
+
+1. In den GitHub-Repo-Settings unter **Secrets and variables -> Actions** anlegen:
+   - `TBW_VERCEL_URL` — die Produktions-Domain, z. B. `https://team-app-two-orpin.vercel.app`.
+   - `TBW_PUSH_WEBHOOK_SECRET` — derselbe Wert wie `PUSH_WEBHOOK_SECRET` in Vercel.
+2. Kein weiteres Setup nötig — nutzt dieselben Vercel-Env-Vars (VAPID, Service-Role-Key) wie
+   "neue Meldung".
+
+Manuell/testweise auslösen, ohne auf den täglichen Cron zu warten — entweder über den Reiter
+**Actions** im Repo (Workflow "Training-Erinnerung (TBW Team App)" -> **Run workflow**) oder
+direkt per SQL:
+```sql
+select net.http_post(
+  url := 'https://<deine-vercel-domain>/api/send-training-reminders',
+  headers := jsonb_build_object('x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>')
+);
+```
+Achtung: verschickt bei jedem Aufruf erneut eine Push an alle, die für den nächsten Termin noch
+nicht geantwortet haben — es gibt (noch) keine "schon benachrichtigt"-Sperre.
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
@@ -1180,6 +1205,18 @@ hier die getroffenen Entscheidungen samt Begründung:
   jetzt nur noch als Verwalten-/Deaktivieren-Option statt weiter prominent oben zu stehen.
   Die Karte selbst bekommt den Status per Prop statt ihn selbst zu laden, damit nicht beide
   Stellen unabhängig voneinander pollen.
+- **Zweite Benachrichtigungsart: Training-Erinnerung** (`api/send-training-reminders.ts`,
+  `.github/workflows/training-reminders.yml`): erste Benachrichtigungsart ohne einzelne
+  auslösende Zeile — statt eines Datenbank-Triggers wie bei "neue Meldung" läuft hier ein
+  täglicher GitHub-Actions-Cron (dieselbe kostenlose Infrastruktur wie Keep-Alive/Backup), der
+  dieselbe "wer hat noch nicht geantwortet"-Logik wie die Startseiten-Erinnerungskarte
+  (`lib/reminders.ts`) serverseitig nachbildet — dafür importiert die Vercel-Function direkt
+  `nextTrainingOccurrences()` aus `lib/trainingSchedule.ts` und `daysUntil()`/`fmtDate()` aus
+  `lib/format.ts` (beides reine Logik ohne Browser-Abhängigkeit, deshalb ohne Duplizierung
+  direkt aus `src/` importierbar). Bewusst noch ohne Sperre gegen Mehrfachversand — bei
+  täglichem Lauf bekäme ein Spieler bis zu seiner Antwort jeden Tag erneut eine Push; für den
+  ersten Test akzeptiert, ließe sich mit einer kleinen "zuletzt benachrichtigt"-Spalte
+  nachschärfen, falls das in der Praxis nervt.
 
 ## Projektstruktur
 
