@@ -6,7 +6,14 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { ErrorNote } from './ErrorNote';
 import { fmtDate, fmtTime } from '../lib/format';
 import { nextTrainingOccurrences, type TrainingOccurrence } from '../lib/trainingSchedule';
-import { playerAbsenceOn, type Player, type PlayerAbsence, type Training, type TrainingRsvpRow } from '../types/database';
+import {
+  playerAbsenceOn,
+  type Player,
+  type PlayerAbsence,
+  type Training,
+  type TrainingOverride,
+  type TrainingRsvpRow
+} from '../types/database';
 
 const UPCOMING_COUNT = 2;
 
@@ -31,20 +38,22 @@ export function UpcomingTrainings({
   const load = useCallback(async () => {
     setError(null);
     const today = new Date().toISOString().slice(0, 10);
-    const [trainingsRes, playersRes, absencesRes] = await Promise.all([
+    const [trainingsRes, overridesRes, playersRes, absencesRes] = await Promise.all([
       supabase.from('trainings').select('*'),
+      supabase.from('training_overrides').select('*').gte('end_date', today),
       supabase.from('players').select('*').eq('is_active', true),
       flags.absences
         ? supabase.from('player_absences').select('*').gte('end_date', today)
         : Promise.resolve({ data: [] as PlayerAbsence[], error: null })
     ]);
-    if (trainingsRes.error || playersRes.error) {
+    if (trainingsRes.error || overridesRes.error || playersRes.error) {
       setError('Fehler beim Laden der Trainingszeiten.');
       return;
     }
 
     const trainings = (trainingsRes.data as Training[]) ?? [];
-    const occurrences = nextTrainingOccurrences(trainings, UPCOMING_COUNT);
+    const overrides = (overridesRes.data as TrainingOverride[]) ?? [];
+    const occurrences = nextTrainingOccurrences(trainings, UPCOMING_COUNT, new Date(), overrides);
     const trainingIds = [...new Set(occurrences.map((o) => o.training.id))];
 
     let rsvps: TrainingRsvpRow[] = [];
@@ -147,6 +156,7 @@ export function UpcomingTrainings({
               <p className="text-sm text-tbw-ink/70">
                 {fmtTime(occ.training.start_time)}–{fmtTime(occ.training.end_time)} · {occ.training.location}
               </p>
+              {occ.note && <p className="mt-0.5 text-xs font-semibold text-tbw-gold">🏖️ {occ.note}</p>}
               <p className="mt-1 text-xs text-tbw-ink/50">
                 ✓ {zusagen.length} · ✗ {absagen.length}
                 {urlaub.length > 0 && ` · 🌴 ${urlaub.length}`} · {offen.length} offen {isExpanded ? '▲' : '▼'}

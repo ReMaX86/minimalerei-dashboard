@@ -2,12 +2,23 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
-import { TimeField } from '../../components/DateTimeField';
-import { fmtTime } from '../../lib/format';
+import { DateField, TimeField } from '../../components/DateTimeField';
+import { fmtDateShort, fmtTime } from '../../lib/format';
 import { weekdayIndex, WEEKDAY_ORDER } from '../../lib/weekdays';
-import type { Training } from '../../types/database';
+import type { Training, TrainingOverride } from '../../types/database';
 
 const EMPTY_FORM = { weekday: WEEKDAY_ORDER[0], start_time: '', end_time: '', location: '' };
+
+const EMPTY_OVERRIDE_FORM = {
+  start_date: '',
+  end_date: '',
+  weekday: '', // '' = alle Trainingstage
+  status: 'cancelled' as 'cancelled' | 'special',
+  start_time: '',
+  end_time: '',
+  location: '',
+  note: ''
+};
 
 export function TrainingsAdmin() {
   const [trainings, setTrainings] = useState<Training[] | null>(null);
@@ -65,11 +76,68 @@ export function TrainingsAdmin() {
     }
   }
 
+  const [overrides, setOverrides] = useState<TrainingOverride[] | null>(null);
+  const [overrideForm, setOverrideForm] = useState(EMPTY_OVERRIDE_FORM);
+  const [overrideBusy, setOverrideBusy] = useState(false);
+  const [overrideError, setOverrideError] = useState<string | null>(null);
+
+  const loadOverrides = useCallback(async () => {
+    setOverrideError(null);
+    const { data, error: loadError } = await supabase.from('training_overrides').select('*');
+    if (loadError) {
+      setOverrideError('Fehler beim Laden der Ferienzeiten.');
+      return;
+    }
+    setOverrides([...((data as TrainingOverride[]) ?? [])].sort((a, b) => a.start_date.localeCompare(b.start_date)));
+  }, []);
+
+  useEffect(() => {
+    loadOverrides().catch(() => setOverrideError('Fehler beim Laden der Ferienzeiten.'));
+  }, [loadOverrides]);
+
+  async function addOverride(e: FormEvent) {
+    e.preventDefault();
+    setOverrideBusy(true);
+    setOverrideError(null);
+    try {
+      const isSpecial = overrideForm.status === 'special';
+      const { error: insertError } = await supabase.from('training_overrides').insert({
+        start_date: overrideForm.start_date,
+        end_date: overrideForm.end_date,
+        weekday: overrideForm.weekday || null,
+        status: overrideForm.status,
+        start_time: isSpecial ? overrideForm.start_time : null,
+        end_time: isSpecial ? overrideForm.end_time : null,
+        location: isSpecial && overrideForm.location.trim() ? overrideForm.location.trim() : null,
+        note: overrideForm.note.trim() || null
+      });
+      if (insertError) throw insertError;
+      setOverrideForm(EMPTY_OVERRIDE_FORM);
+      await loadOverrides();
+    } catch {
+      setOverrideError('Ausnahme konnte nicht angelegt werden.');
+    } finally {
+      setOverrideBusy(false);
+    }
+  }
+
+  async function removeOverride(id: string) {
+    setOverrideError(null);
+    try {
+      const { error: delError } = await supabase.from('training_overrides').delete().eq('id', id);
+      if (delError) throw delError;
+      await loadOverrides();
+    } catch {
+      setOverrideError('Löschen fehlgeschlagen.');
+    }
+  }
+
   if (error) return <ErrorNote message={error} />;
   if (!trainings) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Wöchentliche Trainingszeiten</p>
       <form onSubmit={addTraining} className="card space-y-2">
         <p className="text-sm font-bold text-tbw-navyDark">Neue Trainingszeit</p>
         <select
@@ -125,6 +193,125 @@ export function TrainingsAdmin() {
         ))}
         {trainings.length === 0 && <p className="text-sm text-tbw-ink/50">Noch keine Trainingszeiten eingetragen.</p>}
       </ul>
+
+      <p className="pt-2 text-xs font-bold uppercase tracking-wide text-tbw-ink/40">
+        Ferienzeiten &amp; Sonderregelungen
+      </p>
+      {overrideError && <ErrorNote message={overrideError} />}
+      {overrides === null ? (
+        <LoadingSpinner />
+      ) : (
+        <>
+          <form onSubmit={addOverride} className="card space-y-2">
+            <p className="text-sm font-bold text-tbw-navyDark">Neue Ausnahme</p>
+            <div className="grid grid-cols-2 gap-2">
+              <DateField
+                label="Von"
+                required
+                value={overrideForm.start_date}
+                onChange={(v) => setOverrideForm((f) => ({ ...f, start_date: v }))}
+              />
+              <DateField
+                label="Bis"
+                required
+                min={overrideForm.start_date || undefined}
+                value={overrideForm.end_date}
+                onChange={(v) => setOverrideForm((f) => ({ ...f, end_date: v }))}
+              />
+            </div>
+            <select
+              className="input"
+              value={overrideForm.weekday}
+              onChange={(e) => setOverrideForm((f) => ({ ...f, weekday: e.target.value }))}
+            >
+              <option value="">Alle Trainingstage</option>
+              {WEEKDAY_ORDER.map((day) => (
+                <option key={day} value={day}>
+                  {day}
+                </option>
+              ))}
+            </select>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setOverrideForm((f) => ({ ...f, status: 'cancelled' }))}
+                className={`btn-secondary flex-1 !py-2 text-sm ${
+                  overrideForm.status === 'cancelled' ? '!bg-tbw-red/10 !text-tbw-red !ring-tbw-red/30' : ''
+                }`}
+              >
+                Fällt aus
+              </button>
+              <button
+                type="button"
+                onClick={() => setOverrideForm((f) => ({ ...f, status: 'special' }))}
+                className={`btn-secondary flex-1 !py-2 text-sm ${
+                  overrideForm.status === 'special' ? '!bg-tbw-gold/10 !text-tbw-navyDark !ring-tbw-gold/30' : ''
+                }`}
+              >
+                Sonderzeit
+              </button>
+            </div>
+            {overrideForm.status === 'special' && (
+              <div className="space-y-2 rounded-xl bg-tbw-bg p-3">
+                <TimeField
+                  label="Beginn"
+                  required
+                  value={overrideForm.start_time}
+                  onChange={(v) => setOverrideForm((f) => ({ ...f, start_time: v }))}
+                />
+                <TimeField
+                  label="Ende"
+                  required
+                  value={overrideForm.end_time}
+                  onChange={(v) => setOverrideForm((f) => ({ ...f, end_time: v }))}
+                />
+                <input
+                  placeholder="Halle / Adresse (leer = wie gewohnt)"
+                  className="input"
+                  value={overrideForm.location}
+                  onChange={(e) => setOverrideForm((f) => ({ ...f, location: e.target.value }))}
+                />
+              </div>
+            )}
+            <input
+              placeholder="Notiz (z. B. Herbstferien)"
+              className="input"
+              value={overrideForm.note}
+              onChange={(e) => setOverrideForm((f) => ({ ...f, note: e.target.value }))}
+            />
+            <button className="btn-primary w-full" disabled={overrideBusy}>
+              Anlegen
+            </button>
+          </form>
+
+          <ul className="space-y-2">
+            {overrides.map((o) => (
+              <li key={o.id} className="card flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-tbw-navyDark">
+                    {fmtDateShort(o.start_date)}–{fmtDateShort(o.end_date)} · {o.weekday ?? 'alle Tage'}
+                  </p>
+                  <p className="text-sm text-tbw-ink/60">
+                    {o.status === 'cancelled'
+                      ? 'Fällt aus'
+                      : `Sonderzeit ${fmtTime(o.start_time!)}–${fmtTime(o.end_time!)}${o.location ? ` · ${o.location}` : ''}`}
+                    {o.note ? ` · ${o.note}` : ''}
+                  </p>
+                </div>
+                <button
+                  className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red"
+                  onClick={() => removeOverride(o.id)}
+                >
+                  Löschen
+                </button>
+              </li>
+            ))}
+            {overrides.length === 0 && (
+              <p className="text-sm text-tbw-ink/50">Keine Ferienzeiten/Sonderregelungen eingetragen.</p>
+            )}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
