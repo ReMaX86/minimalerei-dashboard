@@ -5,31 +5,29 @@ import type { Player, PlayerAbsence, ReminderSettings, Training, TrainingOverrid
 
 // Zweite Benachrichtigungsart nach "neue Meldung" (siehe send-push.ts):
 // erinnert Spieler, die für den nächsten Trainingstermin noch nicht
-// geantwortet haben, sobald die in reminder_settings konfigurierte Frist
-// erreicht ist — dieselbe Logik wie die "Für dich zu erledigen"-Karte auf
-// der Startseite (lib/reminders.ts), nur serverseitig für den Push-Versand.
+// geantwortet haben, zu drei festen Zeitpunkten vor Trainingsbeginn (1 Tag,
+// 1 Stunde, 30 Minuten) — unabhängig voneinander, ein Spieler kann also bis
+// zu drei Erinnerungen für denselben Termin bekommen, sofern er bis dahin
+// nicht geantwortet hat. training_reminder_log (Migration 0038) verhindert
+// Mehrfachversand derselben Erinnerungsart für denselben Termin.
+//
+// Aufgerufen wird dieser Endpunkt NICHT mehr per täglichem GitHub-Actions-
+// Cron (zu grob für ein 30-Minuten-Fenster, und ein Free-Tier-Cron im
+// 10-15-Minuten-Takt hätte schnell die kostenlosen GitHub-Actions-Minuten
+// aufgebraucht) — stattdessen per pg_cron direkt in Supabase (kostenlos,
+// keine separate Abrechnung pro Aufruf), siehe README "Push-
+// Benachrichtigungen" für die genaue Einrichtung. Jederzeit auch manuell
+// auslösbar, z. B. testweise per net.http_post im SQL-Editor.
 //
 // Bewusst KOMPLETT ohne eigene lokale Imports (weder aus src/lib/ noch aus
 // einer api/_lib/-Hilfsdatei) — beide Varianten scheiterten live bei Vercel
-// mit ERR_MODULE_NOT_FOUND ("Cannot find module '.../src/lib/...'" bzw.
-// sogar für eine Datei innerhalb von api/). Diese Vercel-Umgebung bündelt
-// offenbar keine lokalen Dateiabhängigkeiten für api/-Functions dieses
-// Projekts (anders als bei den meisten Vercel/Next.js-Setups üblich) — nur
-// Pakete aus node_modules funktionieren zuverlässig (siehe send-push.ts,
-// das nie dieses Problem hatte). Die Terminlogik unten ist deshalb eine
-// bewusste Kopie von src/lib/trainingSchedule.ts (nur
-// nextTrainingOccurrences, plus die kleinen Format-Helfer aus
-// src/lib/format.ts) — bei Änderungen an der Terminlogik dort bitte hier
-// synchron nachziehen.
-//
-// Anders als send-push.ts (Datenbank-Trigger auf INSERT) gibt es hier keine
-// einzelne auslösende Zeile — dieser Endpunkt wird stattdessen zeitgesteuert
-// aufgerufen (siehe .github/workflows/training-reminders.yml), ist aber
-// jederzeit auch manuell auslösbar (z. B. testweise per net.http_post im
-// SQL-Editor oder curl mit demselben x-webhook-secret wie send-push.ts).
-//
-// Bewusst (noch) ohne "schon benachrichtigt"-Sperre — ein Spieler bekommt
-// bei jedem Lauf, an dem er noch nicht geantwortet hat, erneut eine Push.
+// mit ERR_MODULE_NOT_FOUND. Diese Vercel-Umgebung bündelt offenbar keine
+// lokalen Dateiabhängigkeiten für api/-Functions dieses Projekts (anders
+// als bei den meisten Vercel/Next.js-Setups üblich) — nur Pakete aus
+// node_modules funktionieren zuverlässig (siehe send-push.ts). Die
+// Terminlogik unten ist deshalb eine bewusste Kopie von
+// src/lib/trainingSchedule.ts (nur nextTrainingOccurrences) — bei
+// Änderungen an der Terminlogik dort bitte hier synchron nachziehen.
 
 // --- Terminlogik (Kopie von src/lib/trainingSchedule.ts) ---
 
@@ -136,12 +134,6 @@ function nextTrainingOccurrences(
 
 // --- Format-Helfer (Kopie von src/lib/format.ts) ---
 
-function daysUntil(iso: string, today: Date): number {
-  const from = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const target = new Date(iso + 'T00:00:00');
-  return Math.round((target.getTime() - from.getTime()) / 86_400_000);
-}
-
 function fmtDate(iso: string): string {
   const d = new Date(iso + 'T00:00:00');
   return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -149,6 +141,22 @@ function fmtDate(iso: string): string {
 
 function fmtTime(time: string): string {
   return time.slice(0, 5);
+}
+
+// --- Die drei festen Erinnerungszeitpunkte ---
+
+const REMINDER_OFFSETS: { type: '1_day' | '1_hour' | '30_min'; ms: number; label: string }[] = [
+  { type: '1_day', ms: 24 * 60 * 60 * 1000, label: 'morgen' },
+  { type: '1_hour', ms: 60 * 60 * 1000, label: 'in 1 Stunde' },
+  { type: '30_min', ms: 30 * 60 * 1000, label: 'in 30 Minuten' }
+];
+
+interface PushSubRow {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth_key: string;
 }
 
 // --- Handler ---
@@ -206,11 +214,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const today = new Date();
+  const now = new Date();
   const occurrence = nextTrainingOccurrences(
     (trainingsRes.data as Training[]) ?? [],
     1,
-    today,
+    now,
     (overridesRes.data as TrainingOverride[]) ?? []
   )[0];
 
@@ -219,8 +227,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  if (daysUntil(occurrence.date, today) > settings.training_reminder_days_before) {
-    res.status(200).json({ skipped: 'not_due_yet', date: occurrence.date });
+  const [h, m] = occurrence.training.start_time.split(':').map(Number);
+  const [y, mo, d] = occurrence.date.split('-').map(Number);
+  const startsAt = new Date(y, mo - 1, d, h, m);
+
+  if (startsAt <= now) {
+    res.status(200).json({ skipped: 'already_started', date: occurrence.date });
+    return;
+  }
+
+  const dueTypes = REMINDER_OFFSETS.filter((o) => startsAt.getTime() - o.ms <= now.getTime());
+  if (dueTypes.length === 0) {
+    res.status(200).json({ skipped: 'not_due_yet', date: occurrence.date, startsAt: startsAt.toISOString() });
     return;
   }
 
@@ -246,7 +264,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   );
 
   if (targetPlayers.length === 0) {
-    res.status(200).json({ sent: 0, targeted: 0, date: occurrence.date });
+    res.status(200).json({ sent: 0, attempted: 0, date: occurrence.date, dueTypes: dueTypes.map((t) => t.type) });
+    return;
+  }
+
+  const { data: logRows } = await supabase
+    .from('training_reminder_log')
+    .select('player_id, reminder_type')
+    .eq('training_id', occurrence.training.id)
+    .eq('session_date', occurrence.date)
+    .in(
+      'player_id',
+      targetPlayers.map((p) => p.id)
+    );
+  const alreadySent = new Set(
+    ((logRows as { player_id: string; reminder_type: string }[] | null) ?? []).map(
+      (r) => `${r.player_id}:${r.reminder_type}`
+    )
+  );
+
+  const toSend = dueTypes.flatMap((type) =>
+    targetPlayers
+      .filter((p) => !alreadySent.has(`${p.id}:${type.type}`))
+      .map((player) => ({ player, type: type.type, label: type.label }))
+  );
+
+  if (toSend.length === 0) {
+    res.status(200).json({ sent: 0, attempted: 0, date: occurrence.date, dueTypes: dueTypes.map((t) => t.type) });
     return;
   }
 
@@ -257,52 +301,84 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'player_id',
       targetPlayers.map((p) => p.id)
     );
-  const authUserIds = ((linkRows as { player_id: string; auth_user_id: string }[] | null) ?? []).map(
-    (r) => r.auth_user_id
+  const authUserIdByPlayer = new Map(
+    ((linkRows as { player_id: string; auth_user_id: string }[] | null) ?? []).map((r) => [r.player_id, r.auth_user_id])
   );
+  const authUserIds = [...authUserIdByPlayer.values()];
 
   const { data: subRows } = await supabase
     .from('push_subscriptions')
-    .select('id, endpoint, p256dh, auth_key')
+    .select('id, user_id, endpoint, p256dh, auth_key')
     .in('user_id', authUserIds.length > 0 ? authUserIds : ['00000000-0000-0000-0000-000000000000']);
 
-  const payload = JSON.stringify({
-    title: 'Training noch nicht beantwortet',
-    body: `Bist du am ${fmtDate(occurrence.date)} um ${fmtTime(occurrence.training.start_time)} Uhr dabei?`,
-    url: '/#training'
-  });
+  const subsByAuthUser = new Map<string, PushSubRow[]>();
+  for (const sub of (subRows as PushSubRow[] | null) ?? []) {
+    const list = subsByAuthUser.get(sub.user_id) ?? [];
+    list.push(sub);
+    subsByAuthUser.set(sub.user_id, list);
+  }
 
-  const staleIds: string[] = [];
+  const staleSubIds: string[] = [];
   let sent = 0;
+  const newLogRows: { training_id: string; session_date: string; player_id: string; reminder_type: string }[] = [];
 
   await Promise.all(
-    ((subRows as { id: string; endpoint: string; p256dh: string; auth_key: string }[] | null) ?? []).map(
-      async (sub) => {
-        try {
-          await webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth_key } },
-            payload
-          );
-          sent += 1;
-        } catch (err) {
-          const statusCode = (err as { statusCode?: number } | null)?.statusCode;
-          if (statusCode === 404 || statusCode === 410) {
-            staleIds.push(sub.id);
+    toSend.map(async ({ player, type, label }) => {
+      const authUserId = authUserIdByPlayer.get(player.id);
+      const subs = authUserId ? subsByAuthUser.get(authUserId) ?? [] : [];
+
+      const payload = JSON.stringify({
+        title: `Training ${label} — noch nicht beantwortet`,
+        body: `${fmtDate(occurrence.date)} um ${fmtTime(occurrence.training.start_time)} Uhr — bist du dabei?`,
+        url: '/#training'
+      });
+
+      await Promise.all(
+        subs.map(async (sub) => {
+          try {
+            await webpush.sendNotification(
+              { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth_key } },
+              payload
+            );
+            sent += 1;
+          } catch (err) {
+            const statusCode = (err as { statusCode?: number } | null)?.statusCode;
+            if (statusCode === 404 || statusCode === 410) {
+              staleSubIds.push(sub.id);
+            }
           }
-        }
-      }
-    )
+        })
+      );
+
+      // Auch protokollieren, wenn der Spieler (noch) kein Gerät angemeldet
+      // hat — sonst würde bei späterem Aktivieren eine längst verstrichene
+      // Erinnerung verspätet nachgeholt. "Fällig gewesen" zählt als
+      // "erledigt", unabhängig davon, ob gerade ein Gerät erreichbar war.
+      newLogRows.push({
+        training_id: occurrence.training.id,
+        session_date: occurrence.date,
+        player_id: player.id,
+        reminder_type: type
+      });
+    })
   );
 
-  if (staleIds.length > 0) {
-    await supabase.from('push_subscriptions').delete().in('id', staleIds);
+  if (staleSubIds.length > 0) {
+    await supabase.from('push_subscriptions').delete().in('id', staleSubIds);
+  }
+
+  if (newLogRows.length > 0) {
+    await supabase.from('training_reminder_log').upsert(newLogRows, {
+      onConflict: 'training_id,session_date,player_id,reminder_type',
+      ignoreDuplicates: true
+    });
   }
 
   res.status(200).json({
     sent,
-    targeted: targetPlayers.length,
-    subscriptions: (subRows ?? []).length,
-    removed: staleIds.length,
-    date: occurrence.date
+    attempted: toSend.length,
+    removed: staleSubIds.length,
+    date: occurrence.date,
+    dueTypes: dueTypes.map((t) => t.type)
   });
 }

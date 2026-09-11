@@ -178,29 +178,49 @@ select status_code, content, created from net._http_response order by created de
 im SQL-Editor die letzten Aufrufe von Schritt 6 inkl. etwaiger Fehlermeldungen.
 
 **Weitere Benachrichtigungsart: Training-Erinnerung.** Erinnert Spieler per Push, die für den
-nächsten Trainingstermin noch nicht geantwortet haben, sobald die unter Admin -> Funktionen ->
-Erinnerungen eingestellte Frist erreicht ist (dieselbe Logik wie die "Für dich zu
-erledigen"-Karte auf der Startseite). Anders als "neue Meldung" gibt es hier keine einzelne
-auslösende Zeile — der Versand läuft über `api/send-training-reminders.ts`, täglich aufgerufen
-vom Workflow `.github/workflows/training-reminders.yml`. Setup zusätzlich zu den Schritten oben:
+nächsten Trainingstermin noch nicht geantwortet haben — zu drei festen Zeitpunkten vor
+Trainingsbeginn (1 Tag, 1 Stunde, 30 Minuten vorher), unabhängig voneinander: ein Spieler kann
+bis zu drei Erinnerungen für denselben Termin bekommen, sofern er bis dahin nicht geantwortet
+hat. `training_reminder_log` (Migration `0038`) verhindert Mehrfachversand derselben
+Erinnerungsart für denselben Termin, auch wenn der Check mehrfach läuft.
 
-1. In den GitHub-Repo-Settings unter **Secrets and variables -> Actions** anlegen:
-   - `TBW_VERCEL_URL` — die Produktions-Domain, z. B. `https://team-app-two-orpin.vercel.app`.
-   - `TBW_PUSH_WEBHOOK_SECRET` — derselbe Wert wie `PUSH_WEBHOOK_SECRET` in Vercel.
-2. Kein weiteres Setup nötig — nutzt dieselben Vercel-Env-Vars (VAPID, Service-Role-Key) wie
+Anders als "neue Meldung" gibt es hier keine einzelne auslösende Zeile — der Versand läuft über
+`api/send-training-reminders.ts`, aufgerufen von **`pg_cron`** direkt in Supabase (nicht per
+GitHub-Actions-Cron: für ein 30-Minuten-Fenster bräuchte es einen Check alle 10–15 Minuten, das
+hätte auf Dauer das kostenlose GitHub-Actions-Minutenkontingent gesprengt — `pg_cron` läuft
+dagegen kostenlos direkt in der Datenbank, ohne separate Abrechnung pro Aufruf). Setup
+zusätzlich zu den Schritten oben:
+
+1. **`pg_cron`-Erweiterung aktivieren**: Database -> Extensions -> nach `pg_cron` suchen ->
+   aktivieren (analog zu `pg_net` weiter oben).
+2. **Cron-Job anlegen**, im SQL-Editor (läuft alle 10 Minuten, ruft `api/send-training-reminders`
+   auf):
+   ```sql
+   select cron.schedule(
+     'training-reminders',
+     '*/10 * * * *',
+     $$
+     select net.http_post(
+       url := 'https://<deine-vercel-domain>/api/send-training-reminders',
+       headers := jsonb_build_object('x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>')
+     );
+     $$
+   );
+   ```
+3. Kein weiteres Setup nötig — nutzt dieselben Vercel-Env-Vars (VAPID, Service-Role-Key) wie
    "neue Meldung".
 
-Manuell/testweise auslösen, ohne auf den täglichen Cron zu warten — entweder über den Reiter
-**Actions** im Repo (Workflow "Training-Erinnerung (TBW Team App)" -> **Run workflow**) oder
-direkt per SQL:
+Manuell/testweise auslösen, ohne auf den nächsten `pg_cron`-Lauf zu warten, per SQL:
 ```sql
 select net.http_post(
   url := 'https://<deine-vercel-domain>/api/send-training-reminders',
   headers := jsonb_build_object('x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>')
 );
 ```
-Achtung: verschickt bei jedem Aufruf erneut eine Push an alle, die für den nächsten Termin noch
-nicht geantwortet haben — es gibt (noch) keine "schon benachrichtigt"-Sperre.
+Läuft der `pg_cron`-Job noch nicht (nur der manuelle Aufruf), gibt es kein 30-Minuten-Fenster —
+nur der jeweils exakte Moment beim manuellen Aufruf zählt als "fällig".
+
+Den Cron-Job wieder entfernen: `select cron.unschedule('training-reminders');`
 
 ## Design
 
@@ -1205,18 +1225,33 @@ hier die getroffenen Entscheidungen samt Begründung:
   jetzt nur noch als Verwalten-/Deaktivieren-Option statt weiter prominent oben zu stehen.
   Die Karte selbst bekommt den Status per Prop statt ihn selbst zu laden, damit nicht beide
   Stellen unabhängig voneinander pollen.
-- **Zweite Benachrichtigungsart: Training-Erinnerung** (`api/send-training-reminders.ts`,
-  `.github/workflows/training-reminders.yml`): erste Benachrichtigungsart ohne einzelne
-  auslösende Zeile — statt eines Datenbank-Triggers wie bei "neue Meldung" läuft hier ein
-  täglicher GitHub-Actions-Cron (dieselbe kostenlose Infrastruktur wie Keep-Alive/Backup), der
-  dieselbe "wer hat noch nicht geantwortet"-Logik wie die Startseiten-Erinnerungskarte
-  (`lib/reminders.ts`) serverseitig nachbildet — dafür importiert die Vercel-Function direkt
-  `nextTrainingOccurrences()` aus `lib/trainingSchedule.ts` und `daysUntil()`/`fmtDate()` aus
-  `lib/format.ts` (beides reine Logik ohne Browser-Abhängigkeit, deshalb ohne Duplizierung
-  direkt aus `src/` importierbar). Bewusst noch ohne Sperre gegen Mehrfachversand — bei
-  täglichem Lauf bekäme ein Spieler bis zu seiner Antwort jeden Tag erneut eine Push; für den
-  ersten Test akzeptiert, ließe sich mit einer kleinen "zuletzt benachrichtigt"-Spalte
-  nachschärfen, falls das in der Praxis nervt.
+- **Zweite Benachrichtigungsart: Training-Erinnerung, drei Zeitpunkte** (`api/send-training-
+  reminders.ts`, Migration `0038`): erste Benachrichtigungsart ohne einzelne auslösende Zeile
+  — statt eines Datenbank-Triggers wie bei "neue Meldung" läuft hier `pg_cron` direkt in
+  Supabase (alle 10 Minuten), der dieselbe "wer hat noch nicht geantwortet"-Logik wie die
+  Startseiten-Erinnerungskarte (`lib/reminders.ts`) serverseitig nachbildet. Auf Wunsch nicht
+  nur einmalig, sondern zu drei festen Zeitpunkten vor Trainingsbeginn (1 Tag/1 Stunde/30
+  Minuten), unabhängig voneinander — `training_reminder_log` (Migration `0038`) merkt sich pro
+  Termin/Spieler/Erinnerungsart, was schon geschickt wurde, damit `pg_cron` beliebig oft
+  nachfragen kann, ohne doppelt zu verschicken.
+  **Live-Debugging-Verlauf** (mehrere Runden am Abend des ersten Tests, alle drei
+  projektspezifisch, nicht offensichtlich vorab erkennbar): (1) `ERR_MODULE_NOT_FOUND` für
+  einen Import aus `src/lib/` — Vercel bündelt für dieses Projekt keine lokalen
+  Dateiabhängigkeiten in `api/`-Functions, auch nicht für Hilfsdateien innerhalb von `api/`
+  selbst; einzig zuverlässig sind Imports aus `node_modules`. Die Terminlogik
+  (`nextTrainingOccurrences`) ist deshalb direkt in `send-training-reminders.ts` kopiert statt
+  aus `src/lib/trainingSchedule.ts` importiert — bei Änderungen dort bitte hier synchron
+  nachziehen. (2) `permission denied` für mehrere Tabellen (`reminder_settings`, `trainings`
+  usw.) — dieselbe Ursache wie bei `push_subscriptions` in #106 (neue/nicht explizit
+  berechtigte Tabellen bekommen bei diesem Projekt nicht automatisch die üblichen
+  `service_role`-Standardrechte), behoben in Migration `0037`. Der Code prüfte anfangs nur, ob
+  die Einstellungen `null` waren, nicht ob die Abfrage selbst fehlgeschlagen war — ein
+  Berechtigungsfehler sah dadurch identisch aus wie "Erinnerungen sind deaktiviert"; behoben,
+  indem alle Abfragefehler jetzt explizit geprüft und mit Details zurückgegeben werden. (3) Die
+  ursprüngliche Umsetzung nutzte einen täglichen GitHub-Actions-Cron (siehe #111) — für ein
+  30-Minuten-Fenster reicht das nicht, ein GitHub-Actions-Cron im 10-Minuten-Takt hätte aber auf
+  Dauer das kostenlose Minutenkontingent gesprengt; `pg_cron` läuft stattdessen kostenlos direkt
+  in der Datenbank.
 
 ## Projektstruktur
 
