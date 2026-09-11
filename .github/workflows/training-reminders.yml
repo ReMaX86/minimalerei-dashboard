@@ -1,0 +1,41 @@
+name: Training-Erinnerung (TBW Team App)
+
+# Erinnert Spieler per Push, die für den nächsten Trainingstermin noch nicht
+# geantwortet haben (sobald die in Admin -> Funktionen -> Erinnerungen
+# eingestellte Frist erreicht ist) — ruft dafür einmal täglich die
+# Vercel-Funktion api/send-training-reminders.ts auf. Kostenlos: GitHub
+# Actions (Free-Tier-Minuten reichen dafür locker) + dieselbe
+# Vercel-Serverless-Function wie bei "neue Meldung" (siehe send-push.ts).
+#
+# Setup: unter Settings -> Secrets and variables -> Actions zwei Secrets
+# anlegen:
+#   TBW_VERCEL_URL            z.B. https://team-app-two-orpin.vercel.app
+#   TBW_PUSH_WEBHOOK_SECRET   derselbe Wert wie PUSH_WEBHOOK_SECRET in Vercel
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Erinnerungs-Check auslösen
+        run: |
+          if [ -z "${TBW_VERCEL_URL}" ] || [ -z "${TBW_PUSH_WEBHOOK_SECRET}" ]; then
+            echo "TBW_VERCEL_URL / TBW_PUSH_WEBHOOK_SECRET secrets are not set yet - skipping."
+            exit 0
+          fi
+          status=$(curl -s -o /tmp/response.json -w '%{http_code}' -X POST \
+            "${TBW_VERCEL_URL}/api/send-training-reminders" \
+            -H "x-webhook-secret: ${TBW_PUSH_WEBHOOK_SECRET}")
+          echo "Antwort (HTTP ${status}):"
+          cat /tmp/response.json
+          echo
+          if [ "${status}" -ge 300 ]; then
+            exit 1
+          fi
+        env:
+          TBW_VERCEL_URL: ${{ secrets.TBW_VERCEL_URL }}
+          TBW_PUSH_WEBHOOK_SECRET: ${{ secrets.TBW_PUSH_WEBHOOK_SECRET }}
