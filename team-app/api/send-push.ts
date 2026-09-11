@@ -69,7 +69,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .select('id, endpoint, p256dh, auth_key');
 
   if (loadError) {
-    res.status(500).json({ error: 'push_subscriptions konnten nicht geladen werden.' });
+    // eslint-disable-next-line no-console
+    console.error('push_subscriptions load error', loadError);
+    res.status(500).json({
+      error: 'push_subscriptions konnten nicht geladen werden.',
+      details: loadError.message,
+      code: loadError.code
+    });
     return;
   }
 
