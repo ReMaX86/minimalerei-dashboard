@@ -187,6 +187,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     supabase.from('feature_flags').select('enabled').eq('key', 'absences').maybeSingle()
   ]);
 
+  // Fehler bei einer dieser Abfragen (z. B. fehlende service_role-Rechte auf
+  // einer der Tabellen) nicht stillschweigend als "settings null" behandeln
+  // — sonst sieht ein Berechtigungsfehler von außen identisch aus wie
+  // "Erinnerungen sind einfach deaktiviert" (live so aufgefallen).
+  const queryError =
+    settingsRes.error ?? trainingsRes.error ?? overridesRes.error ?? playersRes.error ?? absencesFlagRes.error;
+  if (queryError) {
+    // eslint-disable-next-line no-console
+    console.error('send-training-reminders query error', queryError);
+    res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: queryError.message, code: queryError.code });
+    return;
+  }
+
   const settings = settingsRes.data as ReminderSettings | null;
   if (!settings?.enabled) {
     res.status(200).json({ skipped: 'reminders_disabled' });
