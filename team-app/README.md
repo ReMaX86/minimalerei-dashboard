@@ -1263,6 +1263,16 @@ hier die getroffenen Entscheidungen samt Begründung:
   sonst hätte eine spätere Änderung des Abstands (z. B. von 60 auf 90 Minuten) denselben Slot
   wie einen neuen, noch nie verschickten Zeitpunkt aussehen lassen und zu einem doppelten
   Versand geführt.
+- **Admin-Übersicht "Wer hat Push aktiviert?"** (Migration `0040`,
+  `components/admin/PushSubscribersList.tsx`): zeigt im Funktionen-Reiter unter dem
+  Push-Benachrichtigungen-Schalter Name, Rolle, Geräteanzahl und Aktivierungsdatum aller
+  Nutzer mit mindestens einer `push_subscriptions`-Zeile. `push_subscriptions` hatte bisher nur
+  eine RLS-Policy für die eigene Zeile (`user_id = auth.uid()`) — Migration `0040` ergänzt eine
+  zusätzliche, mit der bestehenden per OR kombinierte Policy, die Trainern Lesezugriff auf alle
+  Zeilen gibt. Die Zuordnung `user_id` -> Name läuft client-seitig über dieselben Link-Tabellen
+  wie in `AuthContext` (`player_auth_links`/`viewer_auth_links`; Trainer haben ihre `auth.uid()`
+  direkt als `trainers.id`), da PostgREST keine beliebigen Joins über mehrere Tabellen in einer
+  Abfrage erlaubt.
 
 ## Projektstruktur
 

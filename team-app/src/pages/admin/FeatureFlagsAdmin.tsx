@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ErrorNote } from '../../components/ErrorNote';
+import { PushSubscribersList } from '../../components/admin/PushSubscribersList';
 import { useFeatureFlags } from '../../context/FeatureFlagsContext';
 import { FEATURE_LABELS, type FeatureKey, type ReminderSettings } from '../../types/database';
 
@@ -103,27 +104,30 @@ export function FeatureFlagsAdmin() {
           const meta = FEATURE_LABELS[key];
           const enabled = flags[key];
           return (
-            <li key={key} className="card flex items-center justify-between gap-3">
-              <div>
-                <p className="font-semibold text-tbw-navyDark">{meta.label}</p>
-                <p className="text-xs text-tbw-ink/50">{meta.description}</p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={enabled}
-                disabled={loading || savingKey === key}
-                onClick={() => toggle(key)}
-                className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-40 ${
-                  enabled ? 'bg-tbw-gold' : 'bg-black/15'
-                }`}
-              >
-                <span
-                  className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${
-                    enabled ? 'left-6' : 'left-1'
+            <li key={key} className="card space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-tbw-navyDark">{meta.label}</p>
+                  <p className="text-xs text-tbw-ink/50">{meta.description}</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={enabled}
+                  disabled={loading || savingKey === key}
+                  onClick={() => toggle(key)}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-40 ${
+                    enabled ? 'bg-tbw-gold' : 'bg-black/15'
                   }`}
-                />
-              </button>
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${
+                      enabled ? 'left-6' : 'left-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              {key === 'push_notifications' && enabled && <PushSubscribersList />}
             </li>
           );
         })}
