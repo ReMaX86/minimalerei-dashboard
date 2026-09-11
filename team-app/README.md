@@ -879,6 +879,36 @@ hier die getroffenen Entscheidungen samt Begründung:
   Tabellen-Antworten frei erfinden, statt wie echtes PostgREST tatsächliche
   Spalten zu validieren — ein struktureller blinder Fleck des bisherigen
   Test-Ansatzes für diese Art Fehler.
+- **Trikot-Übergabe: Erinnerung + Nachtrag-Banner bei vergessener
+  Bestätigung** (`lib/trikots.ts`, `lib/reminders.ts`, `Trikots.tsx`,
+  `Dashboard.tsx`): bisher zeigte die Trikots-Seite nur den nächsten
+  Wäscher an, ohne Erinnerung auf der Startseite und ohne Reaktion, falls
+  die Übergabe am Spieltag vergessen wurde. Die gemeinsame Rotationslogik
+  (wer ist laut `naechsterSpieler` dran, ist die Übergabe fürs jeweilige
+  Set schon in `trikot_wash_log` bestätigt) steckt jetzt in einer einzigen
+  reinen, getesteten Funktion `pendingWasherFor()`, die sowohl von
+  `Trikots.tsx` als auch von der Erinnerungs-Berechnung in `Dashboard.tsx`
+  genutzt wird, damit beide Stellen nie auseinanderlaufen. Zwei Teile:
+  (1) Auf der Trikots-Seite erscheinen die "✓ Übernimmt" / "✗ Kann
+  nicht"-Buttons für das nächste Spiel erst ab dem Spieltag selbst
+  (`game_date === heute`) — vorher steht dort nur informativ "Nächster
+  Trikotwäscher: X" mit dem Hinweis "Bestätigen kann X ab dem Spieltag."
+  (Nutzer-Feedback: vorzeitiges Bestätigen vor dem eigentlichen Spieltag
+  wäre verwirrend). (2) Bleibt die Übergabe für ein bereits gespieltes
+  Spiel unbestätigt, erscheint oben auf der Trikots-Seite dauerhaft (ohne
+  Ablaufdatum) ein rotes Banner "Bitte nachtragen" mit der Frage "Hat X
+  beim Spiel vs. Y die Trikots mitgenommen?" und Ja-/Nein-Buttons; "Nein"
+  öffnet eine Auswahl, wer das Set stattdessen mitgenommen hat. Bestätigen
+  können wie bisher nur der/die betroffene Spieler/in selbst, Captains
+  oder der Trainer. Auf der Startseite erscheint parallel ein
+  "🧺 Trikot-Übergabe … noch nicht bestätigt"-Eintrag in der
+  "Für dich zu erledigen"-Karte, solange die Übergabe (für das aktuelle
+  oder das letzte Spiel) den eigenen Spieler betrifft und offen ist. Keine
+  neue Migration nötig — die Funktion nutzt ausschließlich bereits
+  vorhandene Tabellen (`trikot_wash_log`, `game_squad`, `games`). Auf eine
+  zusätzliche manuelle Wäscher-Zuweisung durch den Trainer wurde bewusst
+  verzichtet, da das rote Banner samt Alternativ-Auswahl den Korrekturfall
+  schon abdeckt.
 
 ## Projektstruktur
 
