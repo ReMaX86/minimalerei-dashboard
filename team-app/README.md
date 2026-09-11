@@ -951,6 +951,20 @@ hier die getroffenen Entscheidungen samt Begründung:
   die Möglichkeit oder Erwartung, Sondertermine einzutragen. Der Trainer
   wählt jetzt zwischen drei klar benannten Buttons: "Regulär", "Fällt aus",
   "Sonderzeiten".
+  **Dritter Nachtrag (Bereich aufgeräumt, Ferienzeiten bearbeitbar):** zwei
+  Anpassungen auf Nutzer-Feedback. (1) Die Neuanlage-Formulare ("Neue
+  Trainingszeit", "Neue Ferienzeit", "Sondertermin hinzufügen") waren immer
+  offen sichtbar und haben die Seite unübersichtlich gemacht — sie stecken
+  jetzt hinter einem "+ Neu"-Button und klappen erst auf Wunsch auf (mit
+  Abbrechen-Button, der Formularwerte wieder zurücksetzt). Das
+  Sondertermin-Formular bleibt nach dem Speichern bewusst offen (nur die
+  Felder werden geleert), da hier typischerweise mehrere Termine
+  hintereinander eingetragen werden. (2) Ferienzeiten lassen sich jetzt
+  nachträglich bearbeiten ("Bearbeiten"-Button öffnet ein vorausgefülltes
+  Formular für Zeitraum/Notiz/Modus, `training_overrides.update()`) — der
+  Trainer kann eine Ferienzeit also erstmal als "Regulär" anlegen und erst
+  umstellen, sobald die tatsächlichen Sonderzeiten feststehen, ohne den
+  Eintrag löschen und neu anlegen zu müssen.
 
 ## Projektstruktur
 
