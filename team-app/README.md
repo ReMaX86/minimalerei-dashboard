@@ -965,6 +965,17 @@ hier die getroffenen Entscheidungen samt Begründung:
   Trainer kann eine Ferienzeit also erstmal als "Regulär" anlegen und erst
   umstellen, sobald die tatsächlichen Sonderzeiten feststehen, ohne den
   Eintrag löschen und neu anlegen zu müssen.
+- **"+ Neu" auch bei Spiele- und Kampfgericht-Admin** (`GamesAdmin.tsx`,
+  `OfficiatingAdmin.tsx`): das "+ Neu"-Muster aus dem Training-Admin kam
+  beim Trainer gut an, deshalb auf die beiden anderen Admin-Seiten mit
+  Neuanlage-Formularen übertragen. Bei `GamesAdmin.tsx` teilt sich das
+  Formular ohnehin schon zwischen Neuanlage und Bearbeiten (`editingId`) —
+  ein Klick auf "Bearbeiten" bei einem bestehenden Spiel öffnet das
+  Formular jetzt genauso wie "+ Neu", nur eben vorausgefüllt und mit
+  "Speichern" statt "Anlegen" als Button-Text; "Abbrechen" klappt in
+  beiden Fällen wieder ein. Die schon vorhandene "Jahrgänge / Teams"-
+  Ablage im Kampfgericht-Admin (eigener ▲/▼-Toggle) blieb unverändert, da
+  sie bereits demselben "erst auf Wunsch aufklappen"-Prinzip folgt.
 
 ## Projektstruktur
 
