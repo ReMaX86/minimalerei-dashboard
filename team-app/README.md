@@ -1717,6 +1717,38 @@ hier die getroffenen Entscheidungen samt Begründung:
   Abwesenheiten, bereits verschickte Erinnerungen, Geräte-Zuordnung, Push-Abos) — vorher hätte
   ein einzelner stiller Fehlschlag dort eine Erinnerung dauerhaft als "verschickt" protokolliert,
   obwohl nie eine Push ankam.
+- **Nachtrag: Trainings-Erinnerung kam mehrfach für dieselbe Erinnerungsart.** Live beobachtet:
+  dieselbe "Training in 1 Tag"-Push kam zweimal exakt zur gleichen Zeit an, und dieselbe
+  Erinnerungsart feuerte später am selben Tag noch einmal erneut — obwohl
+  `training_reminder_log` (Migration `0038`) genau das verhindern soll. Ursache: der alte Ablauf
+  hat erst gesendet und danach protokolliert (`toSend` aus dem `alreadySent`-Stand berechnet, am
+  Ende ein `upsert(..., { ignoreDuplicates: true })` ohne Fehlerprüfung). `pg_cron` ruft diesen
+  Endpunkt alle 10 Minuten auf — läuft er dabei einmal doppelt (z. B. durch einen versehentlich
+  doppelt angelegten Cron-Job oder einen erneut ausgelösten Vercel-Aufruf) an, sehen beide
+  Durchläufe denselben (noch leeren) Log-Stand, halten die Erinnerung beide für fällig und noch
+  nicht verschickt, und senden beide — das Protokollieren danach kommt dafür zu spät. Fix: der
+  Claim (`upsert` auf `training_reminder_log` + `.select()`) läuft jetzt VOR dem Versand, mit
+  Fehlerprüfung. Der Unique-Key der Tabelle (`training_id, session_date, player_id,
+  reminder_type`) wirkt dabei als atomarer Lock — von zwei parallelen Durchläufen bekommt nur
+  einer die Zeile per `INSERT ... ON CONFLICT DO NOTHING RETURNING *` tatsächlich zurück, nur der
+  verschickt anschließend die Push. Ein zweiter, überlappender Durchlauf kann eine bereits
+  beanspruchte Erinnerung dadurch nicht mehr doppelt verschicken, egal wie oft `pg_cron` den
+  Endpunkt aufruft oder wie viele Durchläufe sich zeitlich überschneiden.
+
+  Zwei mögliche Auslöser für überlappende Durchläufe sind über die SQL-Konsole prüfbar, falls das
+  Problem weiter auftritt (der Fix oben verhindert den doppelten Versand so oder so, das ist nur
+  zur Ursachensuche): `select * from cron.job;` zeigt, ob `send-training-reminders` versehentlich
+  von zwei separaten Cron-Jobs aus aufgerufen wird (z. B. weil die Einrichtung aus diesem README
+  ein zweites Mal ausgeführt wurde, ohne den alten Job vorher mit `cron.unschedule(...)` zu
+  entfernen). Und da ein Vieltester wie der Trainer selbst durch wiederholtes Testen leicht
+  mehrere `player_auth_links`-Zeilen (Mehrgeräte-Login, siehe oben) mit je eigenem, weiterhin
+  gültigem `push_subscriptions`-Eintrag fürs gleiche physische Gerät ansammelt, kann auch das wie
+  ein doppelter Versand aussehen, ist aber keiner — dann kommen zwei *unterschiedliche*, beide
+  korrekt einzeln verschickte Pushes einfach auf demselben Handy an. Sichtbar über: `select pal.
+  auth_user_id, ps.id, ps.created_at from player_auth_links pal join push_subscriptions ps on
+  ps.user_id = pal.auth_user_id where pal.player_id = (select id from players where name ilike
+  '%Name%');` — mehr als eine Zeile bedeutet mehrere aktive Anmeldungen mit Push-Abo für diesen
+  Spieler.
 - **Nachtrag zu Kader-Absage: spielende Trainer bekamen die Push nie.** `send-squad-decline.ts`
   fragte nur die `trainers`-Tabelle ab (Login per E-Mail/Passwort). Ein "Spieler mit
   Trainer-Rechten" (`players.is_admin`, siehe Migration `0006` — bewusst kein zweiter Login,
