@@ -105,7 +105,14 @@ export function Spiele() {
     setError(null);
     const today = new Date().toISOString().slice(0, 10);
     const [gamesRes, playersRes, pastGamesRes] = await Promise.all([
-      supabase.from('games').select('*').gte('game_date', today).order('game_date').order('game_time').limit(15),
+      supabase
+        .from('games')
+        .select('*')
+        .gte('game_date', today)
+        .is('stats_finalized_at', null)
+        .order('game_date')
+        .order('game_time')
+        .limit(15),
       supabase.from('players').select('*').eq('is_active', true),
       flags.stats
         ? supabase

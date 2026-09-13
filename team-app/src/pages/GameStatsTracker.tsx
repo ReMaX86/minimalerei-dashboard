@@ -522,7 +522,15 @@ export function GameStatsTracker() {
   }
 
   const boxScore = computeBoxScore(events);
-  const teamScore = computeTeamScore(events);
+  // Bei einem von Hand nachgetragenen Endstand (siehe GamesAdmin.tsx
+  // "Endstand nachtragen") gibt es keine game_stat_events, aus denen sich
+  // ein Punktestand berechnen ließe — dann den in games.final_score_us/
+  // final_score_opponent gespeicherten Endstand anzeigen statt fälschlich
+  // "0 : 0" in der Kopfzeile.
+  const teamScore =
+    lockState.kind === 'readonly' && events.length === 0 && game?.final_score_us !== null && game?.final_score_us !== undefined
+      ? { us: game.final_score_us, opponent: game.final_score_opponent ?? 0 }
+      : computeTeamScore(events);
   const quarterScores = computeQuarterScores(events);
   const recentEvents = [...events].slice(-6).reverse();
   const lastEvent = events[events.length - 1];
@@ -616,11 +624,26 @@ export function GameStatsTracker() {
         {lockState.kind === 'readonly' && (
           <div className="card mb-3">
             <p className="text-sm font-bold text-tbw-navyDark">Stats abgeschlossen</p>
-            <p className="mt-1 text-xs text-tbw-ink/50">Nur noch zur Ansicht.</p>
-            {isAdmin && (
-              <button className="btn-secondary mt-3 w-full" disabled={busy} onClick={reopen}>
-                Wieder öffnen
-              </button>
+            {events.length === 0 ? (
+              // Endstand wurde nachträglich eingetragen (siehe GamesAdmin.tsx
+              // "Endstand nachtragen"), nie live getrackt — es gibt also keine
+              // game_stat_events und damit keinen Box-Score zum Ansehen.
+              // "Wieder öffnen" bewusst ausgeblendet: das würde nur unnötig
+              // eine Live-Tracking-Sitzung starten (Aufstellung, Trikotnummern
+              // ...), die dann wieder mit "Spiel beenden" abgeschlossen werden
+              // müsste — inklusive einer zweiten "Spiel beendet"-Push.
+              <p className="mt-1 text-xs text-tbw-ink/50">
+                Für dieses Spiel wurden keine Einzelspieler-Stats erfasst — der Endstand wurde manuell nachgetragen.
+              </p>
+            ) : (
+              <>
+                <p className="mt-1 text-xs text-tbw-ink/50">Nur noch zur Ansicht.</p>
+                {isAdmin && (
+                  <button className="btn-secondary mt-3 w-full" disabled={busy} onClick={reopen}>
+                    Wieder öffnen
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
