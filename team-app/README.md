@@ -499,6 +499,21 @@ Stand nicht überschreiben), sowohl beim initialen Laden als auch bei jedem `ref
 (15s-Takt/Sichtbarwerden/manueller Button — siehe oben). Der Spielername wird über das ohnehin
 schon geladene `data.players`-Lookup aufgelöst, keine zusätzliche Abfrage dafür nötig.
 
+**"Vergangene Spiele" auf der Spiele-Seite** (`Spiele.tsx`): bisher hatten normale Spieler nur
+für das jeweils *letzte* Spiel einen Box-Score-Link (Startseite "Letztes Ergebnis"), ältere
+Spiele waren nur über Admin -> Spiele erreichbar. Das war aber nie ein echter
+Zugriffsunterschied — `game_stat_events` ist laut RLS für jeden angemeldeten Nutzer lesbar
+(Migration `0028`), es fehlte nur der Einstiegspunkt in der Navigation für Nicht-Admins. Neue
+Sektion "Vergangene Spiele" auf `/spiele` (alle abgeschlossenen Spiele, `stats_finalized_at is
+not null`, neueste zuerst) zeigt Endstand + Sieg/Niederlage/Unentschieden + Box-Score-Link für
+jedes Spiel, erste drei direkt sichtbar, der Rest über "Weitere vergangene Spiele anzeigen"
+aufklappbar (gleiches Muster wie die bestehende "Weitere Spieltage"-Sektion für kommende
+Spiele). Bewusst auch dann sichtbar, wenn gerade kein anstehendes Spiel geplant ist (z. B.
+Saisonende) — die Seite bricht in dem Fall nicht mehr komplett ab, sondern zeigt nur den
+Hinweis "Kein anstehendes Spiel geplant" plus die vergangenen Spiele. Für Betrachter ohnehin
+irrelevant, da die ganze `/spiele`-Route für sie schon gesperrt ist (wie `/stats/:gameId`
+selbst auch).
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
