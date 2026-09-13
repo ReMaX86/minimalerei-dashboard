@@ -352,6 +352,9 @@ export function GameStatsTracker() {
 
   async function finalize() {
     if (!gameId || busy) return;
+    if (!window.confirm('Spiel wirklich beenden? Der Endstand wird dann als Push an alle verschickt und die Stats-Erfassung ist danach abgeschlossen.')) {
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -362,6 +365,18 @@ export function GameStatsTracker() {
     } catch {
       setError('Spiel konnte nicht abgeschlossen werden.');
       setBusy(false);
+    }
+  }
+
+  // Live-Ticker: bei Wechsel in Q2-Q4 den Zwischenstand des soeben beendeten
+  // Viertels per Push verschicken. announce_quarter_score() dedupliziert
+  // serverseitig per "Ratchet" (Migration 0042) — bewusst kein Fehler-UI
+  // hier, ein Fehlschlag bei dieser Zusatzbenachrichtigung soll die
+  // eigentliche Stats-Erfassung nie stören.
+  function selectQuarter(q: number) {
+    setQuarter(q);
+    if (gameId && q >= 2 && q <= 4) {
+      supabase.rpc('announce_quarter_score', { p_game_id: gameId, p_quarter: q - 1 }).then(undefined, () => {});
     }
   }
 
@@ -514,7 +529,7 @@ export function GameStatsTracker() {
                     className={`flex-1 rounded-xl py-2 text-sm font-bold ${
                       quarter === q ? 'bg-tbw-navy text-white' : 'bg-tbw-bg text-tbw-ink/60'
                     }`}
-                    onClick={() => setQuarter(q)}
+                    onClick={() => selectQuarter(q)}
                   >
                     Q{q}
                   </button>

@@ -318,8 +318,18 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  was_selected boolean := false;
 begin
-  if new.is_selected = true and coalesce(old.is_selected, false) = false then
+  -- OLD bewusst nur bei UPDATE lesen: bei INSERT ist OLD noch gar nicht
+  -- zugewiesen, ein direkter Zugriff (auch per coalesce(old.x, ...)) bricht
+  -- dann mit "record 'old' is not assigned yet" ab — live so aufgefallen,
+  -- weil eine Erstaufnahme (kein vorheriger game_squad-Eintrag) genau das ist.
+  if TG_OP = 'UPDATE' then
+    was_selected := coalesce(old.is_selected, false);
+  end if;
+
+  if new.is_selected = true and not was_selected then
     perform net.http_post(
       url := 'https://<deine-vercel-domain>/api/send-squad-nomination',
       headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
@@ -341,6 +351,74 @@ der ursprünglichen Kader-Zusammenstellung ausgewählt (Kader noch nicht veröff
 noch keine Push auslösen, das übernimmt erst "Kader veröffentlicht" für alle auf einmal. Keine
 zusätzlichen `service_role`-Rechte nötig — `games`, `players` und `player_auth_links` waren
 bereits berechtigt.
+
+**Siebte und achte Benachrichtigungsart: Live-Ticker während des Spiels.** Im Live-Stats-Tracker
+(`GameStatsTracker.tsx`) löst der Wechsel in ein neues Viertel (Q2/Q3/Q4) automatisch eine Push
+mit dem aktuellen Gesamtstand des soeben beendeten Viertels aus, "Spiel beenden" eine Push mit
+Endstand und Sieg/Niederlage/Unentschieden. Beide gehen an alle mit aktivierten Push-
+Benachrichtigungen. Die Dedupe-Logik gegen versehentliches Vor-/Zurückklicken im
+Viertel-Umschalter (`announce_quarter_score`, "Ratchet" auf `games.last_announced_quarter`) ist
+bereits über Migration `0042` eingerichtet — hier nur noch die zwei Trigger anlegen:
+
+```sql
+-- Zwischenstand nach Viertel X (last_announced_quarter steigt)
+create or replace function public.notify_quarter_score()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.last_announced_quarter > coalesce(old.last_announced_quarter, 0) then
+    perform net.http_post(
+      url := 'https://<deine-vercel-domain>/api/send-quarter-score',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+      body := jsonb_build_object('record', jsonb_build_object('game_id', new.id, 'quarter', new.last_announced_quarter))
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create trigger games_notify_quarter_score
+after update on public.games
+for each row execute function public.notify_quarter_score();
+
+-- Spiel beendet (stats_finalized_at wechselt von null auf einen Zeitstempel)
+create or replace function public.notify_game_finished()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.stats_finalized_at is not null and old.stats_finalized_at is null then
+    perform net.http_post(
+      url := 'https://<deine-vercel-domain>/api/send-game-finished',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+      body := jsonb_build_object('record', jsonb_build_object('game_id', new.id))
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create trigger games_notify_finished
+after update on public.games
+for each row execute function public.notify_game_finished();
+```
+
+`games` hat jetzt mehrere `after update`-Trigger gleichzeitig (auch `games_notify_squad_published`
+aus dem vorherigen Abschnitt) — das ist unproblematisch, Postgres feuert bei einem `UPDATE` alle
+passenden Trigger, jeder prüft selbst per `IF`, ob seine jeweilige Spalte sich geändert hat.
+Bewusst kein Push bei Wechsel in die Verlängerung (OT) — dafür müsste zuerst geklärt werden, wie
+oft/ob das überhaupt gewünscht ist; der finale Stand inklusive OT kommt ohnehin über "Spiel
+beendet". Keine zusätzlichen `service_role`-Rechte nötig — `games` und `push_subscriptions` waren
+bereits berechtigt.
+
+Zusätzlich: "Spiel beenden" fragt jetzt erst per Bestätigungsdialog nach ("Spiel wirklich
+beenden? ..."), bevor `finalize_game_stats()` aufgerufen wird — ein versehentlicher Tap beendet
+die Erfassung nicht mehr sofort.
 
 ## Design
 
@@ -1443,6 +1521,19 @@ hier die getroffenen Entscheidungen samt Begründung:
   `trainers.id` auch alle `player_auth_links.auth_user_id` von Spielern mit `is_admin = true`
   als Empfänger einbeziehen (wieder ohne `.maybeSingle()`, aus demselben Mehrgeräte-Grund wie
   oben).
+- **Live-Ticker im Spiel** (`api/send-quarter-score.ts`, `api/send-game-finished.ts`, Migration
+  `0042`): Wunsch, die Zwischenstände aus dem ohnehin schon live geführten Stats-Tracking auch
+  per Push zu teilen. Der Viertel-Umschalter im Tracker war bisher reiner Client-State
+  (`useState`) ohne jede DB-Spur — für den Push-Trigger musste daher erst ein serverseitiger
+  Anker her: `games.last_announced_quarter` plus die RPC `announce_quarter_score()`, die diese
+  Spalte nur per "Ratchet" hochzählt (nie runter, nur beim allerersten Erreichen eines Viertels).
+  Ohne dieses Ratchet hätte correctives Vor-/Zurückklicken im Umschalter (z. B. um einen spät
+  erfassten Korb im Vorviertel nachzutragen) bei jedem erneuten Vorwärtsklick eine weitere Push
+  ausgelöst. Der eigentliche Spielstand kommt nicht aus einer eigenen Berechnung, sondern direkt
+  aus `games.final_score_us`/`final_score_opponent` — die hält der bereits bestehende
+  `recalc_game_score()`-Trigger (Migration `0028`) bei jedem Stats-Event ohnehin aktuell. Bewusst
+  kein Push beim Wechsel in die Verlängerung. Zusätzlich: "Spiel beenden" fragt jetzt erst per
+  Bestätigungsdialog nach, bevor die Erfassung tatsächlich abgeschlossen wird.
 
 ## Projektstruktur
 
