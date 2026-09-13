@@ -67,13 +67,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  const [gameRes, playerRes, linkRes] = await Promise.all([
+  const [gameRes, playerRes, linksRes] = await Promise.all([
     supabase.from('games').select('opponent, game_date, squad_published').eq('id', gameId).maybeSingle(),
     supabase.from('players').select('name').eq('id', playerId).maybeSingle(),
-    supabase.from('player_auth_links').select('auth_user_id').eq('player_id', playerId).maybeSingle()
+    // Bewusst OHNE .maybeSingle(): ein Spieler kann mehrere Zeilen haben
+    // (Mehrgeräte-Login mit demselben Zugangscode, siehe player_auth_links
+    // in supabase/migrations/0001_init.sql) — .maybeSingle() bricht dann
+    // mit "PGRST116: multiple rows returned" ab, live so aufgefallen.
+    supabase.from('player_auth_links').select('auth_user_id').eq('player_id', playerId)
   ]);
 
-  const queryError = gameRes.error ?? playerRes.error ?? linkRes.error;
+  const queryError = gameRes.error ?? playerRes.error ?? linksRes.error;
   if (queryError) {
     // eslint-disable-next-line no-console
     console.error('send-squad-nomination query error', queryError);
@@ -91,8 +95,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const opponent = gameRes.data?.opponent;
   const gameDate = gameRes.data?.game_date;
   const playerName = playerRes.data?.name;
-  const authUserId = linkRes.data?.auth_user_id;
-  if (!opponent || !gameDate || !playerName || !authUserId) {
+  const authUserIds = ((linksRes.data as { auth_user_id: string }[] | null) ?? []).map((r) => r.auth_user_id);
+  if (!opponent || !gameDate || !playerName || authUserIds.length === 0) {
     res.status(200).json({ skipped: 'game_or_player_not_found' });
     return;
   }
@@ -100,7 +104,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { data: subs, error: loadError } = await supabase
     .from('push_subscriptions')
     .select('id, endpoint, p256dh, auth_key')
-    .eq('user_id', authUserId);
+    .in('user_id', authUserIds);
 
   if (loadError) {
     // eslint-disable-next-line no-console

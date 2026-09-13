@@ -174,6 +174,18 @@ interface PushSubRow {
   auth_key: string;
 }
 
+// Supabase-Anfragen scheitern auf dem Free-Tier (Nano-Compute) gelegentlich
+// mit "Gateway Timeout", obwohl die Datenbank selbst gesund ist — live
+// beobachtet als wiederholt fehlschlagende Erinnerungsläufe an mehreren
+// Tagen. Ein einziger kurzer Retry behebt die meisten dieser Aussetzer,
+// ohne bei echten Fehlern (z. B. fehlende Rechte) spürbar Zeit zu kosten.
+async function withRetry<T>(fn: () => PromiseLike<T>): Promise<T> {
+  const first = await fn();
+  if (!(first as { error?: unknown }).error) return first;
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  return fn();
+}
+
 // --- Handler ---
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -203,11 +215,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   const [settingsRes, trainingsRes, overridesRes, playersRes, absencesFlagRes] = await Promise.all([
-    supabase.from('reminder_settings').select('*').limit(1).maybeSingle(),
-    supabase.from('trainings').select('*'),
-    supabase.from('training_overrides').select('*'),
-    supabase.from('players').select('*').eq('is_active', true),
-    supabase.from('feature_flags').select('enabled').eq('key', 'absences').maybeSingle()
+    withRetry(() => supabase.from('reminder_settings').select('*').limit(1).maybeSingle()),
+    withRetry(() => supabase.from('trainings').select('*')),
+    withRetry(() => supabase.from('training_overrides').select('*')),
+    withRetry(() => supabase.from('players').select('*').eq('is_active', true)),
+    withRetry(() => supabase.from('feature_flags').select('enabled').eq('key', 'absences').maybeSingle())
   ]);
 
   // Fehler bei einer dieser Abfragen (z. B. fehlende service_role-Rechte auf
@@ -267,21 +279,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const { data: rsvpRows } = await supabase
-    .from('training_rsvps')
-    .select('player_id')
-    .eq('training_id', occurrence.training.id)
-    .eq('session_date', occurrence.date);
-  const respondedIds = new Set(((rsvpRows as { player_id: string }[] | null) ?? []).map((r) => r.player_id));
+  // Ab hier wird bei einem Fehler bewusst abgebrochen statt mit leeren
+  // Daten weiterzumachen: würde z. B. die Zusagen-Abfrage unbemerkt leer
+  // bleiben, würden Spieler, die längst zugesagt haben, trotzdem als
+  // "noch nicht geantwortet" behandelt — und schlimmer noch, unten
+  // trotzdem dauerhaft als "erinnert" protokolliert, obwohl nie eine
+  // Push verschickt wurde (siehe Kommentar bei newLogRows).
+  const rsvpRes = await withRetry(() =>
+    supabase.from('training_rsvps').select('player_id').eq('training_id', occurrence.training.id).eq('session_date', occurrence.date)
+  );
+  if (rsvpRes.error) {
+    // eslint-disable-next-line no-console
+    console.error('send-training-reminders query error', rsvpRes.error);
+    res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: rsvpRes.error.message, code: rsvpRes.error.code });
+    return;
+  }
+  const respondedIds = new Set(((rsvpRes.data as { player_id: string }[] | null) ?? []).map((r) => r.player_id));
 
   let absentIds = new Set<string>();
   if (absencesFlagRes.data?.enabled) {
-    const { data: absenceRows } = await supabase
-      .from('player_absences')
-      .select('player_id')
-      .lte('start_date', occurrence.date)
-      .gte('end_date', occurrence.date);
-    absentIds = new Set(((absenceRows as Pick<PlayerAbsence, 'player_id'>[] | null) ?? []).map((r) => r.player_id));
+    const absenceRes = await withRetry(() =>
+      supabase.from('player_absences').select('player_id').lte('start_date', occurrence.date).gte('end_date', occurrence.date)
+    );
+    if (absenceRes.error) {
+      // eslint-disable-next-line no-console
+      console.error('send-training-reminders query error', absenceRes.error);
+      res
+        .status(500)
+        .json({ error: 'Daten konnten nicht geladen werden.', details: absenceRes.error.message, code: absenceRes.error.code });
+      return;
+    }
+    absentIds = new Set(((absenceRes.data as Pick<PlayerAbsence, 'player_id'>[] | null) ?? []).map((r) => r.player_id));
   }
 
   const targetPlayers = ((playersRes.data as Player[]) ?? []).filter(
@@ -293,17 +321,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const { data: logRows } = await supabase
-    .from('training_reminder_log')
-    .select('player_id, reminder_type')
-    .eq('training_id', occurrence.training.id)
-    .eq('session_date', occurrence.date)
-    .in(
-      'player_id',
-      targetPlayers.map((p) => p.id)
-    );
+  const logRes = await withRetry(() =>
+    supabase
+      .from('training_reminder_log')
+      .select('player_id, reminder_type')
+      .eq('training_id', occurrence.training.id)
+      .eq('session_date', occurrence.date)
+      .in(
+        'player_id',
+        targetPlayers.map((p) => p.id)
+      )
+  );
+  if (logRes.error) {
+    // eslint-disable-next-line no-console
+    console.error('send-training-reminders query error', logRes.error);
+    res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: logRes.error.message, code: logRes.error.code });
+    return;
+  }
   const alreadySent = new Set(
-    ((logRows as { player_id: string; reminder_type: string }[] | null) ?? []).map(
+    ((logRes.data as { player_id: string; reminder_type: string }[] | null) ?? []).map(
       (r) => `${r.player_id}:${r.reminder_type}`
     )
   );
@@ -319,22 +355,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const { data: linkRows } = await supabase
-    .from('player_auth_links')
-    .select('player_id, auth_user_id')
-    .in(
-      'player_id',
-      targetPlayers.map((p) => p.id)
-    );
-  const authUserIdByPlayer = new Map(
-    ((linkRows as { player_id: string; auth_user_id: string }[] | null) ?? []).map((r) => [r.player_id, r.auth_user_id])
+  const linkRes = await withRetry(() =>
+    supabase
+      .from('player_auth_links')
+      .select('player_id, auth_user_id')
+      .in(
+        'player_id',
+        targetPlayers.map((p) => p.id)
+      )
   );
-  const authUserIds = [...authUserIdByPlayer.values()];
+  if (linkRes.error) {
+    // eslint-disable-next-line no-console
+    console.error('send-training-reminders query error', linkRes.error);
+    res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: linkRes.error.message, code: linkRes.error.code });
+    return;
+  }
+  // Ein Spieler kann mehrere Zeilen haben (Mehrgeräte-Login mit demselben
+  // Zugangscode, siehe player_auth_links in supabase/migrations/0001_init.sql)
+  // — deshalb Liste statt einzelnem Wert je Spieler, sonst bekämen Spieler
+  // mit mehreren Geräten die Erinnerung nur auf einem davon.
+  const authUserIdsByPlayer = new Map<string, string[]>();
+  for (const row of (linkRes.data as { player_id: string; auth_user_id: string }[] | null) ?? []) {
+    const list = authUserIdsByPlayer.get(row.player_id) ?? [];
+    list.push(row.auth_user_id);
+    authUserIdsByPlayer.set(row.player_id, list);
+  }
+  const authUserIds = [...authUserIdsByPlayer.values()].flat();
 
-  const { data: subRows } = await supabase
-    .from('push_subscriptions')
-    .select('id, user_id, endpoint, p256dh, auth_key')
-    .in('user_id', authUserIds.length > 0 ? authUserIds : ['00000000-0000-0000-0000-000000000000']);
+  const subRes = await withRetry(() =>
+    supabase
+      .from('push_subscriptions')
+      .select('id, user_id, endpoint, p256dh, auth_key')
+      .in('user_id', authUserIds.length > 0 ? authUserIds : ['00000000-0000-0000-0000-000000000000'])
+  );
+  if (subRes.error) {
+    // eslint-disable-next-line no-console
+    console.error('send-training-reminders query error', subRes.error);
+    res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: subRes.error.message, code: subRes.error.code });
+    return;
+  }
+  const subRows = subRes.data;
 
   const subsByAuthUser = new Map<string, PushSubRow[]>();
   for (const sub of (subRows as PushSubRow[] | null) ?? []) {
@@ -349,8 +409,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   await Promise.all(
     toSend.map(async ({ player, type, label }) => {
-      const authUserId = authUserIdByPlayer.get(player.id);
-      const subs = authUserId ? subsByAuthUser.get(authUserId) ?? [] : [];
+      const playerAuthUserIds = authUserIdsByPlayer.get(player.id) ?? [];
+      const subs = playerAuthUserIds.flatMap((authUserId) => subsByAuthUser.get(authUserId) ?? []);
 
       const payload = JSON.stringify({
         title: `Training in ${label} — noch nicht beantwortet`,
