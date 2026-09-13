@@ -1415,6 +1415,24 @@ hier die getroffenen Entscheidungen samt Begründung:
   nur dann ist es wirklich eine Nachnominierung und nicht Teil der ursprünglichen
   Kader-Zusammenstellung. Geht wie "Kader-Absage" gezielt nur an den einen betroffenen
   Spieler, aufgelöst über `player_auth_links` (`player_id -> auth_user_id`).
+- **Nachtrag zu Kader-Nachnominierung und Trainings-Erinnerungen: zwei Live-Bugs behoben.**
+  Erstens brach `send-squad-nomination.ts` beim Live-Test mit `PGRST116: multiple rows
+  returned` ab — die Abfrage auf `player_auth_links` nutzte `.maybeSingle()`, was aber falsch
+  ist: ein Spieler kann durch Mehrgeräte-Login mehrere Zeilen dort haben (siehe
+  "Mehrgeräte-Login pro Zugangscode" oben), bei einem Vieltester inzwischen 50 Stück. Fix:
+  alle Zeilen abfragen statt einer einzelnen, Push an alle zugehörigen Geräte. Denselben
+  Fehler (nur unbemerkt, da er nicht abstürzte, sondern still nur an ein Gerät sendete) hatte
+  auch `send-training-reminders.ts` — dort ebenfalls behoben (`Map<player_id, string[]>` statt
+  `Map<player_id, string>`). Zweitens traten bei `send-training-reminders.ts` und
+  `send-squad-nomination.ts` wiederholt `Gateway Timeout`-Fehler von Supabase auf (Datenbank
+  laut Supabase-Dashboard dabei "Healthy", CPU/RAM unauffällig — vermutlich kurze Aussetzer der
+  API-Gateway-Schicht auf dem Nano-Compute-Free-Tier), die dazu führten, dass Erinnerungen an
+  ganzen Tagen ausblieben. Fix: `withRetry()`-Hilfsfunktion in `send-training-reminders.ts`,
+  die jede Supabase-Abfrage bei einem Fehler einmal nach 1,2 Sekunden wiederholt, sowie
+  durchgängige Fehlerprüfung auch bei den bisher ungeprüften späteren Abfragen (RSVPs,
+  Abwesenheiten, bereits verschickte Erinnerungen, Geräte-Zuordnung, Push-Abos) — vorher hätte
+  ein einzelner stiller Fehlschlag dort eine Erinnerung dauerhaft als "verschickt" protokolliert,
+  obwohl nie eine Push ankam.
 
 ## Projektstruktur
 
