@@ -224,6 +224,87 @@ nur der jeweils exakte Moment beim manuellen Aufruf zählt als "fällig".
 
 Den Cron-Job wieder entfernen: `select cron.unschedule('training-reminders');`
 
+**Drei weitere Benachrichtigungsarten: Training abgesagt, Kader veröffentlicht,
+Kader-Absage.** Alle drei nach demselben Muster wie "neue Meldung" — je ein eigener
+Datenbank-Trigger (INSERT/UPDATE) ruft eine eigene, in sich geschlossene Vercel-Function auf.
+"Training abgesagt" und "Kader veröffentlicht" gehen an **alle** mit aktivierten
+Benachrichtigungen, "Kader-Absage" nur an **Trainer**. Setup zusätzlich zu den Schritten oben
+(dieselben Vercel-Env-Vars, kein neues Secret nötig):
+
+```sql
+-- Training abgesagt (einzelner Tag oder ganze Ferienzeit im Modus "Fällt aus")
+create or replace function public.notify_training_cancelled()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.mode = 'cancelled' then
+    perform net.http_post(
+      url := 'https://<deine-vercel-domain>/api/send-training-cancelled',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+      body := jsonb_build_object('record', jsonb_build_object('start_date', new.start_date, 'end_date', new.end_date, 'note', new.note))
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create trigger training_overrides_notify_cancelled
+after insert on public.training_overrides
+for each row execute function public.notify_training_cancelled();
+
+-- Kader veröffentlicht (squad_published wechselt auf true)
+create or replace function public.notify_squad_published()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.squad_published = true and coalesce(old.squad_published, false) = false then
+    perform net.http_post(
+      url := 'https://<deine-vercel-domain>/api/send-squad-published',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+      body := jsonb_build_object('record', jsonb_build_object('opponent', new.opponent, 'game_date', new.game_date))
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create trigger games_notify_squad_published
+after update on public.games
+for each row execute function public.notify_squad_published();
+
+-- Kader-Absage (confirmation wechselt auf 'declined') — nur an Trainer
+create or replace function public.notify_squad_decline()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.confirmation = 'declined' and coalesce(old.confirmation, '') is distinct from 'declined' then
+    perform net.http_post(
+      url := 'https://<deine-vercel-domain>/api/send-squad-decline',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+      body := jsonb_build_object('record', jsonb_build_object('game_id', new.game_id, 'player_id', new.player_id))
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create trigger game_squad_notify_decline
+after update on public.game_squad
+for each row execute function public.notify_squad_decline();
+```
+
+Zusätzliche `service_role`-Rechte dafür (Migration `0041`): `games`, `trainers` (`players` und
+`push_subscriptions` waren bereits berechtigt).
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
@@ -1273,6 +1354,21 @@ hier die getroffenen Entscheidungen samt Begründung:
   wie in `AuthContext` (`player_auth_links`/`viewer_auth_links`; Trainer haben ihre `auth.uid()`
   direkt als `trainers.id`), da PostgREST keine beliebigen Joins über mehrere Tabellen in einer
   Abfrage erlaubt.
+- **Drei weitere Benachrichtigungsarten: Training abgesagt, Kader veröffentlicht,
+  Kader-Absage** (`api/send-training-cancelled.ts`, `api/send-squad-published.ts`,
+  `api/send-squad-decline.ts`, Migration `0041`): komplettieren die ursprünglich geplante
+  Liste. Alle drei nach demselben Trigger-Muster wie "neue Meldung" — bewusst als jeweils
+  eigene, komplett in sich geschlossene Vercel-Function statt `send-push.ts`
+  wiederzuverwenden, obwohl der Versand-Code nahezu identisch ist: `send-push.ts` ist bereits
+  live geprüft, ein Umbau zu einem generischeren Endpunkt hätte das Risiko getragen, etwas an
+  der schon funktionierenden "neue Meldung"-Kette zu verändern (und einen bereits von Hand im
+  SQL-Editor angelegten Trigger neu anlegen zu lassen) — Code-Duplizierung war hier die
+  vorsichtigere Wahl. "Kader-Absage" ist die einzige der fünf Arten, die **nicht** an alle
+  geht, sondern gezielt nur an Trainer (`push_subscriptions` gefiltert auf `user_id in
+  (select id from trainers)`) — der Trigger übergibt nur `game_id`/`player_id`, Gegner und
+  Spielername werden serverseitig nachgeschlagen. "Training abgesagt" deckt über
+  `training_overrides.mode = 'cancelled'` sowohl einzelne Tages-Absagen als auch ganze
+  Ferienzeiten ab, da beide denselben Mechanismus nutzen (siehe #104).
 
 ## Projektstruktur
 
