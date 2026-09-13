@@ -375,6 +375,12 @@ export interface GameCourtState {
   updated_at: string;
 }
 
+export interface GamePlayerNumber {
+  game_id: string;
+  player_id: string;
+  number: number;
+}
+
 export type GameResult = 'sieg' | 'niederlage' | 'unentschieden';
 
 // "us" vs. "opponent" statt "home"/"away", damit Sieg/Niederlage unabhängig

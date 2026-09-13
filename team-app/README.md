@@ -514,6 +514,37 @@ Hinweis "Kein anstehendes Spiel geplant" plus die vergangenen Spiele. Für Betra
 irrelevant, da die ganze `/spiele`-Route für sie schon gesperrt ist (wie `/stats/:gameId`
 selbst auch).
 
+**Trikotnummern pro Spiel** (Migration `0044`, `GameStatsTracker.tsx`): bei TB Wülfrath gibt es
+keine festen Trikots — die Nummern wechseln von Spiel zu Spiel. Neue Tabelle
+`game_player_numbers` (`game_id`, `player_id`, `number`, 0-99) ordnet die Nummer deshalb pro
+Spiel statt fest am Spieler zu, gleiches Zugriffsmuster wie `game_stat_events`/
+`game_court_state` (jeder Spieler oder Trainer darf pflegen, nicht nur wer gerade den
+Tracking-Lock hält).
+
+Ablauf beim Start des Trackings: ist für ein Spiel noch keine einzige Nummer hinterlegt und die
+Startaufstellung noch nicht gewählt, zeigt der Tracker zuerst eine Karte "Trikotnummern" mit
+einem Zahlenfeld pro Kader-Spieler (leer bleiben erlaubt — "Weiter zur Aufstellung" speichert
+auch mit Lücken), erst danach folgt wie bisher die Startaufstellung. Kein eigenes
+"erledigt"-Flag in der Datenbank dafür nötig: die Karte verschwindet automatisch, sobald
+entweder eine Nummer gespeichert wurde oder die Aufstellung feststeht (`onCourtIds.length > 0`)
+— beides zusammen ergibt zuverlässig "hier gibt's nichts mehr zu klären". "Überspringen" markiert
+das nur lokal als erledigt (kein Speichern), ein Neuladen der Seite würde danach erneut fragen —
+bewusst in Kauf genommen, statt dafür einen eigenen Zustand in der Datenbank zu pflegen.
+
+Danach jederzeit über den kleinen Link "🔢 Trikotnummern bearbeiten" korrigierbar (auch mitten im
+Spiel) — löscht beim Speichern zunächst alle Nummern-Zeilen des Kaders und legt die
+nicht-leeren neu an, einfacher als ein Diff aus Einzel-Updates und unkritisch bei diesen
+Low-Stakes-Zuordnungsdaten. Angezeigt wird die Nummer überall dort, wo während des Trackings
+ein Spieler ausgewählt wird (Startaufstellung, Wechsel-Picker, "Wer?"-Aktions-Picker — als kleines
+Badge oben links auf dem Avatar) sowie als `#N`-Präfix vor dem Namen in kompakteren Textkontexten
+(Auf-dem-Feld-Grid, Bank-Liste, "Zuletzt"-Zeile/-Verlauf, Box-Score-Tabelle — Letztere auch in der
+schreibgeschützten Ansicht nach Spielende).
+
+Per Playwright end-to-end verifiziert: Trikotnummern-Screen beim ersten Öffnen, Nummern
+eintragen, Weiter zur Aufstellung (Badges sichtbar), Startaufstellung wählen, normale
+Tracking-Ansicht (Nummern im Auf-dem-Feld-Grid/Bank), erneutes Öffnen über "Trikotnummern
+bearbeiten" mit korrekt vorausgefüllten Werten.
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
