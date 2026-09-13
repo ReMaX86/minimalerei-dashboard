@@ -157,8 +157,8 @@ function ActionCircle({
 export function GameStatsTracker() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
-  const { isAdmin, trainer, player } = useAuth();
-  const myName = trainer?.name ?? player?.name ?? 'Unbekannt';
+  const { isAdmin, trainer, player, viewer } = useAuth();
+  const myName = trainer?.name ?? player?.name ?? viewer?.name ?? 'Unbekannt';
 
   const [game, setGame] = useState<Game | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);

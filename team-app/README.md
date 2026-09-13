@@ -545,6 +545,36 @@ eintragen, Weiter zur Aufstellung (Badges sichtbar), Startaufstellung wählen, n
 Tracking-Ansicht (Nummern im Auf-dem-Feld-Grid/Bank), erneutes Öffnen über "Trikotnummern
 bearbeiten" mit korrekt vorausgefüllten Werten.
 
+**Betrachter: Spiele, Team, Live-Tracking** (Migration `0045`, `App.tsx`, `BottomNav.tsx`):
+Betrachter (z. B. Abteilungsleiter) sahen bisher nur Start und Kampfgericht. Jetzt zusätzlich:
+- **Reiter "Spiele"** (`/spiele`) — inklusive der "Vergangene Spiele"-Sektion mit Box-Score-Links
+  (siehe oben), da dort ohnehin schon kein Rollen-Unterschied bestand.
+- **Reiter "Team"** (`/team`, weiterhin nur wenn `player_profiles` aktiviert ist — das Flag
+  entscheidet, nicht die Rolle).
+- **Live-Stats-Tracking übernehmen** (`/stats/:gameId`) inklusive des Zwischenstands/"Tracking
+  übernehmen"-Bereichs auf der Startseite und des Box-Score-Links beim letzten Ergebnis.
+
+Anders als bei den vorherigen Nachträgen dieser Art reichte hier eine reine Client-Routing-
+Änderung nicht aus: die RLS-Policies für `game_stat_events`, `game_court_state` und
+`game_player_numbers` prüften bisher nur `is_trainer() or current_player_id() is not null` —
+ein Betrachter hat keins von beidem, RLS hätte also jeden Schreibversuch abgelehnt. Migration
+`0045` ergänzt überall `or current_viewer_id() is not null`, ebenso in `finalize_game_stats()`
+("Spiel beenden") und `announce_quarter_score()` (Live-Ticker-Push beim Viertelwechsel — sonst
+wäre die Push beim Tracking durch einen Betrachter einfach still ausgeblieben, siehe
+`selectQuarter()` in `GameStatsTracker.tsx`). `claim_stat_session`/`heartbeat_stat_session`/
+`release_stat_session` brauchten keine Änderung, die prüften von Anfang an nur
+`auth.uid() is not null` ohne Rollen-Einschränkung. `reopen_game_stats` und `reset_game_stats`
+bleiben bewusst trainer-only (Admin-Aktionen, kein Teil von "normal tracken").
+
+Nebenbei aufgefallen und mitbehoben: `GameStatsTracker.tsx` ermittelte den angezeigten Namen
+bisher nur aus `trainer?.name ?? player?.name ?? 'Unbekannt'` — ein Betrachter wäre dadurch
+überall als "Unbekannt" aufgetaucht (Tracking-Lock-Anzeige, `created_by_name` an jedem
+erfassten Stat-Event). Jetzt `?? viewer?.name` ergänzt.
+
+Per Playwright verifiziert: Bottom-Nav zeigt Start/Spiele/Team/Kampfgericht für Betrachter,
+`/spiele` und `/team` bleiben (kein Redirect mehr), Live-Score + "Tracking übernehmen" auf der
+Startseite sichtbar, `claim_stat_session` über `/stats/:gameId` erfolgreich ohne Fehler.
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten

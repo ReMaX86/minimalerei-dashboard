@@ -672,7 +672,7 @@ export function Dashboard() {
                     <p className="text-xs text-white/60">
                       <span className="font-semibold text-white">{data.activeStatsHolder}</span> trackt gerade
                     </p>
-                    {(role === 'player' || role === 'trainer') && (
+                    {(role === 'player' || role === 'trainer' || role === 'viewer') && (
                       <Link to={`/stats/${data.nextGame.id}`} className="shrink-0 text-xs font-bold text-tbw-gold">
                         Tracking übernehmen
                       </Link>
@@ -681,7 +681,9 @@ export function Dashboard() {
                 )}
               </div>
             )}
-            {nextGameIsLive && (role === 'player' || role === 'trainer') && !data.activeStatsHolder && (
+            {nextGameIsLive &&
+              (role === 'player' || role === 'trainer' || role === 'viewer') &&
+              !data.activeStatsHolder && (
               <Link to={`/stats/${data.nextGame.id}`} className="btn-accent mt-2 block w-full text-center !py-2 text-sm">
                 📊 Spiel-Stats tracking übernehmen
               </Link>
@@ -749,7 +751,7 @@ export function Dashboard() {
               Deine Punkte diese Saison: <span className="font-bold text-tbw-navyDark">{data.myTotalPoints}</span>
             </p>
           )}
-          {(role === 'player' || role === 'trainer') && (
+          {(role === 'player' || role === 'trainer' || role === 'viewer') && (
             <Link
               to={`/stats/${data.lastResult.id}`}
               className="mt-2 block border-t border-black/5 pt-2 text-xs font-bold text-tbw-navy"
