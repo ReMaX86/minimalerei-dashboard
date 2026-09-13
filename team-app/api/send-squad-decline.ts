@@ -60,13 +60,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  const [gameRes, playerRes, trainersRes] = await Promise.all([
+  const [gameRes, playerRes, trainersRes, adminPlayersRes] = await Promise.all([
     supabase.from('games').select('opponent, game_date').eq('id', gameId).maybeSingle(),
     supabase.from('players').select('name').eq('id', playerId).maybeSingle(),
-    supabase.from('trainers').select('id')
+    supabase.from('trainers').select('id'),
+    // "Trainer" heißt hier wie überall sonst im Projekt (siehe is_trainer()
+    // in supabase/migrations/0006_player_admin_flag.sql): echte Trainer
+    // (trainers-Tabelle) UND Spieler mit Trainer-Rechten (players.is_admin,
+    // z. B. ein spielender Trainer) — sonst bekommen Admin-Spieler diese
+    // Push nie, egal auf welchem Gerät (live so aufgefallen).
+    supabase.from('players').select('id').eq('is_admin', true)
   ]);
 
-  const queryError = gameRes.error ?? playerRes.error ?? trainersRes.error;
+  const queryError = gameRes.error ?? playerRes.error ?? trainersRes.error ?? adminPlayersRes.error;
   if (queryError) {
     // eslint-disable-next-line no-console
     console.error('send-squad-decline query error', queryError);
@@ -83,7 +89,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const trainerIds = ((trainersRes.data as { id: string }[] | null) ?? []).map((t) => t.id);
-  if (trainerIds.length === 0) {
+  const adminPlayerIds = ((adminPlayersRes.data as { id: string }[] | null) ?? []).map((p) => p.id);
+
+  let adminPlayerAuthUserIds: string[] = [];
+  if (adminPlayerIds.length > 0) {
+    const { data: adminLinkRows, error: adminLinkError } = await supabase
+      .from('player_auth_links')
+      .select('auth_user_id')
+      .in('player_id', adminPlayerIds);
+    if (adminLinkError) {
+      // eslint-disable-next-line no-console
+      console.error('send-squad-decline query error', adminLinkError);
+      res
+        .status(500)
+        .json({ error: 'Daten konnten nicht geladen werden.', details: adminLinkError.message, code: adminLinkError.code });
+      return;
+    }
+    adminPlayerAuthUserIds = ((adminLinkRows as { auth_user_id: string }[] | null) ?? []).map((r) => r.auth_user_id);
+  }
+
+  const recipientIds = [...trainerIds, ...adminPlayerAuthUserIds];
+  if (recipientIds.length === 0) {
     res.status(200).json({ sent: 0, reason: 'no_trainers' });
     return;
   }
@@ -91,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { data: subs, error: loadError } = await supabase
     .from('push_subscriptions')
     .select('id, endpoint, p256dh, auth_key')
-    .in('user_id', trainerIds);
+    .in('user_id', recipientIds);
 
   if (loadError) {
     // eslint-disable-next-line no-console
