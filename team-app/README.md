@@ -491,6 +491,14 @@ pulsierendem "Live"-Punkt bei aktivem Tracking bzw. "Zwischenstand" ohne Punkt s
 mit den vorhandenen `tbw-navy`/`tbw-navyDark`/`tbw-gold`-Farbtönen statt neuer Werte, damit es
 wie ein Teil des bestehenden Designsystems wirkt statt wie ein Fremdkörper.
 
+**Nachtrag: letzte Punktaktion in der Anzeigetafel.** Unter dem großen Spielstand steht jetzt
+klein, wer zuletzt getroffen hat ("Zuletzt: Lena Muster (+3)"), bei einem Gegnertreffer der
+Vereinsname statt eines Spielernamens ("Zuletzt: H-Town United (+2)"). Fragt dafür das jüngste
+`game_stat_events`-Ereignis mit wurfrelevantem `stat_type` ab (Rebounds/Fouls/etc. sollen den
+Stand nicht überschreiben), sowohl beim initialen Laden als auch bei jedem `refreshLiveScore`
+(15s-Takt/Sichtbarwerden/manueller Button — siehe oben). Der Spielername wird über das ohnehin
+schon geladene `data.players`-Lookup aufgelöst, keine zusätzliche Abfrage dafür nötig.
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
