@@ -450,6 +450,19 @@ select net.http_post(
 );
 ```
 
+**Tracking zurücksetzen** (Migration `0043`, `GamesAdmin.tsx`): im Admin unter Spiele gibt es bei
+jedem Spiel mit erfassten Stats jetzt einen roten "Tracking zurücksetzen"-Button (nur sichtbar,
+wenn `gameResult()` einen Endstand liefert). Löscht per RPC `reset_game_stats()`
+(trainer-only, wie `reopen_game_stats`) alle `game_stat_events`, die Aufstellung
+(`game_court_state`) und einen eventuell noch aktiven Tracking-Lock (`game_stat_sessions`) für
+dieses eine Spiel und setzt `stats_finalized_at`/`last_announced_quarter` zurück — der Endstand
+wird dabei automatisch wieder `null` (derselbe `recalc_game_score()`-Trigger aus Migration `0028`,
+der auch beim normalen Live-Tracking läuft). Gedacht für Testdaten (z. B. beim Ausprobieren des
+Live-Tickers vor der Saison, siehe oben) oder falsch erfasste Spiele, nicht für den normalen
+Betrieb — löscht unwiderruflich, daher der Bestätigungsdialog. Löst dabei bewusst **keine** neue
+"Spiel beendet"-Push aus: der Trigger dafür feuert nur beim Wechsel von `null` auf einen
+Zeitstempel, nicht umgekehrt.
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
