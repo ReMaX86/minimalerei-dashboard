@@ -12,6 +12,7 @@ import {
   STAT_TYPE_LABELS,
   type Game,
   type GameCourtState,
+  type GamePlayerNumber,
   type GameStatEvent,
   type GameStatSessionState,
   type Player,
@@ -54,13 +55,27 @@ type LockState =
   | { kind: 'takenOver' }
   | { kind: 'held' };
 
+// Kleines Nummern-Badge oben links auf dem Avatar — nur gerendert, wenn für
+// diesen Spieler in diesem Spiel eine Trikotnummer hinterlegt ist (Migration
+// 0044). Bewusst kein Platzhalter ohne Nummer, um nicht "0" oder "?" auf
+// jedem Spieler-Tile stehen zu haben, wenn die Zuordnung übersprungen wurde.
+function NumberBadge({ number }: { number: number }) {
+  return (
+    <span className="absolute -left-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-tbw-gold px-1 text-[10px] font-extrabold text-tbw-navyDark shadow ring-2 ring-white">
+      {number}
+    </span>
+  );
+}
+
 function PlayerTile({
   player,
+  number,
   onClick,
   selected,
   disabled
 }: {
   player: Player;
+  number?: number;
   onClick: () => void;
   selected?: boolean;
   disabled?: boolean;
@@ -73,7 +88,10 @@ function PlayerTile({
         selected ? 'border-status-ok bg-status-ok/5' : 'border-transparent bg-tbw-bg active:scale-[0.97]'
       }`}
     >
-      <Avatar player={player} size="lg" />
+      <div className="relative">
+        <Avatar player={player} size="lg" />
+        {number !== undefined && <NumberBadge number={number} />}
+      </div>
       <span className="text-sm font-semibold leading-tight text-tbw-navyDark">{shortPlayerName(player.name)}</span>
     </button>
   );
@@ -149,6 +167,14 @@ export function GameStatsTracker() {
   const [substituting, setSubstituting] = useState(false);
   const [outgoingId, setOutgoingId] = useState<string | null>(null);
   const [events, setEvents] = useState<GameStatEvent[]>([]);
+  // Trikotnummern für dieses Spiel (ändern sich von Spiel zu Spiel, siehe
+  // Migration 0044) — numbers ist der gespeicherte Stand, numberDrafts die
+  // Texteingaben während der Bearbeitung (Strings, damit ein leeres Feld
+  // möglich ist, statt eine 0 zu erzwingen).
+  const [numbers, setNumbers] = useState<Record<string, number>>({});
+  const [numberDrafts, setNumberDrafts] = useState<Record<string, string>>({});
+  const [manualNumbersEdit, setManualNumbersEdit] = useState(false);
+  const [numbersDismissed, setNumbersDismissed] = useState(false);
   const [lockState, setLockState] = useState<LockState>({ kind: 'loading' });
   const [error, setError] = useState<string | null>(null);
   // Erst Aktion, dann Spieler: pendingAction ist gesetzt, sobald eine
@@ -161,16 +187,22 @@ export function GameStatsTracker() {
 
   const loadPlayersAndEvents = useCallback(async () => {
     if (!gameId) return;
-    const [playersRes, eventsRes, squadRes, courtRes] = await Promise.all([
+    const [playersRes, eventsRes, squadRes, courtRes, numbersRes] = await Promise.all([
       supabase.from('players').select('*').eq('is_active', true).order('name'),
       supabase.from('game_stat_events').select('*').eq('game_id', gameId).order('created_at'),
       supabase.from('game_squad').select('player_id').eq('game_id', gameId).eq('is_selected', true),
-      supabase.from('game_court_state').select('*').eq('game_id', gameId).maybeSingle()
+      supabase.from('game_court_state').select('*').eq('game_id', gameId).maybeSingle(),
+      supabase.from('game_player_numbers').select('player_id, number').eq('game_id', gameId)
     ]);
     setPlayers((playersRes.data as Player[]) ?? []);
     setEvents((eventsRes.data as GameStatEvent[]) ?? []);
     setSquadPlayerIds(((squadRes.data as { player_id: string }[]) ?? []).map((r) => r.player_id));
     setOnCourtIds((courtRes.data as GameCourtState | null)?.on_court_player_ids ?? []);
+    setNumbers(
+      Object.fromEntries(
+        ((numbersRes.data as Pick<GamePlayerNumber, 'player_id' | 'number'>[]) ?? []).map((r) => [r.player_id, r.number])
+      )
+    );
   }, [gameId]);
 
   // Optimistisch lokal setzen und im Hintergrund speichern — bleibt über
@@ -416,6 +448,79 @@ export function GameStatsTracker() {
   const useCourtSplit = trackablePlayers.length > COURT_SIZE;
   const onCourtPlayers = trackablePlayers.filter((p) => onCourtIds.includes(p.id));
   const benchPlayers = trackablePlayers.filter((p) => !onCourtIds.includes(p.id));
+
+  // Trikotnummern: direkt beim Start des Trackings abgefragt (vor der
+  // Startaufstellung), solange für dieses Spiel noch gar keine Nummer
+  // hinterlegt ist und die Aufstellung noch nicht steht — läuft danach
+  // automatisch nicht mehr auf, ohne dass dafür ein extra "erledigt"-Flag
+  // in der Datenbank nötig wäre. "Überspringen" markiert nur lokal
+  // (numbersDismissed) als erledigt, ohne etwas zu speichern — bei einem
+  // Neuladen der Seite würde dann erneut gefragt, was hier bewusst in Kauf
+  // genommen wird statt eines eigenen Persistenz-Flags nur für diesen Fall.
+  const showNumbersCard =
+    (trackablePlayers.length > 0 && onCourtIds.length === 0 && Object.keys(numbers).length === 0 && !numbersDismissed) ||
+    manualNumbersEdit;
+
+  function openNumbersEditor() {
+    setNumberDrafts(
+      Object.fromEntries(trackablePlayers.map((p) => [p.id, numbers[p.id] !== undefined ? String(numbers[p.id]) : '']))
+    );
+    setManualNumbersEdit(true);
+  }
+
+  function closeNumbersEditor() {
+    setManualNumbersEdit(false);
+  }
+
+  function skipNumbers() {
+    setNumbersDismissed(true);
+  }
+
+  async function saveNumbers() {
+    if (!gameId || busy) return;
+    for (const [playerId, raw] of Object.entries(numberDrafts)) {
+      if (raw.trim() === '') continue;
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 0 || n > 99) {
+        setError(`Ungültige Nummer bei ${playersById[playerId]?.name ?? 'einem Spieler'} — bitte 0-99.`);
+        return;
+      }
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const { error: delError } = await supabase
+        .from('game_player_numbers')
+        .delete()
+        .eq('game_id', gameId)
+        .in(
+          'player_id',
+          trackablePlayers.map((p) => p.id)
+        );
+      if (delError) throw delError;
+      const toInsert = Object.entries(numberDrafts)
+        .filter(([, v]) => v.trim() !== '')
+        .map(([playerId, v]) => ({ game_id: gameId, player_id: playerId, number: Number(v) }));
+      if (toInsert.length > 0) {
+        const { error: insertError } = await supabase.from('game_player_numbers').insert(toInsert);
+        if (insertError) throw insertError;
+      }
+      setNumbers(Object.fromEntries(toInsert.map((r) => [r.player_id, r.number])));
+      setManualNumbersEdit(false);
+      setNumbersDismissed(true);
+    } catch {
+      setError('Trikotnummern konnten nicht gespeichert werden.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Für Textkontexte, wo ein NumberBadge zu groß wäre (kleine Avatare,
+  // Bank-Pills, "Zuletzt"-Zeilen, Box-Score) — Nummer als Präfix vor dem Namen.
+  function numPrefix(playerId: string): string {
+    return numbers[playerId] !== undefined ? `#${numbers[playerId]} ` : '';
+  }
+
   const boxScore = computeBoxScore(events);
   const teamScore = computeTeamScore(events);
   const quarterScores = computeQuarterScores(events);
@@ -431,7 +536,9 @@ export function GameStatsTracker() {
   const screenKey =
     trackablePlayers.length === 0
       ? 'empty'
-      : useCourtSplit && onCourtIds.length < COURT_SIZE
+      : showNumbersCard
+        ? 'numbers'
+        : useCourtSplit && onCourtIds.length < COURT_SIZE
         ? 'lineup'
         : useCourtSplit && onCourtIds.length === COURT_SIZE && substituting
           ? `sub-${outgoingId ?? 'out'}`
@@ -552,7 +659,57 @@ export function GameStatsTracker() {
               </div>
             )}
 
-            {trackablePlayers.length > 0 && useCourtSplit && onCourtIds.length < COURT_SIZE && (
+            {trackablePlayers.length > 0 && !showNumbersCard && (
+              <button
+                className="mt-2 block text-xs font-bold text-tbw-navy"
+                onClick={openNumbersEditor}
+              >
+                🔢 Trikotnummern bearbeiten
+              </button>
+            )}
+
+            {trackablePlayers.length > 0 && showNumbersCard && (
+              <div className="card mt-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Trikotnummern</p>
+                <p className="mt-1 text-xs text-tbw-ink/50">
+                  Welcher Spieler hat welche Nummer? Kann auch leer bleiben und später ergänzt werden.
+                </p>
+                <ul className="mt-3 divide-y divide-black/5">
+                  {trackablePlayers.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-3 py-2">
+                      <span className="flex items-center gap-2 text-sm font-medium text-tbw-navyDark">
+                        <Avatar player={p} size="xs" />
+                        {p.name}
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        max={99}
+                        placeholder="–"
+                        value={numberDrafts[p.id] ?? ''}
+                        onChange={(e) => setNumberDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                        className="input w-16 !py-1.5 text-center"
+                      />
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 flex gap-2">
+                  <button className="btn-primary flex-1 !py-2 text-sm" disabled={busy} onClick={saveNumbers}>
+                    {manualNumbersEdit ? 'Speichern' : 'Weiter zur Aufstellung'}
+                  </button>
+                  <button
+                    className="btn-secondary flex-1 !py-2 text-sm"
+                    disabled={busy}
+                    onClick={manualNumbersEdit ? closeNumbersEditor : skipNumbers}
+                  >
+                    {manualNumbersEdit ? 'Abbrechen' : 'Überspringen'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {trackablePlayers.length > 0 && !showNumbersCard && useCourtSplit && onCourtIds.length < COURT_SIZE && (
               <div className="card mt-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
                   Startaufstellung ({onCourtIds.length}/{COURT_SIZE})
@@ -563,6 +720,7 @@ export function GameStatsTracker() {
                     <PlayerTile
                       key={p.id}
                       player={p}
+                      number={numbers[p.id]}
                       selected={onCourtIds.includes(p.id)}
                       disabled={!onCourtIds.includes(p.id) && onCourtIds.length >= COURT_SIZE}
                       onClick={() => toggleStarter(p.id)}
@@ -572,29 +730,35 @@ export function GameStatsTracker() {
               </div>
             )}
 
-            {trackablePlayers.length > 0 && useCourtSplit && onCourtIds.length === COURT_SIZE && substituting && (
-              <div className="card mt-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
-                    {outgoingId ? 'Wer kommt rein?' : 'Wer geht raus?'}
-                  </p>
-                  <button className="text-xs font-bold text-tbw-red" onClick={cancelSubstitution}>
-                    Abbrechen
-                  </button>
+            {trackablePlayers.length > 0 &&
+              !showNumbersCard &&
+              useCourtSplit &&
+              onCourtIds.length === COURT_SIZE &&
+              substituting && (
+                <div className="card mt-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
+                      {outgoingId ? 'Wer kommt rein?' : 'Wer geht raus?'}
+                    </p>
+                    <button className="text-xs font-bold text-tbw-red" onClick={cancelSubstitution}>
+                      Abbrechen
+                    </button>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    {(outgoingId ? benchPlayers : onCourtPlayers).map((p) => (
+                      <PlayerTile
+                        key={p.id}
+                        player={p}
+                        number={numbers[p.id]}
+                        onClick={() => (outgoingId ? confirmSubstitution(p.id) : setOutgoingId(p.id))}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  {(outgoingId ? benchPlayers : onCourtPlayers).map((p) => (
-                    <PlayerTile
-                      key={p.id}
-                      player={p}
-                      onClick={() => (outgoingId ? confirmSubstitution(p.id) : setOutgoingId(p.id))}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+              )}
 
             {trackablePlayers.length > 0 &&
+              !showNumbersCard &&
               (!useCourtSplit || onCourtIds.length === COURT_SIZE) &&
               !substituting &&
               pendingAction && (
@@ -609,7 +773,13 @@ export function GameStatsTracker() {
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-3">
                     {(useCourtSplit ? onCourtPlayers : trackablePlayers).map((p) => (
-                      <PlayerTile key={p.id} player={p} disabled={busy} onClick={() => addStat('us', pendingAction, p.id)} />
+                      <PlayerTile
+                        key={p.id}
+                        player={p}
+                        number={numbers[p.id]}
+                        disabled={busy}
+                        onClick={() => addStat('us', pendingAction, p.id)}
+                      />
                     ))}
                     {OPPONENT_ELIGIBLE.has(pendingAction) && (
                       <OpponentTile disabled={busy} onClick={() => addStat('opponent', pendingAction, null)} />
@@ -619,6 +789,7 @@ export function GameStatsTracker() {
               )}
 
             {trackablePlayers.length > 0 &&
+              !showNumbersCard &&
               (!useCourtSplit || onCourtIds.length === COURT_SIZE) &&
               !substituting &&
               !pendingAction && (
@@ -630,7 +801,9 @@ export function GameStatsTracker() {
                         <Avatar player={playersById[lastEvent.player_id]} size="xs" />
                       )}
                       <span className="font-semibold text-tbw-ink/70">
-                        {lastEvent.team === 'opponent' ? 'Gegner' : (playersById[lastEvent.player_id ?? '']?.name ?? '?')}
+                        {lastEvent.team === 'opponent'
+                          ? 'Gegner'
+                          : `${numPrefix(lastEvent.player_id ?? '')}${playersById[lastEvent.player_id ?? '']?.name ?? '?'}`}
                       </span>
                       <span>· {STAT_TYPE_LABELS[lastEvent.stat_type]}</span>
                     </p>
@@ -672,6 +845,7 @@ export function GameStatsTracker() {
                           <div key={p.id} className="flex flex-col items-center gap-1">
                             <Avatar player={p} size="xs" />
                             <span className="text-center text-[9px] font-semibold leading-tight text-tbw-navyDark">
+                              {numPrefix(p.id)}
                               {shortPlayerName(p.name)}
                             </span>
                           </div>
@@ -683,6 +857,7 @@ export function GameStatsTracker() {
                           <div className="mt-1 flex flex-wrap gap-1.5">
                             {benchPlayers.map((p) => (
                               <span key={p.id} className="rounded-full bg-tbw-bg px-2.5 py-1 text-xs text-tbw-ink/40">
+                                {numPrefix(p.id)}
                                 {shortPlayerName(p.name)}
                               </span>
                             ))}
@@ -715,7 +890,8 @@ export function GameStatsTracker() {
                       <li key={e.id} className="flex items-center gap-2 text-xs text-tbw-ink/60">
                         {evPlayer && <Avatar player={evPlayer} size="xs" />}
                         <span>
-                          {quarterLabel(e.quarter)} · {e.team === 'opponent' ? 'Gegner' : (evPlayer?.name ?? '?')} ·{' '}
+                          {quarterLabel(e.quarter)} ·{' '}
+                          {e.team === 'opponent' ? 'Gegner' : `${numPrefix(e.player_id ?? '')}${evPlayer?.name ?? '?'}`} ·{' '}
                           {STAT_TYPE_LABELS[e.stat_type]}
                         </span>
                       </li>
@@ -757,6 +933,7 @@ export function GameStatsTracker() {
                       <td className="py-1.5 pr-2 font-semibold text-tbw-navyDark">
                         <div className="flex items-center gap-2">
                           {playersById[b.playerId] && <Avatar player={playersById[b.playerId]} size="xs" />}
+                          {numPrefix(b.playerId)}
                           {playersById[b.playerId]?.name ?? '?'}
                         </div>
                       </td>
