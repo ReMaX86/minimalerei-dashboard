@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -406,6 +406,62 @@ export function Dashboard() {
     trainingVersion
   ]);
 
+  // Live-Anzeigetafel fürs laufende Spiel: der große Initial-Load oben läuft
+  // nur einmal beim Öffnen der Seite, ein bereits geöffnetes Dashboard würde
+  // also nie mitbekommen, wenn währenddessen wer anders zu tracken anfängt
+  // (live so aufgefallen — "erst nach mehrmaligem Neuladen sichtbar"). Fragt
+  // deshalb bewusst nur die zwei kleinen, dafür relevanten Felder erneut ab
+  // (nicht den kompletten load() mit seinen ~10 Abfragen) — automatisch alle
+  // 15s (wie der Herzschlag im Tracker selbst) und sofort, sobald die Seite
+  // wieder sichtbar wird, plus ein manueller Button für "jetzt sofort".
+  const today = new Date().toISOString().slice(0, 10);
+  const nextGameIsLive = !!(data?.nextGame && flags.stats && !data.nextGame.stats_finalized_at && data.nextGame.game_date <= today);
+  const [refreshingLive, setRefreshingLive] = useState(false);
+
+  const refreshLiveScore = useCallback(async () => {
+    if (!nextGameIsLive || !data?.nextGame) return;
+    const gameId = data.nextGame.id;
+    setRefreshingLive(true);
+    const [gameRes, sessionRes] = await Promise.all([
+      supabase.from('games').select('final_score_us, final_score_opponent, stats_finalized_at').eq('id', gameId).maybeSingle(),
+      supabase.from('game_stat_sessions').select('holder_name, last_heartbeat').eq('game_id', gameId).maybeSingle()
+    ]);
+    const holder =
+      sessionRes.data && Date.now() - new Date(sessionRes.data.last_heartbeat).getTime() < 30_000
+        ? sessionRes.data.holder_name
+        : null;
+    setData((prev) =>
+      prev && prev.nextGame && prev.nextGame.id === gameId
+        ? {
+            ...prev,
+            nextGame: {
+              ...prev.nextGame,
+              final_score_us: gameRes.data?.final_score_us ?? prev.nextGame.final_score_us,
+              final_score_opponent: gameRes.data?.final_score_opponent ?? prev.nextGame.final_score_opponent,
+              stats_finalized_at: gameRes.data?.stats_finalized_at ?? prev.nextGame.stats_finalized_at
+            },
+            activeStatsHolder: holder
+          }
+        : prev
+    );
+    setRefreshingLive(false);
+  }, [nextGameIsLive, data?.nextGame]);
+
+  useEffect(() => {
+    if (!nextGameIsLive) return;
+    const interval = setInterval(refreshLiveScore, 15_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshLiveScore();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [nextGameIsLive, refreshLiveScore]);
+
   if (error) return <div className="card text-sm text-tbw-red">{error}</div>;
   if (!data) return <LoadingSpinner />;
 
@@ -544,41 +600,43 @@ export function Dashboard() {
             <p className="mt-2 text-xs text-tbw-ink/50">
               Trikot: {benoetigterSatz(data.nextGame) === 'weiss' ? 'Weiß' : 'Schwarz'}
             </p>
-            {flags.stats &&
-              data.nextGame.game_date <= new Date().toISOString().slice(0, 10) &&
-              !data.nextGame.stats_finalized_at &&
-              data.nextGame.final_score_us !== null && (
-                <div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-tbw-bg px-3 py-2">
-                  <p className="text-xs text-tbw-ink/60">
-                    {data.activeStatsHolder && (
-                      <>
-                        <span className="font-semibold text-tbw-ink/80">{data.activeStatsHolder}</span> trackt gerade
-                        {' · '}
-                      </>
-                    )}
-                    <span className="font-bold text-tbw-navyDark">
-                      {data.nextGame.final_score_us}:{data.nextGame.final_score_opponent}
-                    </span>
-                  </p>
-                  {(role === 'player' || role === 'trainer') && data.activeStatsHolder && (
-                    <Link to={`/stats/${data.nextGame.id}`} className="shrink-0 text-xs font-bold text-tbw-navy">
-                      Tracking übernehmen
-                    </Link>
-                  )}
+            {nextGameIsLive && (data.activeStatsHolder || data.nextGame.final_score_us !== null) && (
+              <div className="mt-2 overflow-hidden rounded-2xl bg-gradient-to-b from-tbw-navy to-tbw-navyDark px-4 py-3 text-white shadow-[0_8px_30px_-6px_rgba(7,22,15,0.5)]">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-tbw-red">
+                    {data.activeStatsHolder && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-tbw-red" />}
+                    {data.activeStatsHolder ? 'Live' : 'Zwischenstand'}
+                  </span>
+                  <button
+                    disabled={refreshingLive}
+                    onClick={() => refreshLiveScore()}
+                    className="text-[10px] font-bold uppercase tracking-wide text-white/50 disabled:opacity-40"
+                  >
+                    {refreshingLive ? 'Aktualisiert…' : '🔄 Aktualisieren'}
+                  </button>
                 </div>
-              )}
-            {flags.stats &&
-              (role === 'player' || role === 'trainer') &&
-              data.nextGame.game_date <= new Date().toISOString().slice(0, 10) &&
-              !data.nextGame.stats_finalized_at &&
-              !data.activeStatsHolder && (
-                <Link
-                  to={`/stats/${data.nextGame.id}`}
-                  className="btn-accent mt-2 block w-full text-center !py-2 text-sm"
-                >
-                  📊 Spiel-Stats tracken
-                </Link>
-              )}
+                <p className="headline mt-1 text-center text-6xl tabular-nums">
+                  {data.nextGame.final_score_us ?? 0}:{data.nextGame.final_score_opponent ?? 0}
+                </p>
+                {data.activeStatsHolder && (
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-white/10 pt-2">
+                    <p className="text-xs text-white/60">
+                      <span className="font-semibold text-white">{data.activeStatsHolder}</span> trackt gerade
+                    </p>
+                    {(role === 'player' || role === 'trainer') && (
+                      <Link to={`/stats/${data.nextGame.id}`} className="shrink-0 text-xs font-bold text-tbw-gold">
+                        Tracking übernehmen
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {nextGameIsLive && (role === 'player' || role === 'trainer') && !data.activeStatsHolder && (
+              <Link to={`/stats/${data.nextGame.id}`} className="btn-accent mt-2 block w-full text-center !py-2 text-sm">
+                📊 Spiel-Stats tracken
+              </Link>
+            )}
             {role === 'player' && (
               <div className="mt-3 border-t border-black/5 pt-3">
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">

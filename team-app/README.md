@@ -477,6 +477,20 @@ würde ein Tracker, der die App einfach zugemacht statt sauber verlassen hat, di
 selbst kommt wie beim Live-Ticker direkt aus `games.final_score_us`/`final_score_opponent`, die
 `recalc_game_score()` ohnehin ständig aktuell hält — keine zusätzliche Abfrage nötig.
 
+**Nachtrag: automatisches Aktualisieren + Anzeigetafel-Optik.** Der große Datenabruf beim Öffnen
+der Startseite (`load()`, ~10 Abfragen) läuft nur einmal — ein bereits geöffnetes Dashboard hätte
+also nie mitbekommen, wenn währenddessen wer anders zu tracken anfängt (live so aufgefallen:
+"erst nach mehrmaligem Neuladen sichtbar"). Deshalb eigener, leichtgewichtiger Refresh
+(`refreshLiveScore`, nur die zwei relevanten Felder aus `games` + `game_stat_sessions`, nicht der
+komplette `load()`): automatisch alle 15s (wie der Herzschlag im Tracker selbst,
+`HEARTBEAT_MS`), sofort beim Sichtbarwerden der Seite (`visibilitychange`/`focus` — deckt auch
+den Fall ab, dass die PWA im Hintergrund lag), und zusätzlich ein manueller
+"🔄 Aktualisieren"-Text oben rechts in der Kachel. Optisch als eigene dunkle Kachel im
+`headline`-Font (Anton, schon für "HI {Name}!" im Einsatz) mit großer Punktzahl, rotem
+pulsierendem "Live"-Punkt bei aktivem Tracking bzw. "Zwischenstand" ohne Punkt sonst — bewusst
+mit den vorhandenen `tbw-navy`/`tbw-navyDark`/`tbw-gold`-Farbtönen statt neuer Werte, damit es
+wie ein Teil des bestehenden Designsystems wirkt statt wie ein Fremdkörper.
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
