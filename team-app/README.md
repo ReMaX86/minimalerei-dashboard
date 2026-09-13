@@ -1433,6 +1433,16 @@ hier die getroffenen Entscheidungen samt Begründung:
   Abwesenheiten, bereits verschickte Erinnerungen, Geräte-Zuordnung, Push-Abos) — vorher hätte
   ein einzelner stiller Fehlschlag dort eine Erinnerung dauerhaft als "verschickt" protokolliert,
   obwohl nie eine Push ankam.
+- **Nachtrag zu Kader-Absage: spielende Trainer bekamen die Push nie.** `send-squad-decline.ts`
+  fragte nur die `trainers`-Tabelle ab (Login per E-Mail/Passwort). Ein "Spieler mit
+  Trainer-Rechten" (`players.is_admin`, siehe Migration `0006` — bewusst kein zweiter Login,
+  sondern derselbe Zugangscode wie jeder andere Spieler) taucht dort aber nie auf und bekam die
+  Push deshalb auf keinem Gerät, unabhängig davon, wer absagt. Genau dieser Fall ist überall
+  sonst im Projekt bereits sauber gelöst — `is_trainer()` (Migration `0006`) zählt admin-Spieler
+  ausdrücklich mit, nur diese eine Function hat das nicht beachtet. Fix: zusätzlich zu
+  `trainers.id` auch alle `player_auth_links.auth_user_id` von Spielern mit `is_admin = true`
+  als Empfänger einbeziehen (wieder ohne `.maybeSingle()`, aus demselben Mehrgeräte-Grund wie
+  oben).
 
 ## Projektstruktur
 
