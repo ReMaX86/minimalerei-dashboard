@@ -634,7 +634,7 @@ export function Dashboard() {
             )}
             {nextGameIsLive && (role === 'player' || role === 'trainer') && !data.activeStatsHolder && (
               <Link to={`/stats/${data.nextGame.id}`} className="btn-accent mt-2 block w-full text-center !py-2 text-sm">
-                📊 Spiel-Stats tracken
+                📊 Spiel-Stats tracking übernehmen
               </Link>
             )}
             {role === 'player' && (
