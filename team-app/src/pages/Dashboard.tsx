@@ -87,7 +87,15 @@ export function Dashboard() {
       const today = new Date().toISOString().slice(0, 10);
 
       const [gameRes, trikotRes, playersRes, announcementsRes] = await Promise.all([
-        supabase.from('games').select('*').gte('game_date', today).order('game_date').order('game_time').limit(1).maybeSingle(),
+        supabase
+          .from('games')
+          .select('*')
+          .gte('game_date', today)
+          .is('stats_finalized_at', null)
+          .order('game_date')
+          .order('game_time')
+          .limit(1)
+          .maybeSingle(),
         supabase.from('trikot_sets').select('*').order('id'),
         supabase.from('players').select('*').eq('is_active', true),
         flags.announcements
@@ -254,10 +262,14 @@ export function Dashboard() {
             }
 
             if (!trikotReminder) {
+              // <= statt < today: seit die "Nächstes Spiel"-Abfrage bereits
+              // abgeschlossene Spiele ausschließt (siehe gameRes oben), fällt
+              // ein heute abgeschlossenes Spiel sonst durchs Raster und die
+              // Trikot-Erinnerung würde erst ab morgen greifen.
               const { data: pastGameRow } = await supabase
                 .from('games')
                 .select('*')
-                .lt('game_date', today)
+                .lte('game_date', today)
                 .order('game_date', { ascending: false })
                 .limit(1)
                 .maybeSingle();

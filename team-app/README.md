@@ -597,6 +597,31 @@ gelaufen, und "Tracking zurücksetzen" hätte den nachgetragenen Stand fälschli
 `reset_game_stats()` setzt `final_score_us`/`final_score_opponent` jetzt zusätzlich direkt
 zurück, unabhängig vom Trigger.
 
+**Nachtrag: "Endstand nachtragen" ließ das Spiel weiter als "Nächstes Spiel" stehen.**
+Die "Nächstes Spiel"-Abfrage auf der Startseite (`Dashboard.tsx`) und die Kader-Ansicht
+(`Spiele.tsx`) filterten bisher nur nach `game_date >= heute` — ein Spiel, das heute
+stattfindet und (egal ob live oder nachträglich) bereits abgeschlossen ist, blieb dadurch
+trotzdem "das nächste Spiel", samt Kader-Zusage-Karte usw. für ein bereits vorbeigegangenes
+Spiel. Beide Abfragen filtern jetzt zusätzlich `stats_finalized_at is null` heraus — ein
+abgeschlossenes Spiel taucht nur noch unter "Letztes Ergebnis" bzw. "Vergangene Spiele" auf.
+Die Trikot-Rückgabe-Erinnerung (die bisher "Spieltag = heute" über `nextGame` erkannt hat)
+prüft für den Fallback jetzt `game_date <= heute` statt `< heute`, damit ein heute
+abgeschlossenes Spiel dort nicht durchs Raster fällt.
+
+**Nachtrag: Box-Score-Ansicht für nachgetragene Endstände.** Wer bei einem Spiel ohne
+Live-Tracking auf "Box-Score ansehen" klickt, landete im vollen Tracking-Screen mit "Stats
+abgeschlossen / Wieder öffnen" — "Wieder öffnen" hat dort aber nur unnötig eine neue
+Live-Tracking-Sitzung gestartet (Aufstellung, Trikotnummern …), die anschließend erneut mit
+"Spiel beenden" abgeschlossen werden musste und dabei ein zweites Mal die "Spiel
+beendet"-Push verschickt hat. Da es für ein nachgetragenes Ergebnis (keine
+`game_stat_events`) ohnehin keinen Box-Score zum Ansehen gibt, zeigt `GameStatsTracker.tsx`
+in diesem Fall jetzt stattdessen einen erklärenden Hinweis ("keine Einzelspieler-Stats
+erfasst — Endstand wurde manuell nachgetragen") ohne "Wieder öffnen"-Button. Echte
+live-getrackte und abgeschlossene Spiele zeigen weiterhin wie gewohnt "Wieder öffnen" +
+Box-Score-Tabelle. Zusätzlich zeigte die Kopfzeile dort fälschlich "0 : 0" (berechnet aus den
+— hier leeren — `game_stat_events`) statt des tatsächlichen nachgetragenen Endstands; zeigt
+jetzt in diesem Fall `games.final_score_us`/`final_score_opponent` an.
+
 Per Playwright verifiziert: Formular öffnen, Werte eintragen, Speichern → korrekter
 `PATCH`-Request, "Endstand: 55:48 · Sieg · Stats abgeschlossen" erscheint, Button wechselt zu
 "Tracking zurücksetzen".
