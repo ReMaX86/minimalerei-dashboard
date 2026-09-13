@@ -57,6 +57,7 @@ interface DashboardData {
   declinedNames: string[];
   reminders: ReminderItem[];
   activeStatsHolder: string | null;
+  lastScoreEvent: { team: 'us' | 'opponent'; playerId: string | null; points: number } | null;
 }
 
 export function Dashboard() {
@@ -309,6 +310,7 @@ export function Dashboard() {
       // (Browser einfach zugemacht statt sauber verlassen) die Übernahme-
       // Kachel dauerhaft an Stelle des großen Start-Buttons anzeigen.
       let activeStatsHolder: string | null = null;
+      let lastScoreEvent: DashboardData['lastScoreEvent'] = null;
       if (flags.stats && nextGame && !nextGame.stats_finalized_at && nextGame.game_date <= today) {
         const { data: sessionRow } = await supabase
           .from('game_stat_sessions')
@@ -317,6 +319,25 @@ export function Dashboard() {
           .maybeSingle();
         if (sessionRow && Date.now() - new Date(sessionRow.last_heartbeat).getTime() < 30_000) {
           activeStatsHolder = sessionRow.holder_name;
+        }
+
+        // Letzte Punktaktion fürs Live-Score-Board: nur wurfrelevante Events
+        // (Rebounds, Fouls etc. sollen den "wer hat zuletzt getroffen"-Stand
+        // nicht überschreiben), jüngstes zuerst.
+        const { data: lastScoreRow } = await supabase
+          .from('game_stat_events')
+          .select('team, player_id, stat_type')
+          .eq('game_id', nextGame.id)
+          .in('stat_type', ['fg2_made', 'fg3_made', 'ft_made'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (lastScoreRow) {
+          lastScoreEvent = {
+            team: lastScoreRow.team as 'us' | 'opponent',
+            playerId: lastScoreRow.player_id,
+            points: STAT_POINT_VALUES[lastScoreRow.stat_type as StatType] ?? 0
+          };
         }
       }
 
@@ -386,7 +407,8 @@ export function Dashboard() {
         myTotalPoints,
         reminders,
         declinedNames,
-        activeStatsHolder
+        activeStatsHolder,
+        lastScoreEvent
       });
     }
 
@@ -422,14 +444,29 @@ export function Dashboard() {
     if (!nextGameIsLive || !data?.nextGame) return;
     const gameId = data.nextGame.id;
     setRefreshingLive(true);
-    const [gameRes, sessionRes] = await Promise.all([
+    const [gameRes, sessionRes, lastScoreRes] = await Promise.all([
       supabase.from('games').select('final_score_us, final_score_opponent, stats_finalized_at').eq('id', gameId).maybeSingle(),
-      supabase.from('game_stat_sessions').select('holder_name, last_heartbeat').eq('game_id', gameId).maybeSingle()
+      supabase.from('game_stat_sessions').select('holder_name, last_heartbeat').eq('game_id', gameId).maybeSingle(),
+      supabase
+        .from('game_stat_events')
+        .select('team, player_id, stat_type')
+        .eq('game_id', gameId)
+        .in('stat_type', ['fg2_made', 'fg3_made', 'ft_made'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
     ]);
     const holder =
       sessionRes.data && Date.now() - new Date(sessionRes.data.last_heartbeat).getTime() < 30_000
         ? sessionRes.data.holder_name
         : null;
+    const lastScoreEvent: DashboardData['lastScoreEvent'] = lastScoreRes.data
+      ? {
+          team: lastScoreRes.data.team as 'us' | 'opponent',
+          playerId: lastScoreRes.data.player_id,
+          points: STAT_POINT_VALUES[lastScoreRes.data.stat_type as StatType] ?? 0
+        }
+      : null;
     setData((prev) =>
       prev && prev.nextGame && prev.nextGame.id === gameId
         ? {
@@ -440,7 +477,8 @@ export function Dashboard() {
               final_score_opponent: gameRes.data?.final_score_opponent ?? prev.nextGame.final_score_opponent,
               stats_finalized_at: gameRes.data?.stats_finalized_at ?? prev.nextGame.stats_finalized_at
             },
-            activeStatsHolder: holder
+            activeStatsHolder: holder,
+            lastScoreEvent
           }
         : prev
     );
@@ -618,6 +656,17 @@ export function Dashboard() {
                 <p className="headline mt-1 text-center text-6xl tabular-nums">
                   {data.nextGame.final_score_us ?? 0}:{data.nextGame.final_score_opponent ?? 0}
                 </p>
+                {data.lastScoreEvent && (
+                  <p className="mt-0.5 text-center text-xs text-white/50">
+                    Zuletzt:{' '}
+                    <span className="font-semibold text-white/80">
+                      {data.lastScoreEvent.team === 'opponent'
+                        ? data.nextGame.opponent
+                        : (data.players[data.lastScoreEvent.playerId ?? '']?.name ?? '?')}
+                    </span>{' '}
+                    (+{data.lastScoreEvent.points})
+                  </p>
+                )}
                 {data.activeStatsHolder && (
                   <div className="mt-2 flex items-center justify-between gap-2 border-t border-white/10 pt-2">
                     <p className="text-xs text-white/60">
