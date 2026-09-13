@@ -305,6 +305,43 @@ for each row execute function public.notify_squad_decline();
 Zusätzliche `service_role`-Rechte dafür (Migration `0041`): `games`, `trainers` (`players` und
 `push_subscriptions` waren bereits berechtigt).
 
+**Sechste Benachrichtigungsart: Kader-Nachnominierung.** Wird ein Spieler nach bereits
+veröffentlichtem Kader neu aufgenommen (z. B. weil jemand anders abgesagt hat und der Trainer
+ihn nachnominiert), bekommt genau dieser Spieler eine Push — nicht alle wie bei "Kader
+veröffentlicht". Derselbe `game_squad`-Trigger wie bei "Kader-Absage" (ein Trigger pro Tabelle
+reicht, ruft aber zwei verschiedene Functions auf):
+
+```sql
+create or replace function public.notify_squad_nomination()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.is_selected = true and coalesce(old.is_selected, false) = false then
+    perform net.http_post(
+      url := 'https://<deine-vercel-domain>/api/send-squad-nomination',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+      body := jsonb_build_object('record', jsonb_build_object('game_id', new.game_id, 'player_id', new.player_id, 'is_selected', new.is_selected))
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create trigger game_squad_notify_nomination
+after insert or update on public.game_squad
+for each row execute function public.notify_squad_nomination();
+```
+
+Ob der Kader zum Zeitpunkt der Aufnahme schon veröffentlicht war, prüft
+`api/send-squad-nomination.ts` selbst (Feld `games.squad_published`) — wird ein Spieler während
+der ursprünglichen Kader-Zusammenstellung ausgewählt (Kader noch nicht veröffentlicht), soll das
+noch keine Push auslösen, das übernimmt erst "Kader veröffentlicht" für alle auf einmal. Keine
+zusätzlichen `service_role`-Rechte nötig — `games`, `players` und `player_auth_links` waren
+bereits berechtigt.
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
@@ -1369,6 +1406,15 @@ hier die getroffenen Entscheidungen samt Begründung:
   Spielername werden serverseitig nachgeschlagen. "Training abgesagt" deckt über
   `training_overrides.mode = 'cancelled'` sowohl einzelne Tages-Absagen als auch ganze
   Ferienzeiten ab, da beide denselben Mechanismus nutzen (siehe #104).
+- **Kader-Nachnominierung** (`api/send-squad-nomination.ts`): ergänzt eine Lücke, die beim Bau
+  von "Kader-Absage" auffiel — sagt ein Spieler nach Kader-Veröffentlichung ab und der Trainer
+  nominiert dafür jemand anderen nach, bekam dieser Spieler bisher keine Info, da "Kader
+  veröffentlicht" nur beim ersten Veröffentlichen feuert (`squad_published` wechselt nur einmal
+  auf `true`). Löst stattdessen auf jede `game_squad`-Aufnahme (`is_selected` wechselt auf
+  `true`) aus und prüft serverseitig selbst, ob `games.squad_published` bereits `true` ist —
+  nur dann ist es wirklich eine Nachnominierung und nicht Teil der ursprünglichen
+  Kader-Zusammenstellung. Geht wie "Kader-Absage" gezielt nur an den einen betroffenen
+  Spieler, aufgelöst über `player_auth_links` (`player_id -> auth_user_id`).
 
 ## Projektstruktur
 
