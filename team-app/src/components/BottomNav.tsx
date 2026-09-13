@@ -10,10 +10,13 @@ const ITEMS = [
   { to: '/kampfgericht', label: 'Kampfgericht', Icon: IconClipboard, end: false }
 ];
 
-// Betrachter (z. B. Abteilungsleiter) sehen nur Spielplan + Kampfgericht,
-// kein Kader/Trikots — dafür gibt es keine Spieler-/Trainer-Rechte.
+// Betrachter (z. B. Abteilungsleiter) sehen Spielplan, Team und
+// Kampfgericht, aber kein Trikots — dafür gibt es keine Spieler-/
+// Trainer-Rechte. Spiele-Tab schließt auch das Live-Stats-Tracking ein
+// (Übernahme-Button dort wie bei Spielern/Trainern, siehe Migration 0045).
 const VIEWER_ITEMS = [
   { to: '/', label: 'Start', Icon: IconHome, end: true },
+  { to: '/spiele', label: 'Spiele', Icon: IconTeam, end: false },
   { to: '/kampfgericht', label: 'Kampfgericht', Icon: IconClipboard, end: false }
 ];
 
@@ -22,8 +25,9 @@ export function BottomNav() {
   const { flags } = useFeatureFlags();
 
   let items = role === 'viewer' ? VIEWER_ITEMS : ITEMS;
-  if (role !== 'viewer' && flags.player_profiles) {
-    // Team direkt hinter Spiele einreihen, nicht ans Ende anhängen.
+  if (flags.player_profiles) {
+    // Team direkt hinter Spiele einreihen, nicht ans Ende anhängen — Spiele
+    // steht in ITEMS wie in VIEWER_ITEMS an Index 1.
     items = [...items.slice(0, 2), { to: '/team', label: 'Team', Icon: IconUser, end: false }, ...items.slice(2)];
   }
   if (isAdmin) {

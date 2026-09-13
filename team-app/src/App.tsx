@@ -108,20 +108,16 @@ export default function App() {
       <Route
         path="/spiele"
         element={
-          role === 'viewer' ? (
-            <Navigate to="/" replace />
-          ) : (
-            <Shell title="Spiele & Kader">
-              <Spiele />
-            </Shell>
-          )
+          <Shell title="Spiele & Kader">
+            <Spiele />
+          </Shell>
         }
       />
       <Route path="/kader" element={<Navigate to="/spiele" replace />} />
       <Route
         path="/team"
         element={
-          flags.player_profiles && role !== 'viewer' ? (
+          flags.player_profiles ? (
             <Shell title="Team">
               <PlayerProfiles />
             </Shell>
@@ -130,10 +126,7 @@ export default function App() {
           )
         }
       />
-      <Route
-        path="/stats/:gameId"
-        element={role === 'viewer' ? <Navigate to="/" replace /> : <GameStatsTracker />}
-      />
+      <Route path="/stats/:gameId" element={<GameStatsTracker />} />
       <Route
         path="/admin"
         element={
