@@ -344,11 +344,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     )
   );
 
-  const toSend = dueTypes.flatMap((type) =>
+  const candidates = dueTypes.flatMap((type) =>
     targetPlayers
       .filter((p) => !alreadySent.has(`${p.id}:${type.type}`))
       .map((player) => ({ player, type: type.type, label: type.label }))
   );
+
+  if (candidates.length === 0) {
+    res.status(200).json({ sent: 0, attempted: 0, date: occurrence.date, dueTypes: dueTypes.map((t) => t.type) });
+    return;
+  }
+
+  // Claim VOR dem Versand, nicht danach: pg_cron ruft diesen Endpunkt alle
+  // 10 Minuten auf und kann — z. B. bei einem doppelt angelegten Cron-Job
+  // oder einem langsamen/erneut ausgelösten Vercel-Aufruf — auch zwei
+  // überlappende Durchläufe gleichzeitig starten. Beide hätten beim alten
+  // "erst senden, danach loggen" denselben `alreadySent`-Stand gesehen und
+  // wären beide gesendet worden (live so beobachtet: dieselbe Erinnerung
+  // mehrfach zur exakt gleichen Zeit). `upsert(... ignoreDuplicates: true)`
+  // + `.select()` nutzt stattdessen den Unique-Key von training_reminder_log
+  // selbst als atomaren Lock: von zwei parallelen INSERTs auf denselben
+  // (training_id, session_date, player_id, reminder_type) gewinnt einer,
+  // der andere bekommt die Zeile nicht zurück — nur wer sie tatsächlich neu
+  // beanspruchen konnte, verschickt anschließend die Push.
+  const claimRows = candidates.map(({ player, type }) => ({
+    training_id: occurrence.training.id,
+    session_date: occurrence.date,
+    player_id: player.id,
+    reminder_type: type
+  }));
+  const claimRes = await supabase
+    .from('training_reminder_log')
+    .upsert(claimRows, { onConflict: 'training_id,session_date,player_id,reminder_type', ignoreDuplicates: true })
+    .select('player_id, reminder_type');
+  if (claimRes.error) {
+    // eslint-disable-next-line no-console
+    console.error('send-training-reminders query error', claimRes.error);
+    res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: claimRes.error.message, code: claimRes.error.code });
+    return;
+  }
+  const claimedKeys = new Set(
+    ((claimRes.data as { player_id: string; reminder_type: string }[] | null) ?? []).map(
+      (r) => `${r.player_id}:${r.reminder_type}`
+    )
+  );
+  const toSend = candidates.filter(({ player, type }) => claimedKeys.has(`${player.id}:${type}`));
 
   if (toSend.length === 0) {
     res.status(200).json({ sent: 0, attempted: 0, date: occurrence.date, dueTypes: dueTypes.map((t) => t.type) });
@@ -405,10 +445,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const staleSubIds: string[] = [];
   let sent = 0;
-  const newLogRows: { training_id: string; session_date: string; player_id: string; reminder_type: string }[] = [];
 
   await Promise.all(
-    toSend.map(async ({ player, type, label }) => {
+    toSend.map(async ({ player, label }) => {
       const playerAuthUserIds = authUserIdsByPlayer.get(player.id) ?? [];
       const subs = playerAuthUserIds.flatMap((authUserId) => subsByAuthUser.get(authUserId) ?? []);
 
@@ -434,29 +473,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         })
       );
-
-      // Auch protokollieren, wenn der Spieler (noch) kein Gerät angemeldet
-      // hat — sonst würde bei späterem Aktivieren eine längst verstrichene
-      // Erinnerung verspätet nachgeholt. "Fällig gewesen" zählt als
-      // "erledigt", unabhängig davon, ob gerade ein Gerät erreichbar war.
-      newLogRows.push({
-        training_id: occurrence.training.id,
-        session_date: occurrence.date,
-        player_id: player.id,
-        reminder_type: type
-      });
+      // Geloggt ist der Versuch schon durch den Claim oben — auch wenn der
+      // Spieler (noch) kein Gerät angemeldet hat, zählt "fällig gewesen"
+      // als erledigt, unabhängig davon, ob gerade eines erreichbar war.
     })
   );
 
   if (staleSubIds.length > 0) {
     await supabase.from('push_subscriptions').delete().in('id', staleSubIds);
-  }
-
-  if (newLogRows.length > 0) {
-    await supabase.from('training_reminder_log').upsert(newLogRows, {
-      onConflict: 'training_id,session_date,player_id,reminder_type',
-      ignoreDuplicates: true
-    });
   }
 
   res.status(200).json({
