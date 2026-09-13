@@ -23,6 +23,11 @@ interface QuarterScorePayload {
   record?: {
     game_id?: string;
     quarter?: number;
+    // Nur zum manuellen Testen per SQL Editor gesetzt (siehe README) — schränkt
+    // den Versand auf eine einzelne auth_user_id ein, statt an alle zu gehen.
+    // Der echte Trigger (Viertel-Wechsel im Tracker) übergibt das nie, Live-
+    // Verhalten bleibt also unverändert Broadcast an alle.
+    test_user_id?: string;
   };
 }
 
@@ -57,6 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body = req.body as QuarterScorePayload;
   const gameId = body?.record?.game_id;
   const quarter = body?.record?.quarter;
+  const testUserId = body?.record?.test_user_id;
   if (!gameId || !quarter) {
     res.status(400).json({ error: 'Kein game_id/quarter im Webhook-Payload.' });
     return;
@@ -83,9 +89,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const { data: subs, error: loadError } = await supabase
-    .from('push_subscriptions')
-    .select('id, endpoint, p256dh, auth_key');
+  const subsQuery = supabase.from('push_subscriptions').select('id, endpoint, p256dh, auth_key');
+  const { data: subs, error: loadError } = await (testUserId ? subsQuery.eq('user_id', testUserId) : subsQuery);
 
   if (loadError) {
     // eslint-disable-next-line no-console
