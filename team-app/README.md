@@ -420,6 +420,36 @@ Zusätzlich: "Spiel beenden" fragt jetzt erst per Bestätigungsdialog nach ("Spi
 beenden? ..."), bevor `finalize_game_stats()` aufgerufen wird — ein versehentlicher Tap beendet
 die Erfassung nicht mehr sofort.
 
+**Beide Live-Ticker-Functions testweise nur an sich selbst schicken.** Praktisch, um vor einem
+echten Spiel zu testen, ohne die ganze Mannschaft/Eltern mit Test-Pushes zu stören: beide
+Payloads akzeptieren ein zusätzliches, rein manuelles Feld `test_user_id` — ist es gesetzt, geht
+die Push nur an diese eine `auth_user_id` statt an alle. Der echte Trigger übergibt das Feld nie,
+Live-Verhalten (Broadcast an alle) bleibt also unverändert. Eigene `auth_user_id`(s) finden
+(mehrere bei Mehrgeräte-Login, siehe oben):
+
+```sql
+select pal.auth_user_id
+from public.player_auth_links pal
+join public.players p on p.id = pal.player_id
+where p.name ilike '%<eigener Name>%';
+```
+
+Test auslösen (beliebige echte `game_id` aus `games` einsetzen):
+
+```sql
+select net.http_post(
+  url := 'https://team-app-two-orpin.vercel.app/api/send-quarter-score',
+  headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+  body := jsonb_build_object('record', jsonb_build_object('game_id', '<game-id>', 'quarter', 1, 'test_user_id', '<eigene auth_user_id>'))
+);
+
+select net.http_post(
+  url := 'https://team-app-two-orpin.vercel.app/api/send-game-finished',
+  headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+  body := jsonb_build_object('record', jsonb_build_object('game_id', '<game-id>', 'test_user_id', '<eigene auth_user_id>'))
+);
+```
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
