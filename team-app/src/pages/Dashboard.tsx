@@ -56,6 +56,7 @@ interface DashboardData {
   myTotalPoints: number | null;
   declinedNames: string[];
   reminders: ReminderItem[];
+  activeStatsHolder: string | null;
 }
 
 export function Dashboard() {
@@ -300,6 +301,25 @@ export function Dashboard() {
         absencesOverview = (absenceRows as PlayerAbsence[]) ?? [];
       }
 
+      // "Wer trackt gerade" fürs nächste Spiel: nur relevant, wenn es überhaupt
+      // trackbar ist (Datum erreicht, noch nicht abgeschlossen) — Alter des
+      // Herzschlags wie im weichen Lock selbst behandelt (siehe
+      // claim_stat_session in Migration 0028): über 30s Funkstille zählt als
+      // "trackt gerade niemand mehr", sonst würde ein verlassener Tracker
+      // (Browser einfach zugemacht statt sauber verlassen) die Übernahme-
+      // Kachel dauerhaft an Stelle des großen Start-Buttons anzeigen.
+      let activeStatsHolder: string | null = null;
+      if (flags.stats && nextGame && !nextGame.stats_finalized_at && nextGame.game_date <= today) {
+        const { data: sessionRow } = await supabase
+          .from('game_stat_sessions')
+          .select('holder_name, last_heartbeat')
+          .eq('game_id', nextGame.id)
+          .maybeSingle();
+        if (sessionRow && Date.now() - new Date(sessionRow.last_heartbeat).getTime() < 30_000) {
+          activeStatsHolder = sessionRow.holder_name;
+        }
+      }
+
       let lastResult: Game | null = null;
       let myTotalPoints: number | null = null;
       if (flags.stats) {
@@ -365,7 +385,8 @@ export function Dashboard() {
         lastResult,
         myTotalPoints,
         reminders,
-        declinedNames
+        declinedNames,
+        activeStatsHolder
       });
     }
 
@@ -524,9 +545,33 @@ export function Dashboard() {
               Trikot: {benoetigterSatz(data.nextGame) === 'weiss' ? 'Weiß' : 'Schwarz'}
             </p>
             {flags.stats &&
+              data.nextGame.game_date <= new Date().toISOString().slice(0, 10) &&
+              !data.nextGame.stats_finalized_at &&
+              data.nextGame.final_score_us !== null && (
+                <div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-tbw-bg px-3 py-2">
+                  <p className="text-xs text-tbw-ink/60">
+                    {data.activeStatsHolder && (
+                      <>
+                        <span className="font-semibold text-tbw-ink/80">{data.activeStatsHolder}</span> trackt gerade
+                        {' · '}
+                      </>
+                    )}
+                    <span className="font-bold text-tbw-navyDark">
+                      {data.nextGame.final_score_us}:{data.nextGame.final_score_opponent}
+                    </span>
+                  </p>
+                  {(role === 'player' || role === 'trainer') && data.activeStatsHolder && (
+                    <Link to={`/stats/${data.nextGame.id}`} className="shrink-0 text-xs font-bold text-tbw-navy">
+                      Tracking übernehmen
+                    </Link>
+                  )}
+                </div>
+              )}
+            {flags.stats &&
               (role === 'player' || role === 'trainer') &&
               data.nextGame.game_date <= new Date().toISOString().slice(0, 10) &&
-              !data.nextGame.stats_finalized_at && (
+              !data.nextGame.stats_finalized_at &&
+              !data.activeStatsHolder && (
                 <Link
                   to={`/stats/${data.nextGame.id}`}
                   className="btn-accent mt-2 block w-full text-center !py-2 text-sm"

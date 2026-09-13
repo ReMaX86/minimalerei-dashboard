@@ -463,6 +463,20 @@ Betrieb — löscht unwiderruflich, daher der Bestätigungsdialog. Löst dabei b
 "Spiel beendet"-Push aus: der Trigger dafür feuert nur beim Wechsel von `null` auf einen
 Zeitstempel, nicht umgekehrt.
 
+**Live-Score + "wer trackt gerade" auf der Startseite** (`Dashboard.tsx`): sobald jemand das
+Stats-Tracking für das nächste Spiel gestartet hat, sehen alle anderen (auch Betrachter) in der
+"Nächstes Spiel"-Kachel den aktuellen Zwischenstand plus, falls gerade aktiv jemand trackt,
+dessen Namen ("Tom Trainer trackt gerade · 18:14"). Der auffällige grüne "📊 Spiel-Stats
+tracken"-Button wird dann durch einen kleinen "Tracking übernehmen"-Link ersetzt (nur für
+Spieler/Trainer, löst denselben Übernahme-Dialog wie bisher aus, falls tatsächlich schon wer
+trackt) — niemand braucht mehr den großen Button suchen, wenn eh schon getrackt wird. "Aktiv
+getrackt" wird dabei genauso beurteilt wie der weiche Lock selbst (`claim_stat_session`,
+Migration `0028`): länger als 30s kein Herzschlag mehr zählt als "trackt niemand mehr", sonst
+würde ein Tracker, der die App einfach zugemacht statt sauber verlassen hat, die
+Übernahme-Anzeige dauerhaft an Stelle des großen Start-Buttons stehen lassen. Der Zwischenstand
+selbst kommt wie beim Live-Ticker direkt aus `games.final_score_us`/`final_score_opponent`, die
+`recalc_game_score()` ohnehin ständig aktuell hält — keine zusätzliche Abfrage nötig.
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
