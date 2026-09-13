@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
@@ -8,14 +8,26 @@ import { ErrorNote } from '../components/ErrorNote';
 import { MeetingPointFields, EMPTY_MEETING_POINT, type MeetingPointFormValue } from '../components/MeetingPointFields';
 import { CarpoolSection } from '../components/CarpoolSection';
 import { fmtDate, fmtTime } from '../lib/format';
-import { meetingPoints, playerAbsenceOn, type Game, type GameSquadRow, type Player, type PlayerAbsence } from '../types/database';
+import {
+  gameResult,
+  meetingPoints,
+  playerAbsenceOn,
+  type Game,
+  type GameSquadRow,
+  type Player,
+  type PlayerAbsence
+} from '../types/database';
 
 const MAX_SQUAD_SIZE = 12;
 const UPCOMING_PREVIEW_COUNT = 3;
+const PAST_PREVIEW_COUNT = 3;
+
+const RESULT_LABELS = { sieg: 'Sieg', niederlage: 'Niederlage', unentschieden: 'Unentschieden' } as const;
 
 interface State {
   nextGame: Game | null;
   upcomingGames: Game[];
+  pastGames: Game[];
   squad: GameSquadRow[];
   players: Player[];
   absences: PlayerAbsence[];
@@ -34,6 +46,44 @@ function GameListItem({ game }: { game: Game }) {
   );
 }
 
+// Zeigt jedes abgeschlossene Spiel mit Endstand + Link zum Box-Score — bisher
+// hatten normale Spieler nur für das jeweils letzte Spiel einen solchen Link
+// (Startseite "Letztes Ergebnis"), ältere waren nur über Admin -> Spiele
+// erreichbar. Kein Zugriffsunterschied dahinter (game_stat_events ist für
+// jeden angemeldeten Nutzer lesbar), nur ein fehlender Einstiegspunkt.
+function PastGameListItem({ game }: { game: Game }) {
+  const result = gameResult(game);
+  return (
+    <li className="rounded-xl bg-tbw-bg p-3 text-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-semibold text-tbw-navyDark">
+            vs. {game.opponent} <span className="pill pill-open ml-1">{game.is_home ? 'Heim' : 'Auswärts'}</span>
+          </p>
+          <p className="text-tbw-ink/60">{fmtDate(game.game_date)}</p>
+        </div>
+        {result && (
+          <div className="shrink-0 text-right">
+            <p className="font-bold text-tbw-navyDark">
+              {game.final_score_us}:{game.final_score_opponent}
+            </p>
+            <span
+              className={`pill !text-[10px] ${
+                result === 'sieg' ? 'pill-ok' : result === 'niederlage' ? 'pill-open' : ''
+              }`}
+            >
+              {RESULT_LABELS[result]}
+            </span>
+          </div>
+        )}
+      </div>
+      <Link to={`/stats/${game.id}`} className="mt-1.5 inline-block text-xs font-bold text-tbw-navy">
+        Box-Score ansehen →
+      </Link>
+    </li>
+  );
+}
+
 export function Spiele() {
   const { role, isAdmin, player } = useAuth();
   const { flags } = useFeatureFlags();
@@ -44,6 +94,7 @@ export function Spiele() {
   const [squadEditorOpen, setSquadEditorOpen] = useState(false);
   const [meetingEditorOpen, setMeetingEditorOpen] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [showPastMore, setShowPastMore] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [meetingForm, setMeetingForm] = useState<MeetingPointFormValue>(EMPTY_MEETING_POINT);
@@ -53,11 +104,20 @@ export function Spiele() {
   const load = useCallback(async () => {
     setError(null);
     const today = new Date().toISOString().slice(0, 10);
-    const [gamesRes, playersRes] = await Promise.all([
+    const [gamesRes, playersRes, pastGamesRes] = await Promise.all([
       supabase.from('games').select('*').gte('game_date', today).order('game_date').order('game_time').limit(15),
-      supabase.from('players').select('*').eq('is_active', true)
+      supabase.from('players').select('*').eq('is_active', true),
+      flags.stats
+        ? supabase
+            .from('games')
+            .select('*')
+            .not('stats_finalized_at', 'is', null)
+            .order('game_date', { ascending: false })
+            .order('game_time', { ascending: false })
+            .limit(15)
+        : Promise.resolve({ data: [] as Game[], error: null })
     ]);
-    if (gamesRes.error || playersRes.error) {
+    if (gamesRes.error || playersRes.error || pastGamesRes.error) {
       setError('Fehler beim Laden der Spiele.');
       return;
     }
@@ -80,11 +140,12 @@ export function Spiele() {
     setState({
       nextGame,
       upcomingGames: games.slice(1),
+      pastGames: (pastGamesRes.data as Game[]) ?? [],
       squad,
       absences,
       players: ((playersRes.data as Player[]) ?? []).sort((a, b) => a.name.localeCompare(b.name, 'de'))
     });
-  }, [flags.absences]);
+  }, [flags.absences, flags.stats]);
 
   useEffect(() => {
     load().catch(() => setError('Fehler beim Laden der Spiele.'));
@@ -127,8 +188,44 @@ export function Spiele() {
   if (error) return <ErrorNote message={error} />;
   if (!state) return <LoadingSpinner />;
 
+  const pastPreview = state.pastGames.slice(0, PAST_PREVIEW_COUNT);
+  const pastRest = state.pastGames.slice(PAST_PREVIEW_COUNT);
+  const pastGamesSection = flags.stats && state.pastGames.length > 0 && (
+    <section className="card">
+      <p className="text-sm font-bold text-tbw-navyDark">Vergangene Spiele</p>
+      <ul className="mt-2 space-y-2">
+        {pastPreview.map((g) => (
+          <PastGameListItem key={g.id} game={g} />
+        ))}
+      </ul>
+      {pastRest.length > 0 && (
+        <>
+          <button
+            className="mt-3 flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+            onClick={() => setShowPastMore((v) => !v)}
+          >
+            Weitere vergangene Spiele anzeigen
+            <span>{showPastMore ? '▲' : '▼'}</span>
+          </button>
+          {showPastMore && (
+            <ul className="mt-3 space-y-2">
+              {pastRest.map((g) => (
+                <PastGameListItem key={g.id} game={g} />
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+
   if (!state.nextGame) {
-    return <p className="card text-sm text-tbw-ink/50">Kein anstehendes Spiel geplant.</p>;
+    return (
+      <div className="space-y-4">
+        <p className="card text-sm text-tbw-ink/50">Kein anstehendes Spiel geplant.</p>
+        {pastGamesSection}
+      </div>
+    );
   }
 
   const selectedByPlayer: Record<string, boolean> = {};
@@ -521,6 +618,8 @@ export function Spiele() {
           )}
         </section>
       )}
+
+      {pastGamesSection}
     </div>
   );
 }
