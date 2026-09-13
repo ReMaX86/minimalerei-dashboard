@@ -575,6 +575,32 @@ Per Playwright verifiziert: Bottom-Nav zeigt Start/Spiele/Team/Kampfgericht für
 `/spiele` und `/team` bleiben (kein Redirect mehr), Live-Score + "Tracking übernehmen" auf der
 Startseite sichtbar, `claim_stat_session` über `/stats/:gameId` erfolgreich ohne Fehler.
 
+**Endstand nachtragen ohne Live-Tracking** (Migration `0046`, `GamesAdmin.tsx`): falls ein Spiel
+nicht live getrackt wurde, aber der Endstand nachträglich bekannt ist (z. B. per Anruf/Zuruf),
+gibt es im Admin bei jedem Spiel ohne Endstand jetzt einen Button "Endstand nachtragen" —
+öffnet ein kleines Inline-Formular (zwei Zahlenfelder), speichert direkt per Update auf
+`games.final_score_us`/`final_score_opponent` und setzt `stats_finalized_at`. Bewusst ohne neue
+RPC: `games` ist per RLS ohnehin trainer-schreibbar (dieselbe Policy, die auch das normale
+Bearbeiten-Formular nutzt), keine eigene Berechtigungsprüfung nötig. Da `stats_finalized_at`
+dabei von `null` auf einen Zeitstempel wechselt, feuert der bestehende
+`games_notify_finished`-Trigger (Live-Ticker) ganz normal mit — das Team bekommt also auch bei
+einem nachgetragenen Ergebnis die "Spiel beendet"-Push, genau wie bei echtem Live-Tracking.
+Verschwindet automatisch, sobald ein Endstand existiert (`gameResult()` liefert dann etwas) —
+für ein bereits getracktes/nachgetragenes Spiel gibt's stattdessen wie gewohnt "Tracking
+zurücksetzen".
+
+Dabei auch einen Bug in `reset_game_stats()` (Migration `0043`) behoben: das Zurücksetzen des
+Endstands verließ sich komplett auf den `recalc_game_score()`-Trigger, der nur bei tatsächlichen
+`game_stat_events`-Änderungen feuert. Bei einem nachgetragenen Endstand ohne jegliche Events
+hätte das `delete from game_stat_events` dort null Zeilen betroffen, der Trigger wäre nie
+gelaufen, und "Tracking zurücksetzen" hätte den nachgetragenen Stand fälschlich stehen lassen.
+`reset_game_stats()` setzt `final_score_us`/`final_score_opponent` jetzt zusätzlich direkt
+zurück, unabhängig vom Trigger.
+
+Per Playwright verifiziert: Formular öffnen, Werte eintragen, Speichern → korrekter
+`PATCH`-Request, "Endstand: 55:48 · Sieg · Stats abgeschlossen" erscheint, Button wechselt zu
+"Tracking zurücksetzen".
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten

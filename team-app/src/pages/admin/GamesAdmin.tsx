@@ -29,6 +29,12 @@ export function GamesAdmin() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  // Endstand nachtragen, wenn ein Spiel nicht live getrackt wurde (z. B.
+  // vergessen) — statt Zwang zum Event-für-Event-Tracking einfach den
+  // Endstand direkt eintragen. Nur ein Spiel gleichzeitig offen.
+  const [scoreFormId, setScoreFormId] = useState<string | null>(null);
+  const [scoreForm, setScoreForm] = useState({ us: '', opponent: '' });
+  const [savingScore, setSavingScore] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -104,6 +110,39 @@ export function GamesAdmin() {
       await load();
     } catch {
       setError('Löschen fehlgeschlagen.');
+    }
+  }
+
+  function openScoreForm(id: string) {
+    setScoreForm({ us: '', opponent: '' });
+    setScoreFormId(id);
+  }
+
+  function closeScoreForm() {
+    setScoreFormId(null);
+  }
+
+  async function saveScore(id: string) {
+    const us = Number(scoreForm.us);
+    const opponent = Number(scoreForm.opponent);
+    if (!Number.isInteger(us) || us < 0 || !Number.isInteger(opponent) || opponent < 0) {
+      setError('Bitte für beide Teams eine gültige Punktzahl (0 oder mehr) eingeben.');
+      return;
+    }
+    setSavingScore(true);
+    setError(null);
+    try {
+      const { error: saveError } = await supabase
+        .from('games')
+        .update({ final_score_us: us, final_score_opponent: opponent, stats_finalized_at: new Date().toISOString() })
+        .eq('id', id);
+      if (saveError) throw saveError;
+      setScoreFormId(null);
+      await load();
+    } catch {
+      setError('Endstand konnte nicht gespeichert werden.');
+    } finally {
+      setSavingScore(false);
     }
   }
 
@@ -230,6 +269,46 @@ export function GamesAdmin() {
                     {m.place ? `${m.time ? ', ' : ''}${m.place}` : ''}
                   </p>
                 ))}
+                {flags.stats && scoreFormId === g.id && (
+                  <div className="mt-2 rounded-xl bg-tbw-bg p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
+                      Endstand nachtragen
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        placeholder="Wir"
+                        value={scoreForm.us}
+                        onChange={(e) => setScoreForm((f) => ({ ...f, us: e.target.value }))}
+                        className="input !py-1.5 text-center"
+                      />
+                      <span className="text-sm font-bold text-tbw-ink/40">:</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        placeholder={g.opponent}
+                        value={scoreForm.opponent}
+                        onChange={(e) => setScoreForm((f) => ({ ...f, opponent: e.target.value }))}
+                        className="input !py-1.5 text-center"
+                      />
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        className="btn-primary flex-1 !py-1.5 text-xs"
+                        disabled={savingScore}
+                        onClick={() => saveScore(g.id)}
+                      >
+                        Speichern
+                      </button>
+                      <button className="btn-secondary flex-1 !py-1.5 text-xs" disabled={savingScore} onClick={closeScoreForm}>
+                        Abbrechen
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {flags.stats && gameResult(g) && (
                   <p className="text-xs text-tbw-ink/40">
                     Endstand: {g.final_score_us}:{g.final_score_opponent} ·{' '}
@@ -256,6 +335,11 @@ export function GamesAdmin() {
                   <Link to={`/stats/${g.id}`} className="btn-secondary !px-2 !py-1 text-center text-xs">
                     {g.stats_finalized_at ? 'Stats ansehen' : 'Stats tracken'}
                   </Link>
+                )}
+                {flags.stats && !gameResult(g) && scoreFormId !== g.id && (
+                  <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => openScoreForm(g.id)}>
+                    Endstand nachtragen
+                  </button>
                 )}
                 {flags.stats && gameResult(g) && (
                   <button
