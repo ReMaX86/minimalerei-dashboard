@@ -107,6 +107,24 @@ export function GamesAdmin() {
     }
   }
 
+  async function resetStats(id: string) {
+    if (
+      !window.confirm(
+        'Tracking wirklich zurücksetzen? Alle erfassten Aktionen, der Punktestand und die Aufstellung für dieses Spiel gehen dabei unwiderruflich verloren.'
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    try {
+      const { error: resetError } = await supabase.rpc('reset_game_stats', { p_game_id: id });
+      if (resetError) throw resetError;
+      await load();
+    } catch {
+      setError('Tracking konnte nicht zurückgesetzt werden.');
+    }
+  }
+
   if (error) return <ErrorNote message={error} />;
   if (!games) return <LoadingSpinner />;
 
@@ -238,6 +256,14 @@ export function GamesAdmin() {
                   <Link to={`/stats/${g.id}`} className="btn-secondary !px-2 !py-1 text-center text-xs">
                     {g.stats_finalized_at ? 'Stats ansehen' : 'Stats tracken'}
                   </Link>
+                )}
+                {flags.stats && gameResult(g) && (
+                  <button
+                    className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red"
+                    onClick={() => resetStats(g.id)}
+                  >
+                    Tracking zurücksetzen
+                  </button>
                 )}
                 <button className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red" onClick={() => remove(g.id)}>
                   Löschen
