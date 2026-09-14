@@ -1798,6 +1798,27 @@ hier die getroffenen Entscheidungen samt Begründung:
   direkt auf `player_auth_links`/`viewer_auth_links` geöffnet, sonst könnte jeder Trainer darüber
   auch alle Zugangscode-Zuordnungen einsehen. `PushSubscribersList.tsx` ruft jetzt nur noch diese
   eine RPC statt der bisherigen fünf Einzelabfragen auf.
+- **Nachtrag: die 9-Stunden-Erinnerung kam nicht — Zeitzonen-Bug bei der Fälligkeitsberechnung.**
+  Live-Test ergab: die 3. Erinnerung (an diesem Tag auf 9 Stunden vorher gestellt, Training
+  20:30 Uhr, Schwelle also 11:30 Uhr deutscher Zeit) war um 11:40 Uhr immer noch nicht verschickt
+  — `training_reminder_log` zeigte für den betroffenen Spieler nur `slot_1`/`slot_2`, kein
+  `slot_3`, obwohl er (noch) nicht geantwortet hatte. Ursache: `training.start_time` (z. B.
+  `"20:30"`) ist als deutsche Wanduhrzeit gemeint, aber `new Date(y, mo, d, h, m)` interpretiert
+  diese Zahlen als Ortszeit **des laufenden Prozesses** — und der läuft auf Vercel mit `TZ=UTC`,
+  nicht Europe/Berlin. "20:30" wurde dadurch unbemerkt als 20:30 UTC behandelt (= 22:30 deutscher
+  Zeit im Sommer, zwei Stunden zu spät), wodurch **jede** "X Stunden vorher"-Schwelle systematisch
+  um den aktuellen UTC-Offset (Sommer +2h, Winter +1h) zu spät lag — bei den ursprünglichen
+  Standardwerten (1 Tag/1 Stunde/30 Minuten) kaum auffällig, bei größeren, custom eingestellten
+  Abständen aber klar sichtbar, wie hier. Fix: neue Hilfsfunktion `berlinTimeToUtc()` in
+  `send-training-reminders.ts` — der Standard-"doppelte Umrechnung"-Trick ohne zusätzliche
+  Abhängigkeit (einmal naiv als UTC interpretieren, per `Intl`/`toLocaleString('en-US', {
+  timeZone: 'Europe/Berlin' })` ablesen, wie spät es zu diesem Zeitpunkt tatsächlich in Berlin
+  ist, um die Differenz korrigieren — DST-bewusst, funktioniert also sowohl für Sommer- als auch
+  Winterzeit). Ersetzt jede bisherige naive `new Date(y, mo, d, h, m)`-Konstruktion in dieser
+  Datei (auch innerhalb der kopierten `nextTrainingOccurrences`-Terminlogik, die denselben Fehler
+  für die "ist der heutige Termin schon vorbei"-Prüfung hatte). Betrifft ausschließlich diese
+  Server-Funktion — die Client-Seite (`src/lib/trainingSchedule.ts`) läuft im Browser der
+  Spieler, dessen Ortszeit ohnehin schon Europe/Berlin ist, und war nie betroffen.
 - **Nachtrag zu Kader-Absage: spielende Trainer bekamen die Push nie.** `send-squad-decline.ts`
   fragte nur die `trainers`-Tabelle ab (Login per E-Mail/Passwort). Ein "Spieler mit
   Trainer-Rechten" (`players.is_admin`, siehe Migration `0006` — bewusst kein zweiter Login,
