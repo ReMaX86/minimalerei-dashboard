@@ -180,7 +180,8 @@ im SQL-Editor die letzten Aufrufe von Schritt 6 inkl. etwaiger Fehlermeldungen.
 **Weitere Benachrichtigungsart: Training-Erinnerung.** Erinnert Spieler per Push, die für den
 nächsten Trainingstermin noch nicht geantwortet haben — zu bis zu drei Zeitpunkten vor
 Trainingsbeginn (Default: 1 Tag, 1 Stunde, 30 Minuten vorher; **im Admin unter Funktionen ->
-Erinnerungen -> "Push-Erinnerung fürs Training" in Minuten änderbar, 0 = abgeschaltet**),
+Erinnerungen -> "Push-Erinnerung fürs Training" in Stunden änderbar (Nachkommastellen erlaubt,
+z. B. 0,5 für 30 Minuten), 0 = abgeschaltet**),
 unabhängig voneinander: ein Spieler kann bis zu drei Erinnerungen für denselben Termin
 bekommen, sofern er bis dahin nicht geantwortet hat. `training_reminder_log` (Migration `0038`)
 verhindert Mehrfachversand derselben Erinnerungsart für denselben Termin, auch wenn der Check
@@ -1749,6 +1750,17 @@ hier die getroffenen Entscheidungen samt Begründung:
   ps.user_id = pal.auth_user_id where pal.player_id = (select id from players where name ilike
   '%Name%');` — mehr als eine Zeile bedeutet mehrere aktive Anmeldungen mit Push-Abo für diesen
   Spieler.
+- **Nachtrag: Trainings-Erinnerung — Eingabe in Stunden statt Minuten, Push-Text vereinfacht.**
+  Die drei Zeitpunkte im Admin (`training_push_offset_1/2/3_min`) waren bisher nur in Minuten
+  einzugeben (z. B. `1440` für "1 Tag vorher") — bei größeren Abständen unhandlich zu rechnen.
+  Gespeichert wird weiterhin in Minuten (keine Migration nötig, `send-training-reminders.ts`
+  rechnet ebenfalls in Minuten) — nur `FeatureFlagsAdmin.tsx` rechnet beim Laden/Speichern jetzt
+  zwischen Minuten (DB) und Stunden (Anzeige) um, inklusive Nachkommastellen für den 30-Minuten-
+  Default (`0,5`). Zusätzlich verzichtet die Push selbst jetzt bewusst auf den Zeitpunkt-Hinweis
+  ("Training in 1 Tag"/"in 1 Stunde") — für den Spieler ist ohnehin nur relevant, wann das
+  Training stattfindet, nicht zu welchem der drei Zeitpunkte gerade erinnert wird. Titel/Text
+  sind jetzt für alle drei Erinnerungsarten identisch: "Training {Wochentag}. {Uhrzeit} Uhr" /
+  "Bist du dabei?" (z. B. "Training Mo. 20:30 Uhr" / "Bist du dabei?").
 - **Nachtrag zu Kader-Absage: spielende Trainer bekamen die Push nie.** `send-squad-decline.ts`
   fragte nur die `trainers`-Tabelle ab (Login per E-Mail/Passwort). Ein "Spieler mit
   Trainer-Rechten" (`players.is_admin`, siehe Migration `0006` — bewusst kein zweiter Login,
