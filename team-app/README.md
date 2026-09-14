@@ -1786,6 +1786,18 @@ hier die getroffenen Entscheidungen samt Begründung:
   Schleife zurück in die Pro-Spieler-Schleife wandern, da er jetzt wieder von `player.name`
   abhängt — derselbe "erstes Leerzeichen abschneiden"-Vorname-Zuschnitt wie z. B. `firstName` in
   `Dashboard.tsx`.
+- **Nachtrag: "Wer hat Push aktiviert?" zeigte durchweg "Unbekannt".** Die ursprüngliche
+  Umsetzung (siehe oben) hat `player_auth_links`/`viewer_auth_links` direkt per Client-Query
+  abgefragt, um `user_id` auf einen Namen aufzulösen — genau diese beiden Tabellen haben aber
+  laut Migration `0001` bewusst KEINE client-seitige RLS-Policy (Zugriff nur über die
+  security-definer `current_player_id()`/`current_viewer_id()`-Funktionen, siehe `AuthContext`)
+  und lieferten deshalb immer eine leere Liste, egal wer fragt — die Auflösung schlug für
+  ausnahmslos jeden Eintrag fehl. Migration `0047` löst das über eine eigene security-definer RPC
+  `admin_push_subscribers()` (nur per `is_trainer()`-Check aufrufbar), die diese Zuordnung
+  serverseitig auflöst und nur (`auth_user_id`, Name, Rolle) zurückgibt — bewusst keine RLS-Policy
+  direkt auf `player_auth_links`/`viewer_auth_links` geöffnet, sonst könnte jeder Trainer darüber
+  auch alle Zugangscode-Zuordnungen einsehen. `PushSubscribersList.tsx` ruft jetzt nur noch diese
+  eine RPC statt der bisherigen fünf Einzelabfragen auf.
 - **Nachtrag zu Kader-Absage: spielende Trainer bekamen die Push nie.** `send-squad-decline.ts`
   fragte nur die `trainers`-Tabelle ab (Login per E-Mail/Passwort). Ein "Spieler mit
   Trainer-Rechten" (`players.is_admin`, siehe Migration `0006` — bewusst kein zweiter Login,
