@@ -10,9 +10,28 @@ interface ReminderForm {
   squad_reminder_days_before: string;
   training_reminder_days_before: string;
   officiating_season_min: string;
+  // Trotz "_min"-Namen (passend zur DB-Spalte/zum Speichern) hält das
+  // Formular hier Stunden als String — siehe minutesToHoursStr/
+  // hoursStrToMinutes.
   training_push_offset_1_min: string;
   training_push_offset_2_min: string;
   training_push_offset_3_min: string;
+}
+
+// Minuten (Datenbank) <-> Stunden (Admin-Eingabe) — die drei
+// Erinnerungs-Zeitpunkte waren bisher in Minuten einzugeben (z. B. 1440 für
+// "1 Tag vorher"), was bei größeren Abständen unhandlich zu rechnen ist.
+// Gespeichert wird weiterhin in Minuten (keine Migration nötig, andere Stellen
+// wie api/send-training-reminders.ts rechnen ebenfalls in Minuten) — nur die
+// Anzeige/Eingabe im Formular rechnet um. Bruchteile bleiben möglich (0.5 =
+// 30 Minuten), damit sich der bisherige Default (30 Minuten) weiter abbilden
+// lässt.
+function minutesToHoursStr(minutes: number): string {
+  return String(minutes / 60);
+}
+
+function hoursStrToMinutes(hours: string): number {
+  return Math.max(0, Math.round((Number(hours) || 0) * 60));
 }
 
 function reminderFormFromSettings(row: ReminderSettings): ReminderForm {
@@ -21,9 +40,9 @@ function reminderFormFromSettings(row: ReminderSettings): ReminderForm {
     squad_reminder_days_before: String(row.squad_reminder_days_before),
     training_reminder_days_before: String(row.training_reminder_days_before),
     officiating_season_min: String(row.officiating_season_min),
-    training_push_offset_1_min: String(row.training_push_offset_1_min),
-    training_push_offset_2_min: String(row.training_push_offset_2_min),
-    training_push_offset_3_min: String(row.training_push_offset_3_min)
+    training_push_offset_1_min: minutesToHoursStr(row.training_push_offset_1_min),
+    training_push_offset_2_min: minutesToHoursStr(row.training_push_offset_2_min),
+    training_push_offset_3_min: minutesToHoursStr(row.training_push_offset_3_min)
   };
 }
 
@@ -76,9 +95,9 @@ export function FeatureFlagsAdmin() {
           squad_reminder_days_before: Math.max(0, Number(reminderForm.squad_reminder_days_before) || 0),
           training_reminder_days_before: Math.max(0, Number(reminderForm.training_reminder_days_before) || 0),
           officiating_season_min: Math.max(0, Number(reminderForm.officiating_season_min) || 0),
-          training_push_offset_1_min: Math.max(0, Number(reminderForm.training_push_offset_1_min) || 0),
-          training_push_offset_2_min: Math.max(0, Number(reminderForm.training_push_offset_2_min) || 0),
-          training_push_offset_3_min: Math.max(0, Number(reminderForm.training_push_offset_3_min) || 0)
+          training_push_offset_1_min: hoursStrToMinutes(reminderForm.training_push_offset_1_min),
+          training_push_offset_2_min: hoursStrToMinutes(reminderForm.training_push_offset_2_min),
+          training_push_offset_3_min: hoursStrToMinutes(reminderForm.training_push_offset_3_min)
         })
         .eq('id', 1);
       if (updError) throw updError;
@@ -207,14 +226,15 @@ export function FeatureFlagsAdmin() {
             <p className="text-sm font-semibold text-tbw-navyDark">Push-Erinnerung fürs Training</p>
             <p className="text-xs text-tbw-ink/50">
               Bis zu drei Zeitpunkte vor Trainingsbeginn, zu denen Spieler ohne Antwort per
-              Push erinnert werden (in Minuten, 0 = aus). Wirkt nur, wenn "Push-Benachrichtigungen"
-              unter Funktionen aktiviert ist.
+              Push erinnert werden (in Stunden, 0 = aus; z. B. 0,5 für 30 Minuten). Wirkt nur,
+              wenn "Push-Benachrichtigungen" unter Funktionen aktiviert ist.
             </p>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">1. Erinnerung (z. B. 1440 = 1 Tag vorher)</span>
+              <span className="text-tbw-ink/70">1. Erinnerung (z. B. 24 = 1 Tag vorher)</span>
               <input
                 type="number"
                 min={0}
+                step={0.5}
                 className="input !w-20 text-center"
                 value={reminderForm.training_push_offset_1_min}
                 onChange={(e) =>
@@ -223,10 +243,11 @@ export function FeatureFlagsAdmin() {
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">2. Erinnerung (z. B. 60 = 1 Stunde vorher)</span>
+              <span className="text-tbw-ink/70">2. Erinnerung (z. B. 1 = 1 Stunde vorher)</span>
               <input
                 type="number"
                 min={0}
+                step={0.5}
                 className="input !w-20 text-center"
                 value={reminderForm.training_push_offset_2_min}
                 onChange={(e) =>
@@ -235,10 +256,11 @@ export function FeatureFlagsAdmin() {
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">3. Erinnerung (z. B. 30 = 30 Minuten vorher)</span>
+              <span className="text-tbw-ink/70">3. Erinnerung (z. B. 0,5 = 30 Minuten vorher)</span>
               <input
                 type="number"
                 min={0}
+                step={0.5}
                 className="input !w-20 text-center"
                 value={reminderForm.training_push_offset_3_min}
                 onChange={(e) =>

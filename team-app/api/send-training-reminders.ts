@@ -140,9 +140,14 @@ function nextTrainingOccurrences(
 
 // --- Format-Helfer (Kopie von src/lib/format.ts) ---
 
-function fmtDate(iso: string): string {
+// Kurzes Wochentagskürzel ("Mo.", "Di." ...) für die Push — bewusst ohne
+// volles Datum/Jahr, siehe Push-Text unten. `weekday: 'short'` allein liefert
+// von Node/ICU (anders als in Kombination mit weiteren Datumsfeldern, siehe
+// fmtDate in src/lib/format.ts) keinen Punkt ("Mo" statt "Mo.") — deshalb
+// hier manuell angehängt, für dieselbe Schreibweise wie im Rest der App.
+function fmtWeekdayShort(iso: string): string {
   const d = new Date(iso + 'T00:00:00');
-  return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+  return `${d.toLocaleDateString('de-DE', { weekday: 'short' })}.`;
 }
 
 function fmtTime(time: string): string {
@@ -153,18 +158,6 @@ function fmtTime(time: string): string {
 // unter Funktionen -> Erinnerungen änderbar — siehe reminder_settings) ---
 
 type ReminderSlot = 'slot_1' | 'slot_2' | 'slot_3';
-
-function offsetLabel(minutes: number): string {
-  if (minutes >= 1440 && minutes % 1440 === 0) {
-    const days = minutes / 1440;
-    return days === 1 ? '1 Tag' : `${days} Tagen`;
-  }
-  if (minutes >= 60 && minutes % 60 === 0) {
-    const hours = minutes / 60;
-    return hours === 1 ? '1 Stunde' : `${hours} Stunden`;
-  }
-  return `${minutes} Minuten`;
-}
 
 interface PushSubRow {
   id: string;
@@ -272,7 +265,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   ).filter((o) => o.minutes > 0);
 
   const dueTypes = offsets
-    .map((o) => ({ type: o.type, ms: o.minutes * 60_000, label: offsetLabel(o.minutes) }))
+    .map((o) => ({ type: o.type, ms: o.minutes * 60_000 }))
     .filter((o) => startsAt.getTime() - o.ms <= now.getTime());
   if (dueTypes.length === 0) {
     res.status(200).json({ skipped: 'not_due_yet', date: occurrence.date, startsAt: startsAt.toISOString() });
@@ -347,7 +340,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const candidates = dueTypes.flatMap((type) =>
     targetPlayers
       .filter((p) => !alreadySent.has(`${p.id}:${type.type}`))
-      .map((player) => ({ player, type: type.type, label: type.label }))
+      .map((player) => ({ player, type: type.type }))
   );
 
   if (candidates.length === 0) {
@@ -446,16 +439,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const staleSubIds: string[] = [];
   let sent = 0;
 
+  // Bewusst kein Hinweis mehr auf den Erinnerungs-Zeitpunkt ("in 1 Tag"/
+  // "in 1 Stunde") in der Push selbst — für den Spieler ist ohnehin nur
+  // relevant, wann das Training ist, nicht zu welchem der drei
+  // Erinnerungs-Zeitpunkte gerade erinnert wird. Dieselbe Nachricht für
+  // alle drei Erinnerungsarten, deshalb einmalig vor der Schleife gebaut.
+  const payload = JSON.stringify({
+    title: `Training ${fmtWeekdayShort(occurrence.date)} ${fmtTime(occurrence.training.start_time)} Uhr`,
+    body: 'Bist du dabei?',
+    url: '/#training'
+  });
+
   await Promise.all(
-    toSend.map(async ({ player, label }) => {
+    toSend.map(async ({ player }) => {
       const playerAuthUserIds = authUserIdsByPlayer.get(player.id) ?? [];
       const subs = playerAuthUserIds.flatMap((authUserId) => subsByAuthUser.get(authUserId) ?? []);
-
-      const payload = JSON.stringify({
-        title: `Training in ${label} — noch nicht beantwortet`,
-        body: `${fmtDate(occurrence.date)} um ${fmtTime(occurrence.training.start_time)} Uhr — bist du dabei?`,
-        url: '/#training'
-      });
 
       await Promise.all(
         subs.map(async (sub) => {
