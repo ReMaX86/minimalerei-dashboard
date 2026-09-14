@@ -1750,6 +1750,25 @@ hier die getroffenen Entscheidungen samt Begründung:
   ps.user_id = pal.auth_user_id where pal.player_id = (select id from players where name ilike
   '%Name%');` — mehr als eine Zeile bedeutet mehrere aktive Anmeldungen mit Push-Abo für diesen
   Spieler.
+- **Nachtrag: der eigentliche Grund für die Mehrfachversände gefunden — kaputte Check-Constraint
+  auf `training_reminder_log.reminder_type`.** Live-Test des Claim-vor-Versand-Fixes oben ergab
+  sofort `ERROR 23514: violates check constraint "training_reminder_log_reminder_type_check"` bei
+  jedem Insert mit dem gültigen Wert `slot_1` — der Claim schlug dadurch komplett fehl, keine
+  Erinnerung ging mehr raus. Ursache: `select reminder_type, count(*) from
+  training_reminder_log group by reminder_type` zeigte 6 Zeilen mit dem Wert `1_day` — einem
+  Bezeichner aus einer früheren Version dieser Funktion, von vor der Umstellung auf die
+  Positions-Namen `slot_1/2/3` (siehe Kommentar in Migration `0038`), der nie bereinigt wurde und
+  die Check-Constraint dauerhaft in einem inkonsistenten Zustand hielt. Das war vermutlich die
+  ganze Zeit der wahre Grund für die oben beschriebenen Mehrfachversände: der alte Code hat
+  Fehler beim Protokollieren (`upsert(...).then()`-artig, ohne Fehlerprüfung) still verschluckt —
+  jeder Log-Versuch ist an dieser kaputten Constraint gescheitert, ohne dass es je auffiel, und
+  jeder folgende `pg_cron`-Lauf hat die fällige Erinnerung deshalb erneut für "noch nicht
+  verschickt" gehalten. Behoben direkt in der SQL-Konsole (kein Code-Fix nötig, reine
+  Datenbereinigung): alte `1_day`-Zeilen gelöscht (`delete from training_reminder_log where
+  reminder_type not in ('slot_1', 'slot_2', 'slot_3')`), Constraint neu angelegt. Seitdem
+  protokolliert `training_reminder_log` wieder erfolgreich, und der Claim-vor-Versand-Fix oben
+  kann seine eigentliche Aufgabe (kein Doppelversand bei überlappenden Cron-Durchläufen) endlich
+  wirksam erfüllen.
 - **Nachtrag: Trainings-Erinnerung — Eingabe in Stunden statt Minuten, Push-Text vereinfacht.**
   Die drei Zeitpunkte im Admin (`training_push_offset_1/2/3_min`) waren bisher nur in Minuten
   einzugeben (z. B. `1440` für "1 Tag vorher") — bei größeren Abständen unhandlich zu rechnen.
