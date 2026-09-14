@@ -442,18 +442,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Bewusst kein Hinweis mehr auf den Erinnerungs-Zeitpunkt ("in 1 Tag"/
   // "in 1 Stunde") in der Push selbst — für den Spieler ist ohnehin nur
   // relevant, wann das Training ist, nicht zu welchem der drei
-  // Erinnerungs-Zeitpunkte gerade erinnert wird. Dieselbe Nachricht für
-  // alle drei Erinnerungsarten, deshalb einmalig vor der Schleife gebaut.
-  const payload = JSON.stringify({
-    title: `Training ${fmtWeekdayShort(occurrence.date)} ${fmtTime(occurrence.training.start_time)} Uhr`,
-    body: 'Bist du dabei?',
-    url: '/#training'
-  });
+  // Erinnerungs-Zeitpunkte gerade erinnert wird. Titel ist deshalb für alle
+  // drei Erinnerungsarten identisch; nur der Vorname im Text wechselt pro
+  // Spieler (gleiches "ersten Leerzeichen abschneiden"-Muster wie z. B.
+  // Dashboard.tsx firstName).
+  const title = `Training ${fmtWeekdayShort(occurrence.date)} ${fmtTime(occurrence.training.start_time)} Uhr`;
 
   await Promise.all(
     toSend.map(async ({ player }) => {
       const playerAuthUserIds = authUserIdsByPlayer.get(player.id) ?? [];
       const subs = playerAuthUserIds.flatMap((authUserId) => subsByAuthUser.get(authUserId) ?? []);
+      const firstName = player.name.split(' ')[0];
+      const payload = JSON.stringify({
+        title,
+        body: `${firstName}, bist du dabei?`,
+        url: '/#training'
+      });
 
       await Promise.all(
         subs.map(async (sub) => {

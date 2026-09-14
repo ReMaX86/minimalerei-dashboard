@@ -1780,6 +1780,12 @@ hier die getroffenen Entscheidungen samt Begründung:
   Training stattfindet, nicht zu welchem der drei Zeitpunkte gerade erinnert wird. Titel/Text
   sind jetzt für alle drei Erinnerungsarten identisch: "Training {Wochentag}. {Uhrzeit} Uhr" /
   "Bist du dabei?" (z. B. "Training Mo. 20:30 Uhr" / "Bist du dabei?").
+- **Nachtrag: Vorname in der Trainings-Erinnerung.** Der Push-Text nennt jetzt den Vornamen des
+  jeweiligen Empfängers statt eines generischen "Bist du dabei?" — z. B. "Marc, bist du dabei?".
+  Dafür musste der Payload (Titel bleibt gleich, nur der Text ändert sich) von einmalig vor der
+  Schleife zurück in die Pro-Spieler-Schleife wandern, da er jetzt wieder von `player.name`
+  abhängt — derselbe "erstes Leerzeichen abschneiden"-Vorname-Zuschnitt wie z. B. `firstName` in
+  `Dashboard.tsx`.
 - **Nachtrag zu Kader-Absage: spielende Trainer bekamen die Push nie.** `send-squad-decline.ts`
   fragte nur die `trainers`-Tabelle ab (Login per E-Mail/Passwort). Ein "Spieler mit
   Trainer-Rechten" (`players.is_admin`, siehe Migration `0006` — bewusst kein zweiter Login,
