@@ -59,6 +59,28 @@ function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// Trainingszeiten (training.start_time) sind Wanduhrzeiten in deutscher
+// Ortszeit gemeint, z. B. "20:30" = 20:30 Uhr in Wülfrath. `new Date(y, mo,
+// d, h, m)` interpretiert diese Zahlen aber als Ortszeit DES LAUFENDEN
+// PROZESSES — und der läuft auf Vercel mit TZ=UTC, nicht Europe/Berlin.
+// "20:30" wurde dadurch bislang als 20:30 UTC (= 22:30 deutscher Zeit im
+// Sommer) behandelt: alle "X Stunden vorher"-Schwellen liefen dadurch
+// unbemerkt zwei Stunden zu spät (live so aufgefallen — die
+// 9-Stunden-Erinnerung ist trotz Fälligkeit nicht losgegangen, weil der
+// Code sie erst ab "13:30 Uhr" für fällig hielt statt ab 11:30 Uhr). Diese
+// Hilfsfunktion rechnet die gegebenen Wanduhrzeit-Komponenten korrekt
+// DST-bewusst von Europe/Berlin nach UTC um, ohne eine zusätzliche
+// Abhängigkeit zu brauchen (Node/Intl kennt die IANA-Zeitzonendaten
+// bereits) — Standard-"Doppelte Umrechnung"-Trick: einmal naiv als UTC
+// interpretieren, dann ablesen, wie spät es zu diesem Zeitpunkt tatsächlich
+// in Berlin ist, und um die Differenz korrigieren.
+function berlinTimeToUtc(y: number, mo: number, d: number, h: number, m: number): Date {
+  const asIfUtc = new Date(Date.UTC(y, mo - 1, d, h, m));
+  const berlinReading = new Date(asIfUtc.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+  const offsetMs = asIfUtc.getTime() - berlinReading.getTime();
+  return new Date(asIfUtc.getTime() + offsetMs);
+}
+
 function firstOccurrenceOnOrAfter(training: Training, from: Date): Date {
   const targetDay = WEEKDAY_TO_JS_DAY[training.weekday!];
   const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
@@ -69,7 +91,7 @@ function firstOccurrenceOnOrAfter(training: Training, from: Date): Date {
 
   if (diff === 0) {
     const [h, m] = training.start_time.split(':').map(Number);
-    const startsAt = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
+    const startsAt = berlinTimeToUtc(d.getFullYear(), d.getMonth() + 1, d.getDate(), h, m);
     if (startsAt <= from) d.setDate(d.getDate() + 7);
   }
   return d;
@@ -80,7 +102,7 @@ function isOneOffUpcoming(training: Training, from: Date): boolean {
   if (training.specific_date! > today) return true;
   if (training.specific_date! < today) return false;
   const [h, m] = training.start_time.split(':').map(Number);
-  const startsAt = new Date(from.getFullYear(), from.getMonth(), from.getDate(), h, m);
+  const startsAt = berlinTimeToUtc(from.getFullYear(), from.getMonth() + 1, from.getDate(), h, m);
   return startsAt > from;
 }
 
@@ -234,6 +256,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // Bewusst nicht weiter angefasst: `now`s Kalendertag wird an ein paar
+  // Stellen oben (toDateKey/firstOccurrenceOnOrAfter) über lokale
+  // Datumskomponenten gelesen, die auf dem UTC-Server nur zwischen 00:00
+  // und 02:00 deutscher Zeit vom tatsächlichen Berliner Kalendertag
+  // abweichen könnten — für Trainingstermine, die alle abends liegen,
+  // praktisch nie relevant.
   const now = new Date();
   const occurrence = nextTrainingOccurrences(
     (trainingsRes.data as Training[]) ?? [],
@@ -249,7 +277,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const [h, m] = occurrence.training.start_time.split(':').map(Number);
   const [y, mo, d] = occurrence.date.split('-').map(Number);
-  const startsAt = new Date(y, mo - 1, d, h, m);
+  const startsAt = berlinTimeToUtc(y, mo, d, h, m);
 
   if (startsAt <= now) {
     res.status(200).json({ skipped: 'already_started', date: occurrence.date });
