@@ -11,11 +11,15 @@ interface Subscriber {
 }
 
 // Wer hat Push-Benachrichtigungen aktiviert? push_subscriptions kennt nur
-// user_id (auth.uid()) — die Zuordnung zu Spieler/Trainer/Betrachter läuft
-// über dieselben Link-Tabellen wie in AuthContext (player_auth_links/
-// viewer_auth_links; Trainer haben ihre auth.uid() direkt als trainers.id).
-// Braucht die "trainer read"-RLS-Policy aus Migration 0040 — ohne die sieht
-// ein Trainer hier nur seine eigene Zeile (die bestehende "own"-Policy).
+// user_id (auth.uid()) — die Zuordnung zu Spieler/Trainer/Betrachter lief
+// früher über eine direkte Client-Abfrage auf player_auth_links/
+// viewer_auth_links, lieferte aber immer "Unbekannt": diese beiden Tabellen
+// haben laut Migration 0001 bewusst KEINE client-seitige RLS-Policy (Zugriff
+// nur über die security-definer current_player_id()/current_viewer_id()-
+// Funktionen, siehe AuthContext.tsx) und geben bei einer direkten Abfrage
+// immer eine leere Liste zurück. Migration 0047 löst das stattdessen über
+// eine eigene security-definer RPC (admin_push_subscribers, nur für
+// Trainer/Admins aufrufbar), die genau diese Zuordnung serverseitig auflöst.
 export function PushSubscribersList() {
   const [subscribers, setSubscribers] = useState<Subscriber[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,54 +28,22 @@ export function PushSubscribersList() {
     let cancelled = false;
 
     async function load() {
-      const [subsRes, linksRes, playersRes, trainersRes, viewerLinksRes, viewersRes] = await Promise.all([
+      const [subsRes, identitiesRes] = await Promise.all([
         supabase.from('push_subscriptions').select('user_id, created_at'),
-        supabase.from('player_auth_links').select('player_id, auth_user_id'),
-        supabase.from('players').select('id, name'),
-        supabase.from('trainers').select('id, name'),
-        supabase.from('viewer_auth_links').select('viewer_id, auth_user_id'),
-        supabase.from('viewers').select('id, name')
+        supabase.rpc('admin_push_subscribers')
       ]);
 
       if (cancelled) return;
-      if (subsRes.error) {
+      if (subsRes.error || identitiesRes.error) {
         setError('Konnte Push-Anmeldungen nicht laden.');
         return;
       }
 
-      const playerNameById = new Map(
-        ((playersRes.data as { id: string; name: string }[] | null) ?? []).map((p) => [p.id, p.name])
+      const identityByAuthUser = new Map(
+        (
+          (identitiesRes.data as { auth_user_id: string; name: string; role: Subscriber['role'] }[] | null) ?? []
+        ).map((i) => [i.auth_user_id, { name: i.name, role: i.role }])
       );
-      const trainerNameById = new Map(
-        ((trainersRes.data as { id: string; name: string }[] | null) ?? []).map((t) => [t.id, t.name])
-      );
-      const viewerNameById = new Map(
-        ((viewersRes.data as { id: string; name: string }[] | null) ?? []).map((v) => [v.id, v.name])
-      );
-      const playerAuthMap = new Map(
-        ((linksRes.data as { player_id: string; auth_user_id: string }[] | null) ?? []).map((l) => [
-          l.auth_user_id,
-          l.player_id
-        ])
-      );
-      const viewerAuthMap = new Map(
-        ((viewerLinksRes.data as { viewer_id: string; auth_user_id: string }[] | null) ?? []).map((l) => [
-          l.auth_user_id,
-          l.viewer_id
-        ])
-      );
-
-      function resolve(authUserId: string): { name: string; role: Subscriber['role'] } | null {
-        const trainerName = trainerNameById.get(authUserId);
-        if (trainerName) return { name: trainerName, role: 'Trainer' };
-        const playerId = playerAuthMap.get(authUserId);
-        const playerName = playerId ? playerNameById.get(playerId) : undefined;
-        if (playerName) return { name: playerName, role: 'Spieler' };
-        const viewerId = viewerAuthMap.get(authUserId);
-        const viewerName = viewerId ? viewerNameById.get(viewerId) : undefined;
-        if (viewerName) return { name: viewerName, role: 'Betrachter' };
-        return null;
-      }
 
       const byUser = new Map<string, { devices: number; since: string }>();
       for (const sub of (subsRes.data as { user_id: string; created_at: string }[] | null) ?? []) {
@@ -86,7 +58,7 @@ export function PushSubscribersList() {
 
       const list: Subscriber[] = [];
       for (const [authUserId, info] of byUser) {
-        const identity = resolve(authUserId);
+        const identity = identityByAuthUser.get(authUserId);
         list.push({
           name: identity?.name ?? 'Unbekannt',
           role: identity?.role ?? 'Spieler',
