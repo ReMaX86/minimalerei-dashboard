@@ -246,6 +246,13 @@ Fälligkeitsprüfung läuft deshalb über jedes anstehende Spiel mit gesetzter U
 Spiele ohne eingetragene Uhrzeit (`officiating_games.game_time` ist nullable) werden dabei
 übersprungen, da sich ohne Uhrzeit keine "X Stunden vorher"-Schwelle berechnen lässt.
 
+**Nachtrag:** Damit dieser stille Lücken-Fall bei neuen Terminen gar nicht erst entsteht, ist
+die Uhrzeit im Formular "Neuer Kampfgericht-Termin" (`OfficiatingAdmin.tsx`) seit diesem
+Nachtrag ein Pflichtfeld (`<TimeField required>`, analog zum bereits vorhandenen `required`
+beim Datum). Bestehende Termine ohne Uhrzeit sind davon nicht betroffen und bleiben nullable —
+das Feld war zum Zeitpunkt dieser Änderung laut Prüfung des Nutzers bei allen bisherigen
+Terminen ohnehin schon ausgefüllt.
+
 Setup zusätzlich zu den Schritten oben — derselbe `pg_cron`-Job-Takt reicht aus, nur ein
 zweiter `cron.schedule(...)`-Eintrag mit dieser URL (dieselben Vercel-Env-Vars, kein neues
 Secret nötig):
