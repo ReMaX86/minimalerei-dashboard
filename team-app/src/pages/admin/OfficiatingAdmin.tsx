@@ -215,7 +215,16 @@ export function OfficiatingAdmin() {
               value={form.game_date}
               onChange={(v) => setForm((f) => ({ ...f, game_date: v }))}
             />
-            <TimeField label="Uhrzeit" value={form.game_time} onChange={(v) => setForm((f) => ({ ...f, game_time: v }))} />
+            {/* Pflichtfeld, nicht nur optional wie ursprünglich: ohne Uhrzeit
+                kann api/send-officiating-reminders.ts keine "X Stunden
+                vorher"-Schwelle berechnen und überspringt den Termin dann
+                stillschweigend, ohne dass irgendwo ein Fehler auftaucht. */}
+            <TimeField
+              label="Uhrzeit"
+              required
+              value={form.game_time}
+              onChange={(v) => setForm((f) => ({ ...f, game_time: v }))}
+            />
           </div>
           <select
             required
