@@ -394,19 +394,22 @@ function GameList({
                       ))}
                     </select>
                   ) : task.assigned_player_id ? (
-                    task.assigned_player_id === currentPlayerId && !deadlinePassed ? (
-                      <button
-                        className="btn-secondary !px-3 !py-1 text-xs"
-                        disabled={busyTaskId === task.id}
-                        onClick={() => onRelease(task.id)}
-                      >
-                        Abwählen
-                      </button>
-                    ) : (
+                    <div className="flex items-center gap-2">
                       <span className={task.assigned_player_id === currentPlayerId ? 'pill pill-warn' : 'pill pill-ok'}>
-                        {playersById[task.assigned_player_id]?.name ?? '?'}
+                        {task.assigned_player_id === currentPlayerId
+                          ? 'Du'
+                          : (playersById[task.assigned_player_id]?.name ?? '?')}
                       </span>
-                    )
+                      {task.assigned_player_id === currentPlayerId && !deadlinePassed && (
+                        <button
+                          className="btn-secondary !px-2 !py-1 text-xs"
+                          disabled={busyTaskId === task.id}
+                          onClick={() => onRelease(task.id)}
+                        >
+                          Abwählen
+                        </button>
+                      )}
+                    </div>
                   ) : currentPlayerId && !deadlinePassed ? (
                     <button
                       className="btn-secondary !px-3 !py-1 text-xs"
