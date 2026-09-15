@@ -16,6 +16,9 @@ interface ReminderForm {
   training_push_offset_1_min: string;
   training_push_offset_2_min: string;
   training_push_offset_3_min: string;
+  officiating_push_offset_1_min: string;
+  officiating_push_offset_2_min: string;
+  officiating_push_offset_3_min: string;
 }
 
 // Minuten (Datenbank) <-> Stunden (Admin-Eingabe) — die drei
@@ -42,7 +45,10 @@ function reminderFormFromSettings(row: ReminderSettings): ReminderForm {
     officiating_season_min: String(row.officiating_season_min),
     training_push_offset_1_min: minutesToHoursStr(row.training_push_offset_1_min),
     training_push_offset_2_min: minutesToHoursStr(row.training_push_offset_2_min),
-    training_push_offset_3_min: minutesToHoursStr(row.training_push_offset_3_min)
+    training_push_offset_3_min: minutesToHoursStr(row.training_push_offset_3_min),
+    officiating_push_offset_1_min: minutesToHoursStr(row.officiating_push_offset_1_min),
+    officiating_push_offset_2_min: minutesToHoursStr(row.officiating_push_offset_2_min),
+    officiating_push_offset_3_min: minutesToHoursStr(row.officiating_push_offset_3_min)
   };
 }
 
@@ -97,7 +103,10 @@ export function FeatureFlagsAdmin() {
           officiating_season_min: Math.max(0, Number(reminderForm.officiating_season_min) || 0),
           training_push_offset_1_min: hoursStrToMinutes(reminderForm.training_push_offset_1_min),
           training_push_offset_2_min: hoursStrToMinutes(reminderForm.training_push_offset_2_min),
-          training_push_offset_3_min: hoursStrToMinutes(reminderForm.training_push_offset_3_min)
+          training_push_offset_3_min: hoursStrToMinutes(reminderForm.training_push_offset_3_min),
+          officiating_push_offset_1_min: hoursStrToMinutes(reminderForm.officiating_push_offset_1_min),
+          officiating_push_offset_2_min: hoursStrToMinutes(reminderForm.officiating_push_offset_2_min),
+          officiating_push_offset_3_min: hoursStrToMinutes(reminderForm.officiating_push_offset_3_min)
         })
         .eq('id', 1);
       if (updError) throw updError;
@@ -265,6 +274,56 @@ export function FeatureFlagsAdmin() {
                 value={reminderForm.training_push_offset_3_min}
                 onChange={(e) =>
                   setReminderForm({ ...reminderForm, training_push_offset_3_min: e.target.value })
+                }
+              />
+            </label>
+          </div>
+
+          <div className="space-y-2 border-t border-black/5 pt-3">
+            <p className="text-sm font-semibold text-tbw-navyDark">Push-Erinnerung fürs Kampfgericht</p>
+            <p className="text-xs text-tbw-ink/50">
+              Bis zu drei Zeitpunkte vor Spielbeginn, zu denen Spieler mit einer zugewiesenen
+              Kampfgericht-Aufgabe per Push erinnert werden (in Stunden, 0 = aus). Anders als bei
+              der Training-Erinnerung gibt es hier keine Zu-/Absage — die Aufgabe ist bereits fest
+              zugewiesen, die Erinnerung ist reine Gedächtnisstütze. Wirkt nur, wenn
+              "Push-Benachrichtigungen" unter Funktionen aktiviert ist.
+            </p>
+            <label className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-tbw-ink/70">1. Erinnerung (z. B. 120 = 5 Tage vorher)</span>
+              <input
+                type="number"
+                min={0}
+                step={0.5}
+                className="input !w-20 text-center"
+                value={reminderForm.officiating_push_offset_1_min}
+                onChange={(e) =>
+                  setReminderForm({ ...reminderForm, officiating_push_offset_1_min: e.target.value })
+                }
+              />
+            </label>
+            <label className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-tbw-ink/70">2. Erinnerung (z. B. 24 = 1 Tag vorher)</span>
+              <input
+                type="number"
+                min={0}
+                step={0.5}
+                className="input !w-20 text-center"
+                value={reminderForm.officiating_push_offset_2_min}
+                onChange={(e) =>
+                  setReminderForm({ ...reminderForm, officiating_push_offset_2_min: e.target.value })
+                }
+              />
+            </label>
+            <label className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-tbw-ink/70">3. Erinnerung (z. B. 2 = 2 Stunden vorher)</span>
+              <input
+                type="number"
+                min={0}
+                step={0.5}
+                className="input !w-20 text-center"
+                value={reminderForm.officiating_push_offset_3_min}
+                onChange={(e) =>
+                  setReminderForm({ ...reminderForm, officiating_push_offset_3_min: e.target.value })
                 }
               />
             </label>
