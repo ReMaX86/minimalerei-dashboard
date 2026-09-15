@@ -48,6 +48,10 @@ export interface ReminderSettings {
   training_push_offset_1_min: number;
   training_push_offset_2_min: number;
   training_push_offset_3_min: number;
+  // Dasselbe fürs Kampfgericht (siehe api/send-officiating-reminders.ts).
+  officiating_push_offset_1_min: number;
+  officiating_push_offset_2_min: number;
+  officiating_push_offset_3_min: number;
 }
 
 export type PlayerPosition = 'pg' | 'sg' | 'sf' | 'pf' | 'c';

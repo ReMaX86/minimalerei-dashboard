@@ -225,6 +225,46 @@ nur der jeweils exakte Moment beim manuellen Aufruf zählt als "fällig".
 
 Den Cron-Job wieder entfernen: `select cron.unschedule('training-reminders');`
 
+**Weitere Benachrichtigungsart: Kampfgericht-Erinnerung** (Migration `0049`,
+`api/send-officiating-reminders.ts`). Erinnert Spieler mit einer zugewiesenen
+Kampfgericht-Aufgabe (`officiating_tasks.assigned_player_id`) an ihren Einsatz — zu bis zu drei
+Zeitpunkten vor Spielbeginn (Default: 5 Tage, 1 Tag, 2 Stunden vorher; **im Admin unter
+Funktionen -> Erinnerungen -> "Push-Erinnerung fürs Kampfgericht" in Stunden änderbar, 0 =
+abgeschaltet**). Anders als bei der Training-Erinnerung gibt es hier keine Zu-/Absage — die
+Aufgabe ist bereits vom Trainer fest zugewiesen, die Erinnerung ist reine Gedächtnisstütze.
+`officiating_reminder_log` dedupliziert deshalb direkt pro einzelner Aufgabe
+(`officiating_task_id` + `reminder_type`), nicht pro Spieler+Termin wie beim Training — eine
+Aufgabe hat ohnehin nur einen zugewiesenen Spieler. Technisch auch sonst eng an die
+Training-Erinnerung angelehnt (bewusste Kopien statt lokaler Imports, siehe dortige Begründung):
+dieselbe `berlinTimeToUtc()`-Zeitzonen-Umrechnung, derselbe Claim-vor-Versand-Mechanismus gegen
+doppelten Versand bei überlappenden `pg_cron`-Durchläufen, derselbe personalisierte Push-Text
+ohne Zeitpunkt-Hinweis (z. B. "Kampfgericht Sa. 15:00 Uhr" / "Marc, du bist für '24-Sekunden-Uhr'
+eingeteilt (TBW vs. BC Beispielstadt)."). Ein wichtiger struktureller Unterschied zur
+Training-Erinnerung: dort gibt es nur einen einzelnen "nächsten Termin", hier dagegen potenziell
+mehrere unabhängige Spiele mit je eigenen fälligen Aufgaben in einem einzigen Durchlauf — die
+Fälligkeitsprüfung läuft deshalb über jedes anstehende Spiel mit gesetzter Uhrzeit einzeln.
+Spiele ohne eingetragene Uhrzeit (`officiating_games.game_time` ist nullable) werden dabei
+übersprungen, da sich ohne Uhrzeit keine "X Stunden vorher"-Schwelle berechnen lässt.
+
+Setup zusätzlich zu den Schritten oben — derselbe `pg_cron`-Job-Takt reicht aus, nur ein
+zweiter `cron.schedule(...)`-Eintrag mit dieser URL (dieselben Vercel-Env-Vars, kein neues
+Secret nötig):
+```sql
+select cron.schedule(
+  'officiating-reminders',
+  '*/10 * * * *',
+  $$
+  select net.http_post(
+    url := 'https://<deine-vercel-domain>/api/send-officiating-reminders',
+    headers := jsonb_build_object('x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>')
+  );
+  $$
+);
+```
+Manuell/testweise auslösen: derselbe `net.http_post`-Aufruf wie oben, nur mit
+`/api/send-officiating-reminders` als URL. Wieder entfernen:
+`select cron.unschedule('officiating-reminders');`
+
 **Drei weitere Benachrichtigungsarten: Training abgesagt, Kader veröffentlicht,
 Kader-Absage.** Alle drei nach demselben Muster wie "neue Meldung" — je ein eigener
 Datenbank-Trigger (INSERT/UPDATE) ruft eine eigene, in sich geschlossene Vercel-Function auf.
