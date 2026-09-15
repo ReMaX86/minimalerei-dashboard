@@ -31,6 +31,25 @@ export function OfficiatingAdmin() {
   const [teamBusy, setTeamBusy] = useState(false);
   const [showTeams, setShowTeams] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [signupDeadline, setSignupDeadline] = useState('');
+  const [savingDeadline, setSavingDeadline] = useState(false);
+  const [deadlineSaved, setDeadlineSaved] = useState(false);
+
+  // Eigener, separater Fetch (statt Teil von load()): reminder_settings ist
+  // eine Singleton-Tabelle unabhängig von den Kampfgericht-Terminen selbst,
+  // dasselbe Muster wie der reminderForm-Fetch in FeatureFlagsAdmin.tsx.
+  useEffect(() => {
+    supabase
+      .from('reminder_settings')
+      .select('officiating_signup_deadline')
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        setSignupDeadline(
+          (data as { officiating_signup_deadline: string | null } | null)?.officiating_signup_deadline ?? ''
+        );
+      });
+  }, []);
 
   const load = useCallback(async () => {
     setError(null);
@@ -151,11 +170,57 @@ export function OfficiatingAdmin() {
     }
   }
 
+  async function saveDeadline() {
+    setSavingDeadline(true);
+    setError(null);
+    setDeadlineSaved(false);
+    try {
+      const { error: updError } = await supabase
+        .from('reminder_settings')
+        .update({ officiating_signup_deadline: signupDeadline || null })
+        .eq('id', 1);
+      if (updError) throw updError;
+      setDeadlineSaved(true);
+    } catch {
+      setError('Meldefrist konnte nicht gespeichert werden.');
+    } finally {
+      setSavingDeadline(false);
+    }
+  }
+
   if (error) return <ErrorNote message={error} />;
   if (!games) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">
+      <div className="card space-y-2">
+        <p className="text-sm font-bold text-tbw-navyDark">Meldefrist</p>
+        <p className="text-xs text-tbw-ink/50">
+          Bis zu diesem Datum können Spieler ihre Kampfgericht-Termine auf der Kampfgericht-Seite
+          selbst übernehmen und auch wieder abwählen. Danach sind die Zuteilungen fix — Änderungen
+          (z. B. weil jemand spontan doch nicht kann) laufen dann über Trainer oder Kapitän/
+          Co-Kapitän, die sie hier unten bzw. direkt auf der Kampfgericht-Seite manuell anpassen
+          können. Leer lassen = keine Frist, Spieler können jederzeit selbst ändern.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="date"
+            className="input !w-auto"
+            value={signupDeadline}
+            onChange={(e) => setSignupDeadline(e.target.value)}
+          />
+          <button
+            type="button"
+            className="btn-primary !px-4 !py-2 text-sm"
+            disabled={savingDeadline}
+            onClick={saveDeadline}
+          >
+            {savingDeadline ? 'Speichere…' : 'Speichern'}
+          </button>
+          {deadlineSaved && <span className="text-xs font-semibold text-status-ok">Gespeichert ✓</span>}
+        </div>
+      </div>
+
       <div className="card space-y-2">
         <button
           className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"

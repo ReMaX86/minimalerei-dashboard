@@ -10,9 +10,6 @@ interface ReminderForm {
   squad_reminder_days_before: string;
   training_reminder_days_before: string;
   officiating_season_min: string;
-  // Leerer String = kein Datum gesetzt (unbegrenzte Selbstverwaltung) — siehe
-  // officiating_signup_deadline in ReminderSettings.
-  officiating_signup_deadline: string;
   // Trotz "_min"-Namen (passend zur DB-Spalte/zum Speichern) hält das
   // Formular hier Stunden als String — siehe minutesToHoursStr/
   // hoursStrToMinutes.
@@ -46,7 +43,6 @@ function reminderFormFromSettings(row: ReminderSettings): ReminderForm {
     squad_reminder_days_before: String(row.squad_reminder_days_before),
     training_reminder_days_before: String(row.training_reminder_days_before),
     officiating_season_min: String(row.officiating_season_min),
-    officiating_signup_deadline: row.officiating_signup_deadline ?? '',
     training_push_offset_1_min: minutesToHoursStr(row.training_push_offset_1_min),
     training_push_offset_2_min: minutesToHoursStr(row.training_push_offset_2_min),
     training_push_offset_3_min: minutesToHoursStr(row.training_push_offset_3_min),
@@ -105,7 +101,6 @@ export function FeatureFlagsAdmin() {
           squad_reminder_days_before: Math.max(0, Number(reminderForm.squad_reminder_days_before) || 0),
           training_reminder_days_before: Math.max(0, Number(reminderForm.training_reminder_days_before) || 0),
           officiating_season_min: Math.max(0, Number(reminderForm.officiating_season_min) || 0),
-          officiating_signup_deadline: reminderForm.officiating_signup_deadline || null,
           training_push_offset_1_min: hoursStrToMinutes(reminderForm.training_push_offset_1_min),
           training_push_offset_2_min: hoursStrToMinutes(reminderForm.training_push_offset_2_min),
           training_push_offset_3_min: hoursStrToMinutes(reminderForm.training_push_offset_3_min),
@@ -232,25 +227,8 @@ export function FeatureFlagsAdmin() {
             </label>
             <p className="text-xs text-tbw-ink/40">
               U18-Spieler, die schon über ihre eigene Mannschaft eingeteilt werden, lassen sich unter
-              "Admin → Spieler" von der Kampfgericht-Erinnerung ausnehmen.
-            </p>
-            <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">Kampfgericht: Meldefrist (bis wann selbst wählbar?)</span>
-              <input
-                type="date"
-                className="input !w-auto text-center"
-                value={reminderForm.officiating_signup_deadline}
-                onChange={(e) =>
-                  setReminderForm({ ...reminderForm, officiating_signup_deadline: e.target.value })
-                }
-              />
-            </label>
-            <p className="text-xs text-tbw-ink/40">
-              Bis zu diesem Datum können Spieler ihre Kampfgericht-Termine auf der Kampfgericht-Seite
-              selbst übernehmen und auch wieder abwählen. Danach sind die Zuteilungen fix — Änderungen
-              (z. B. weil jemand spontan doch nicht kann) laufen dann über Trainer oder Kapitän/
-              Co-Kapitän, die sie hier bzw. direkt auf der Kampfgericht-Seite manuell anpassen können.
-              Leer lassen = keine Frist, Spieler können jederzeit selbst ändern.
+              "Admin → Spieler" von der Kampfgericht-Erinnerung ausnehmen. Die Meldefrist für die
+              Selbstverwaltung der Kampfgericht-Termine ist im Admin unter "Kampfgericht" einstellbar.
             </p>
           </div>
 

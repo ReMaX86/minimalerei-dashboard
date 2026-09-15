@@ -1956,6 +1956,12 @@ hier die getroffenen Entscheidungen samt Begründung:
   Spieler:in einen offenen Slot auch per direktem Tabellen-Write erlaubte, wurde entfernt — jede
   Spieler-Änderung läuft jetzt ausschließlich über die beiden RPCs, sonst ließe sich die
   Meldefrist-Prüfung und Protokollierung umgehen.
+- **Nachtrag: Meldefrist-Einstellung von "Funktionen" in den "Kampfgericht"-Admin-Reiter verschoben.**
+  Das Feld saß bisher im `FeatureFlagsAdmin.tsx`-Erinnerungen-Block zusammen mit den Push-Zeitpunkten
+  — inhaltlich aber näher am Kampfgericht selbst. Jetzt eine eigene kleine Karte oben auf
+  `OfficiatingAdmin.tsx` (Admin → Kampfgericht), mit eigenem Speichern-Button statt Teil des
+  gemeinsamen "Erinnerungen speichern"-Formulars. Rein clientseitige Verschiebung derselben
+  `reminder_settings.officiating_signup_deadline`-Spalte — keine Migration nötig.
 
 ## Projektstruktur
 
