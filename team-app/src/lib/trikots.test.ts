@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pendingWasherFor } from './trikots';
+import { latestTransferFrom, pendingWasherFor } from './trikots';
 
 const players = [
   { id: 'p-anna', name: 'Anna' },
@@ -50,5 +50,49 @@ describe('pendingWasherFor', () => {
     const overriddenGame = { ...homeGame, trikot_override: 'schwarz' as const };
     const result = pendingWasherFor(overriddenGame, squadOf('p-anna'), players, []);
     expect(result?.setId).toBe('schwarz');
+  });
+});
+
+describe('latestTransferFrom', () => {
+  it('returns null when there is no transfer log entry for the set', () => {
+    expect(latestTransferFrom('weiss', [], [])).toBeNull();
+  });
+
+  it('returns the previous holder when the latest event for the set was a transfer', () => {
+    const transferLog = [
+      { set_id: 'weiss' as const, from_player_id: 'p-anna', created_at: '2026-09-10T10:00:00Z' }
+    ];
+    expect(latestTransferFrom('weiss', [], transferLog)).toBe('p-anna');
+  });
+
+  it('returns null once a wash log entry supersedes the transfer', () => {
+    const transferLog = [
+      { set_id: 'weiss' as const, from_player_id: 'p-anna', created_at: '2026-09-10T10:00:00Z' }
+    ];
+    const washLog = [{ set_id: 'weiss' as const, created_at: '2026-09-12T10:00:00Z' }];
+    expect(latestTransferFrom('weiss', washLog, transferLog)).toBeNull();
+  });
+
+  it('returns the previous holder again if a newer transfer follows an older wash', () => {
+    const washLog = [{ set_id: 'weiss' as const, created_at: '2026-09-10T10:00:00Z' }];
+    const transferLog = [
+      { set_id: 'weiss' as const, from_player_id: 'p-ben', created_at: '2026-09-12T10:00:00Z' }
+    ];
+    expect(latestTransferFrom('weiss', washLog, transferLog)).toBe('p-ben');
+  });
+
+  it('ignores entries for a different set', () => {
+    const transferLog = [
+      { set_id: 'schwarz' as const, from_player_id: 'p-anna', created_at: '2026-09-10T10:00:00Z' }
+    ];
+    expect(latestTransferFrom('weiss', [], transferLog)).toBeNull();
+  });
+
+  it('picks the most recent of multiple transfers for the same set', () => {
+    const transferLog = [
+      { set_id: 'weiss' as const, from_player_id: 'p-anna', created_at: '2026-09-10T10:00:00Z' },
+      { set_id: 'weiss' as const, from_player_id: 'p-ben', created_at: '2026-09-11T10:00:00Z' }
+    ];
+    expect(latestTransferFrom('weiss', [], transferLog)).toBe('p-ben');
   });
 });

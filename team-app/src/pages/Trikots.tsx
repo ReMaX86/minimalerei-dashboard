@@ -4,8 +4,17 @@ import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { fmtDate, fmtDateShort } from '../lib/format';
-import { pendingWasherFor } from '../lib/trikots';
-import { benoetigterSatz, type Game, type GameSquadRow, type Player, type TrikotSetId, type TrikotSet, type TrikotWashLogRow } from '../types/database';
+import { latestTransferFrom, pendingWasherFor } from '../lib/trikots';
+import {
+  benoetigterSatz,
+  type Game,
+  type GameSquadRow,
+  type Player,
+  type TrikotSetId,
+  type TrikotSet,
+  type TrikotTransferLogRow,
+  type TrikotWashLogRow
+} from '../types/database';
 
 interface State {
   nextGame: Game | null;
@@ -15,6 +24,7 @@ interface State {
   players: Player[];
   sets: TrikotSet[];
   washLog: TrikotWashLogRow[];
+  transferLog: TrikotTransferLogRow[];
 }
 
 interface ConfirmTarget {
@@ -32,20 +42,26 @@ export function Trikots() {
   const [pastConfirming, setPastConfirming] = useState(false);
   const [pastPickingAlternate, setPastPickingAlternate] = useState(false);
   const [pastAlternateId, setPastAlternateId] = useState('');
+  // Direkte Trikot-Übergabe (Migration 0048) — eigener State statt pro-Set,
+  // siehe Dashboard.tsx (dieselbe Begründung).
+  const [transferringSetId, setTransferringSetId] = useState<TrikotSetId | null>(null);
+  const [transferTargetId, setTransferTargetId] = useState('');
+  const [transferring, setTransferring] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
     const today = new Date().toISOString().slice(0, 10);
 
-    const [gameRes, pastGameRes, playersRes, setsRes, washRes] = await Promise.all([
+    const [gameRes, pastGameRes, playersRes, setsRes, washRes, transferRes] = await Promise.all([
       supabase.from('games').select('*').gte('game_date', today).order('game_date').order('game_time').limit(1).maybeSingle(),
       supabase.from('games').select('*').lt('game_date', today).order('game_date', { ascending: false }).order('game_time', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('players').select('*').eq('is_active', true),
       supabase.from('trikot_sets').select('*').order('id'),
-      supabase.from('trikot_wash_log').select('*').order('created_at', { ascending: false })
+      supabase.from('trikot_wash_log').select('*').order('created_at', { ascending: false }),
+      supabase.from('trikot_transfer_log').select('*').order('created_at', { ascending: false })
     ]);
 
-    if (gameRes.error || pastGameRes.error || playersRes.error || setsRes.error || washRes.error) {
+    if (gameRes.error || pastGameRes.error || playersRes.error || setsRes.error || washRes.error || transferRes.error) {
       setError('Fehler beim Laden der Trikot-Daten.');
       return;
     }
@@ -69,7 +85,8 @@ export function Trikots() {
       pastSquad,
       players: (playersRes.data as Player[]) ?? [],
       sets: (setsRes.data as TrikotSet[]) ?? [],
-      washLog: (washRes.data as TrikotWashLogRow[]) ?? []
+      washLog: (washRes.data as TrikotWashLogRow[]) ?? [],
+      transferLog: (transferRes.data as TrikotTransferLogRow[]) ?? []
     });
   }, []);
 
@@ -134,6 +151,25 @@ export function Trikots() {
       setError('Übergabe konnte nicht bestätigt werden.');
     } finally {
       setters.setConfirming(false);
+    }
+  }
+
+  async function transferSet(setId: TrikotSetId, toPlayerId: string) {
+    setTransferring(true);
+    setError(null);
+    try {
+      const { error: rpcError } = await supabase.rpc('transfer_trikot_set', {
+        p_set_id: setId,
+        p_to_player_id: toPlayerId
+      });
+      if (rpcError) throw rpcError;
+      setTransferringSetId(null);
+      setTransferTargetId('');
+      await load();
+    } catch {
+      setError('Übergabe konnte nicht gespeichert werden.');
+    } finally {
+      setTransferring(false);
     }
   }
 
@@ -332,22 +368,88 @@ export function Trikots() {
       )}
 
       <section className="grid grid-cols-2 gap-3">
-        {state.sets.map((set) => (
-          <div key={set.id} className="card">
-            <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
-              {set.label.split(' · ').map((part, i) => (
-                <span key={i} className="block">
-                  {part}
-                </span>
-              ))}
-            </p>
-            <p className="mt-1 font-bold text-tbw-navyDark">
-              {set.current_holder_id ? playersById[set.current_holder_id]?.name ?? '—' : 'Niemand'}
-            </p>
-            {set.since && <p className="text-xs text-tbw-ink/50">seit {fmtDateShort(set.since)}</p>}
-          </div>
-        ))}
+        {state.sets.map((set) => {
+          const transferredFrom = latestTransferFrom(set.id, state.washLog, state.transferLog);
+          const canTransfer =
+            !!set.current_holder_id &&
+            (isAdmin || player?.id === set.current_holder_id || player?.is_captain || player?.is_co_captain);
+          return (
+            <div key={set.id} className="card">
+              <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
+                {set.label.split(' · ').map((part, i) => (
+                  <span key={i} className="block">
+                    {part}
+                  </span>
+                ))}
+              </p>
+              <p className="mt-1 font-bold text-tbw-navyDark">
+                {set.current_holder_id ? playersById[set.current_holder_id]?.name ?? '—' : 'Niemand'}
+              </p>
+              {set.since && <p className="text-xs text-tbw-ink/50">seit {fmtDateShort(set.since)}</p>}
+              {transferredFrom && (
+                <p className="mt-0.5 text-[10px] text-tbw-ink/40">
+                  Übergeben von {playersById[transferredFrom]?.name ?? '?'}
+                </p>
+              )}
+              {canTransfer && transferringSetId !== set.id && (
+                <button
+                  className="mt-2 text-xs font-bold text-tbw-navy"
+                  onClick={() => {
+                    setTransferringSetId(set.id);
+                    setTransferTargetId('');
+                  }}
+                >
+                  Übergeben?
+                </button>
+              )}
+            </div>
+          );
+        })}
       </section>
+
+      {transferringSetId &&
+        (() => {
+          const set = state.sets.find((s) => s.id === transferringSetId);
+          if (!set) return null;
+          return (
+            <section className="card">
+              <p className="text-sm font-bold text-tbw-navyDark">
+                {set.label.split(' · ')[0]} übergeben — an wen?
+              </p>
+              <div className="mt-3 space-y-2">
+                <select className="input" value={transferTargetId} onChange={(e) => setTransferTargetId(e.target.value)}>
+                  <option value="">Spieler wählen…</option>
+                  {sortedPlayers
+                    .filter((p) => p.id !== set.current_holder_id)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+                <div className="flex gap-2">
+                  <button
+                    className="btn-primary flex-1"
+                    disabled={!transferTargetId || transferring}
+                    onClick={() => transferSet(set.id, transferTargetId)}
+                  >
+                    {transferring ? 'Speichere…' : 'Bestätigen'}
+                  </button>
+                  <button
+                    className="btn-secondary flex-1"
+                    disabled={transferring}
+                    onClick={() => {
+                      setTransferringSetId(null);
+                      setTransferTargetId('');
+                    }}
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            </section>
+          );
+        })()}
 
       <section className="card">
         <p className="mb-2 text-sm font-bold text-tbw-navyDark">Spieler</p>
@@ -373,20 +475,48 @@ export function Trikots() {
 
       <section className="card">
         <p className="mb-2 text-sm font-bold text-tbw-navyDark">Verlauf</p>
-        {state.washLog.length === 0 ? (
-          <p className="text-sm text-tbw-ink/50">Noch keine Übergaben erfasst.</p>
-        ) : (
-          <ul className="space-y-1 text-sm">
-            {state.washLog.slice(0, 15).map((row) => (
-              <li key={row.id} className="flex items-center justify-between">
-                <span className="text-tbw-ink/70">
-                  {row.set_id === 'weiss' ? 'Weiß' : 'Schwarz'} → {playersById[row.player_id]?.name ?? '?'}
-                </span>
-                <span className="text-xs text-tbw-ink/40">{fmtDateShort(row.created_at.slice(0, 10))}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        {(() => {
+          // Beide Vorgangsarten (Waschen + direkte Übergabe) chronologisch
+          // gemeinsam anzeigen, damit im Verlauf keine Lücke entsteht, wenn
+          // ein Set zwischendurch mal nur weitergereicht statt gewaschen
+          // wurde.
+          type HistoryRow =
+            | { kind: 'wash'; id: string; created_at: string; setId: TrikotSetId; playerId: string }
+            | { kind: 'transfer'; id: string; created_at: string; setId: TrikotSetId; fromId: string | null; toId: string };
+          const history: HistoryRow[] = [
+            ...state.washLog.map(
+              (w): HistoryRow => ({ kind: 'wash', id: w.id, created_at: w.created_at, setId: w.set_id, playerId: w.player_id })
+            ),
+            ...state.transferLog.map(
+              (t): HistoryRow => ({
+                kind: 'transfer',
+                id: t.id,
+                created_at: t.created_at,
+                setId: t.set_id,
+                fromId: t.from_player_id,
+                toId: t.to_player_id
+              })
+            )
+          ].sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+          return history.length === 0 ? (
+            <p className="text-sm text-tbw-ink/50">Noch keine Übergaben erfasst.</p>
+          ) : (
+            <ul className="space-y-1 text-sm">
+              {history.slice(0, 15).map((row) => (
+                <li key={`${row.kind}-${row.id}`} className="flex items-center justify-between">
+                  <span className="text-tbw-ink/70">
+                    {row.setId === 'weiss' ? 'Weiß' : 'Schwarz'}{' '}
+                    {row.kind === 'wash'
+                      ? `→ ${playersById[row.playerId]?.name ?? '?'}`
+                      : `${row.fromId ? playersById[row.fromId]?.name ?? '?' : '?'} → ${playersById[row.toId]?.name ?? '?'} (übergeben)`}
+                  </span>
+                  <span className="text-xs text-tbw-ink/40">{fmtDateShort(row.created_at.slice(0, 10))}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        })()}
       </section>
     </div>
   );

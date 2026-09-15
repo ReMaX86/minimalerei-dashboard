@@ -1842,6 +1842,30 @@ hier die getroffenen Entscheidungen samt Begründung:
   `recalc_game_score()`-Trigger (Migration `0028`) bei jedem Stats-Event ohnehin aktuell. Bewusst
   kein Push beim Wechsel in die Verlängerung. Zusätzlich: "Spiel beenden" fragt jetzt erst per
   Bestätigungsdialog nach, bevor die Erfassung tatsächlich abgeschlossen wird.
+- **Direkte Trikot-Übergabe außerhalb des Wasch-Rhythmus** (Migration `0048`,
+  `lib/trikots.ts`, `Dashboard.tsx`, `Trikots.tsx`): bisher wechselte ein Trikot-Set nur über den
+  normalen Wasch-Ablauf (`confirm_trikot_handover()`) den Besitzer — kein Weg für den Fall, dass
+  der aktuelle Halter beim nächsten Spiel gar nicht dabei ist und die Trikots stattdessen z. B.
+  schon beim Training direkt an jemand anderen weitergegeben hat. Neue, bewusst separate
+  Tabelle/RPC (`trikot_transfer_log`/`transfer_trikot_set()`) statt `trikot_wash_log`
+  mitzunutzen: eine Übergabe ist kein Waschen und darf den Wasch-Zähler (Basis der Rotation in
+  `naechsterSpieler()`) nicht erhöhen und die Rotationsreihenfolge nicht verschieben — wer das
+  Set nur kurz weiterreicht, hat es ja nicht gewaschen. Auslösbar vom aktuellen Halter selbst, von
+  Captains/Co-Captains oder vom Trainer, jederzeit (kein Spielbezug wie beim Wasch-Flow).
+  Startseite (persönlicher Bereich): neue "Deine Trikots"-Karte für jeden Spieler, der aktuell
+  ein Set hält — "Du hast aktuell den weißen/schwarzen Trikotsatz", mit Hinweis auf den nächsten
+  Einsatz (nur falls das nächste Spiel tatsächlich dieses Set braucht, sonst ein allgemeiner
+  Hinweis) sowie einem "Set übergeben?"-Aufklapper mit Spieler-Auswahl. "Wer hat die
+  Trikots?" (Startseite + Trikots-Reiter) zeigt unter dem aktuellen Halter jetzt zusätzlich
+  "Übergeben von X", sobald der letzte Vorgang für dieses Set eine Übergabe statt eine
+  Wasch-Bestätigung war — ermittelt clientseitig über `latestTransferFrom()`
+  (`lib/trikots.ts`), die den jeweils neuesten Eintrag aus `trikot_wash_log` und
+  `trikot_transfer_log` für das Set vergleicht. Der "Verlauf"-Abschnitt auf der Trikots-Seite
+  zeigt jetzt beide Vorgangsarten chronologisch gemeinsam, damit dort keine Lücke entsteht, wenn
+  ein Set zwischendurch nur weitergereicht statt gewaschen wurde. `reset_trikots()` (Migration
+  `0004`) räumt jetzt zusätzlich `trikot_transfer_log` mit leer — sonst hätte ein Reset alte
+  Übergaben stehen lassen und der "Übergeben von"-Hinweis wäre fälschlich unter einem frisch auf
+  "Niemand" zurückgesetzten Set hängen geblieben.
 
 ## Projektstruktur
 
