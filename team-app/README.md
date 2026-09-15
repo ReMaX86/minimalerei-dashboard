@@ -1875,6 +1875,16 @@ hier die getroffenen Entscheidungen samt Begründung:
   `benoetigterSatz()` das erste Spiel, das wirklich das gehaltene Set braucht — die Karte nennt
   jetzt also Datum und Gegner des tatsächlich relevanten nächsten Einsatzes, nicht mehr nur des
   nächsten Spiels überhaupt.
+- **Nachtrag: Mitfahrgelegenheit optisch an die Nächster-Spieltag-Karte angebunden.**
+  `CarpoolSection.tsx` stand auf der Spiele-Seite bisher als eigene, unabhängige Karte unter der
+  "Nächster Spieltag"-Karte — obwohl sie sich immer auf genau dieses eine Spiel bezieht, wirkte
+  sie optisch wie ein losgelöster, allgemeiner Abschnitt. Die Komponente hat jetzt eine neue
+  `embedded`-Prop: `false` (Default) rendert wie bisher eine eigene `<section className="card">`,
+  `true` stattdessen nur einen `<div>` mit derselben `border-t`-Trennlinie, die auch die
+  Kader-/Treffpunkt-Abschnitte innerhalb derselben Karte voneinander trennen. `Spiele.tsx` rendert
+  die Mitfahrgelegenheit jetzt mit `embedded` direkt am Ende der "Nächster Spieltag"-Karte statt
+  danach als eigene Karte — dieselbe Karte, ein Abschnitt mehr, macht auf einen Blick klar, dass
+  sich beides auf denselben Termin bezieht.
 
 ## Projektstruktur
 

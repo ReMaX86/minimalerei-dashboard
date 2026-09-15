@@ -590,11 +590,11 @@ export function Spiele() {
           ) : (
             <p className="mt-3 text-sm text-tbw-ink/50">Kader für dieses Spiel noch nicht veröffentlicht.</p>
           ))}
-      </section>
 
-      {flags.carpool && role !== 'viewer' && !state.nextGame.is_home && (
-        <CarpoolSection gameId={state.nextGame.id} players={state.players} />
-      )}
+        {flags.carpool && role !== 'viewer' && !state.nextGame.is_home && (
+          <CarpoolSection gameId={state.nextGame.id} players={state.players} embedded />
+        )}
+      </section>
 
       {next3.length > 0 && (
         <section className="card">

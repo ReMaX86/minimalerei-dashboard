@@ -10,7 +10,20 @@ interface State {
   claims: CarpoolClaim[];
 }
 
-export function CarpoolSection({ gameId, players }: { gameId: string; players: Player[] }) {
+export function CarpoolSection({
+  gameId,
+  players,
+  embedded = false
+}: {
+  gameId: string;
+  players: Player[];
+  // Standardmäßig eine eigene Karte — auf der Spiele-Seite aber bewusst
+  // ohne eigene Karte gerendert (embedded=true), direkt unten an die
+  // "Nächster Spieltag"-Karte angehängt: die Mitfahrgelegenheit bezieht
+  // sich immer auf genau dieses eine Spiel, stand als separate Karte aber
+  // optisch wie ein eigenständiger, unabhängiger Abschnitt da.
+  embedded?: boolean;
+}) {
   const { player } = useAuth();
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -119,8 +132,8 @@ export function CarpoolSection({ gameId, players }: { gameId: string; players: P
     }
   }
 
-  return (
-    <section className="card">
+  const content = (
+    <>
       <p className="text-sm font-bold text-tbw-navyDark">🚗 Mitfahrgelegenheit</p>
 
       {state.offers.length === 0 && <p className="mt-2 text-sm text-tbw-ink/50">Noch keine Fahrer eingetragen.</p>}
@@ -217,6 +230,12 @@ export function CarpoolSection({ gameId, players }: { gameId: string; players: P
           )}
         </div>
       )}
-    </section>
+    </>
+  );
+
+  return embedded ? (
+    <div className="mt-3 border-t border-black/5 pt-3">{content}</div>
+  ) : (
+    <section className="card">{content}</section>
   );
 }
