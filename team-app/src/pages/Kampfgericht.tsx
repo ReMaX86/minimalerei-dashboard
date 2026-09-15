@@ -3,10 +3,11 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
-import { fmtDate, fmtTime, isFuture } from '../lib/format';
+import { fmtDate, fmtDateShort, fmtTime, isFuture } from '../lib/format';
 import {
   OFFICIATING_TASK_LABELS,
   officiatingGameLabel,
+  type OfficiatingAssignmentLogRow,
   type OfficiatingGame,
   type OfficiatingTask,
   type OfficiatingTaskType,
@@ -20,7 +21,10 @@ const SEASON_TARGET_MAX = 3;
 interface State {
   games: OfficiatingGame[];
   tasksByGame: Record<string, OfficiatingTask[]>;
+  taskById: Record<string, OfficiatingTask>;
   players: Player[];
+  assignmentLog: OfficiatingAssignmentLogRow[];
+  signupDeadline: string | null;
 }
 
 export function Kampfgericht() {
@@ -29,27 +33,37 @@ export function Kampfgericht() {
   const [error, setError] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
   const [showPlayerCounts, setShowPlayerCounts] = useState(false);
+  const [showLog, setShowLog] = useState(false);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
-    const [gamesRes, tasksRes, playersRes] = await Promise.all([
+    const [gamesRes, tasksRes, playersRes, logRes, settingsRes] = await Promise.all([
       supabase.from('officiating_games').select('*').order('game_date'),
       supabase.from('officiating_tasks').select('*'),
-      supabase.from('players').select('*').eq('is_active', true)
+      supabase.from('players').select('*').eq('is_active', true),
+      supabase.from('officiating_assignment_log').select('*').order('created_at', { ascending: false }).limit(20),
+      supabase.from('reminder_settings').select('officiating_signup_deadline').limit(1).maybeSingle()
     ]);
-    if (gamesRes.error || tasksRes.error || playersRes.error) {
+    if (gamesRes.error || tasksRes.error || playersRes.error || logRes.error) {
       setError('Fehler beim Laden der Kampfgericht-Termine.');
       return;
     }
     const tasksByGame: Record<string, OfficiatingTask[]> = {};
+    const taskById: Record<string, OfficiatingTask> = {};
     (tasksRes.data as OfficiatingTask[]).forEach((t) => {
       (tasksByGame[t.officiating_game_id] ??= []).push(t);
+      taskById[t.id] = t;
     });
     setState({
       games: (gamesRes.data as OfficiatingGame[]) ?? [],
       tasksByGame,
-      players: (playersRes.data as Player[]) ?? []
+      taskById,
+      players: (playersRes.data as Player[]) ?? [],
+      assignmentLog: (logRes.data as OfficiatingAssignmentLogRow[]) ?? [],
+      signupDeadline:
+        (settingsRes.data as { officiating_signup_deadline: string | null } | null)?.officiating_signup_deadline ??
+        null
     });
   }, []);
 
@@ -94,15 +108,24 @@ export function Kampfgericht() {
     0
   );
 
+  // Kapitän/Co-Kapitän dürfen wie der Trainer Zuteilungen manuell ändern
+  // (siehe admin_assign_officiating_task(), Migration 0050) — genau die
+  // Rolle, die laut Nutzer nachträgliche, privat abgesprochene Tausche in
+  // die App einträgt, sobald die Meldefrist um ist.
+  const isCaptain = !!player && (player.is_captain || player.is_co_captain);
+  const canReassign = isAdmin || isCaptain;
+  const today = new Date().toISOString().slice(0, 10);
+  const deadlinePassed = state.signupDeadline !== null && today > state.signupDeadline;
+
   async function assign(taskId: string, playerId: string | null) {
     setBusyTaskId(taskId);
     setError(null);
     try {
-      const { error: updError } = await supabase
-        .from('officiating_tasks')
-        .update({ assigned_player_id: playerId })
-        .eq('id', taskId);
-      if (updError) throw updError;
+      const { error: rpcError } = await supabase.rpc('admin_assign_officiating_task', {
+        p_task_id: taskId,
+        p_player_id: playerId
+      });
+      if (rpcError) throw rpcError;
       await load();
     } catch {
       setError('Zuweisung fehlgeschlagen.');
@@ -114,15 +137,35 @@ export function Kampfgericht() {
   async function claim(taskId: string) {
     setBusyTaskId(taskId);
     setError(null);
-    try {
-      const { error: rpcError } = await supabase.rpc('claim_officiating_task', { p_task_id: taskId });
-      if (rpcError) throw rpcError;
-      await load();
-    } catch {
-      setError('Der Slot wurde gerade schon vergeben. Bitte Seite aktualisieren.');
-    } finally {
+    const { error: rpcError } = await supabase.rpc('claim_officiating_task', { p_task_id: taskId });
+    if (rpcError) {
+      setError(
+        rpcError.message.includes('deadline_passed')
+          ? 'Die Meldefrist ist abgelaufen — Änderungen bitte bei Trainer oder Kapitän melden.'
+          : 'Der Slot wurde gerade schon vergeben. Bitte Seite aktualisieren.'
+      );
       setBusyTaskId(null);
+      return;
     }
+    await load();
+    setBusyTaskId(null);
+  }
+
+  async function release(taskId: string) {
+    setBusyTaskId(taskId);
+    setError(null);
+    const { error: rpcError } = await supabase.rpc('release_officiating_task', { p_task_id: taskId });
+    if (rpcError) {
+      setError(
+        rpcError.message.includes('deadline_passed')
+          ? 'Die Meldefrist ist abgelaufen — Änderungen bitte bei Trainer oder Kapitän melden.'
+          : 'Abwählen fehlgeschlagen. Bitte Seite aktualisieren.'
+      );
+      setBusyTaskId(null);
+      return;
+    }
+    await load();
+    setBusyTaskId(null);
   }
 
   return (
@@ -141,17 +184,32 @@ export function Kampfgericht() {
         </span>
       </section>
 
+      {state.signupDeadline && (
+        <section className="card flex items-center justify-between gap-3">
+          <p className="text-sm text-tbw-ink/70">
+            {deadlinePassed
+              ? `Zuteilungen sind seit ${fmtDate(state.signupDeadline)} fix. Kann jemand spontan doch nicht, bitte privat einen Tausch klären und danach Trainer oder Kapitän Bescheid geben.`
+              : `Bis ${fmtDate(state.signupDeadline)} könnt ihr eure Kampfgericht-Termine hier noch selbst übernehmen und abwählen.`}
+          </p>
+          <span className={deadlinePassed ? 'pill pill-warn shrink-0' : 'pill pill-ok shrink-0'}>
+            {deadlinePassed ? 'fix' : 'offen'}
+          </span>
+        </section>
+      )}
+
       <GameList
         title="Kommende Termine"
         games={upcoming}
         tasksByGame={state.tasksByGame}
         playersById={playersById}
         players={state.players}
-        isAdmin={isAdmin}
+        canReassign={canReassign}
+        deadlinePassed={deadlinePassed}
         currentPlayerId={player?.id ?? null}
         busyTaskId={busyTaskId}
         onAssign={assign}
         onClaim={claim}
+        onRelease={release}
         emptyText="Keine anstehenden Kampfgericht-Termine."
       />
 
@@ -171,11 +229,13 @@ export function Kampfgericht() {
               tasksByGame={state.tasksByGame}
               playersById={playersById}
               players={state.players}
-              isAdmin={isAdmin}
+              canReassign={canReassign}
+              deadlinePassed={deadlinePassed}
               currentPlayerId={player?.id ?? null}
               busyTaskId={busyTaskId}
               onAssign={assign}
               onClaim={claim}
+              onRelease={release}
               emptyText="Keine vergangenen Termine."
               flat
             />
@@ -204,6 +264,45 @@ export function Kampfgericht() {
           </ul>
         )}
       </section>
+
+      <section className="card">
+        <button
+          className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+          onClick={() => setShowLog((v) => !v)}
+        >
+          Letzte Änderungen
+          <span>{showLog ? '▲' : '▼'}</span>
+        </button>
+        {showLog &&
+          (state.assignmentLog.length === 0 ? (
+            <p className="mt-3 text-sm text-tbw-ink/50">Noch keine Änderungen protokolliert.</p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {state.assignmentLog.map((row) => {
+                const task = state.taskById[row.officiating_task_id];
+                const game = task ? state.games.find((g) => g.id === task.officiating_game_id) : undefined;
+                const fromName = row.from_player_id ? (playersById[row.from_player_id]?.name ?? '?') : 'offen';
+                const toName = row.to_player_id ? (playersById[row.to_player_id]?.name ?? '?') : 'offen';
+                return (
+                  <li key={row.id} className="border-b border-black/5 pb-2 text-sm last:border-0 last:pb-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-tbw-navyDark">
+                        {task ? OFFICIATING_TASK_LABELS[task.task_type] : 'Aufgabe gelöscht'}
+                        {game ? ` · ${officiatingGameLabel(game)}` : ''}
+                      </span>
+                      <span className="shrink-0 text-xs text-tbw-ink/40">
+                        {fmtDateShort(row.created_at.slice(0, 10))}
+                      </span>
+                    </div>
+                    <p className="text-xs text-tbw-ink/50">
+                      {fromName} → {toName} · geändert von {row.changed_by_label}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          ))}
+      </section>
     </div>
   );
 }
@@ -214,11 +313,13 @@ function GameList({
   tasksByGame,
   playersById,
   players,
-  isAdmin,
+  canReassign,
+  deadlinePassed,
   currentPlayerId,
   busyTaskId,
   onAssign,
   onClaim,
+  onRelease,
   emptyText,
   flat
 }: {
@@ -227,11 +328,13 @@ function GameList({
   tasksByGame: Record<string, OfficiatingTask[]>;
   playersById: Record<string, Player>;
   players: Player[];
-  isAdmin: boolean;
+  canReassign: boolean;
+  deadlinePassed: boolean;
   currentPlayerId: string | null;
   busyTaskId: string | null;
   onAssign: (taskId: string, playerId: string | null) => void;
   onClaim: (taskId: string) => void;
+  onRelease: (taskId: string) => void;
   emptyText: string;
   flat?: boolean;
 }) {
@@ -260,7 +363,7 @@ function GameList({
                   {game.game_time ? ` · ${fmtTime(game.game_time)} Uhr` : ''} · {game.location}
                 </p>
               </div>
-              {isAdmin && (
+              {canReassign && (
                 <span className={openCount > 0 ? 'pill pill-warn shrink-0' : 'pill pill-ok shrink-0'}>
                   {openCount > 0 ? `${openCount} offen` : 'komplett'}
                 </span>
@@ -272,7 +375,7 @@ function GameList({
                   <span className="text-sm text-tbw-ink/70">{OFFICIATING_TASK_LABELS[task.task_type]}</span>
                   {!task.id ? (
                     <span className="text-sm text-tbw-ink/30">–</span>
-                  ) : isAdmin ? (
+                  ) : canReassign ? (
                     <select
                       className={`input !w-auto !py-1 text-xs ${
                         task.assigned_player_id
@@ -291,10 +394,20 @@ function GameList({
                       ))}
                     </select>
                   ) : task.assigned_player_id ? (
-                    <span className={task.assigned_player_id === currentPlayerId ? 'pill pill-warn' : 'pill pill-ok'}>
-                      {playersById[task.assigned_player_id]?.name ?? '?'}
-                    </span>
-                  ) : currentPlayerId ? (
+                    task.assigned_player_id === currentPlayerId && !deadlinePassed ? (
+                      <button
+                        className="btn-secondary !px-3 !py-1 text-xs"
+                        disabled={busyTaskId === task.id}
+                        onClick={() => onRelease(task.id)}
+                      >
+                        Abwählen
+                      </button>
+                    ) : (
+                      <span className={task.assigned_player_id === currentPlayerId ? 'pill pill-warn' : 'pill pill-ok'}>
+                        {playersById[task.assigned_player_id]?.name ?? '?'}
+                      </span>
+                    )
+                  ) : currentPlayerId && !deadlinePassed ? (
                     <button
                       className="btn-secondary !px-3 !py-1 text-xs"
                       disabled={busyTaskId === task.id}

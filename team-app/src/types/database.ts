@@ -52,6 +52,10 @@ export interface ReminderSettings {
   officiating_push_offset_1_min: number;
   officiating_push_offset_2_min: number;
   officiating_push_offset_3_min: number;
+  // Bis zu diesem Datum können Spieler ihre Kampfgericht-Zuteilungen selbst
+  // übernehmen/abwählen (siehe Migration 0050); danach sind sie fix und
+  // Änderungen laufen nur noch über Trainer/Kapitän. null = unbegrenzt.
+  officiating_signup_deadline: string | null;
 }
 
 export type PlayerPosition = 'pg' | 'sg' | 'sf' | 'pf' | 'c';
@@ -229,6 +233,15 @@ export interface OfficiatingTask {
   officiating_game_id: string;
   task_type: OfficiatingTaskType;
   assigned_player_id: string | null;
+}
+
+export interface OfficiatingAssignmentLogRow {
+  id: string;
+  officiating_task_id: string;
+  from_player_id: string | null;
+  to_player_id: string | null;
+  changed_by_label: string;
+  created_at: string;
 }
 
 export interface Training {
