@@ -194,6 +194,14 @@ export interface TrikotWashLogRow {
   created_at: string;
 }
 
+export interface TrikotTransferLogRow {
+  id: string;
+  set_id: TrikotSetId;
+  from_player_id: string | null;
+  to_player_id: string;
+  created_at: string;
+}
+
 export interface OfficiatingGame {
   id: string;
   game_date: string;

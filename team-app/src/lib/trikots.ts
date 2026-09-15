@@ -1,5 +1,13 @@
 import { naechsterSpieler } from './rotation';
-import { benoetigterSatz, type Game, type GameSquadRow, type Player, type TrikotSetId, type TrikotWashLogRow } from '../types/database';
+import {
+  benoetigterSatz,
+  type Game,
+  type GameSquadRow,
+  type Player,
+  type TrikotSetId,
+  type TrikotTransferLogRow,
+  type TrikotWashLogRow
+} from '../types/database';
 
 export interface PendingWasher {
   setId: TrikotSetId;
@@ -30,4 +38,29 @@ export function pendingWasherFor(
   const player = naechsterSpieler(game, players, squad, washCount);
   if (!player) return null;
   return { setId, player };
+}
+
+/**
+ * Hat der aktuelle Halter eines Sets es per direkter Übergabe bekommen
+ * (statt über den normalen Wasch-Rhythmus)? Ein Set wechselt entweder über
+ * confirm_trikot_handover() (Eintrag in trikot_wash_log) oder über
+ * transfer_trikot_set() (Eintrag in trikot_transfer_log) den Besitzer —
+ * welcher der beiden Vorgänge zuletzt für dieses Set passiert ist, bestimmt
+ * die player_id des Vorbesitzers, die in der "Übergeben von"-Anzeige
+ * auftaucht. Kommt seit dem letzten Wasch-Eintrag keine Übergabe vor
+ * (oder gab's noch nie eine), liefert die Funktion null.
+ */
+export function latestTransferFrom(
+  setId: TrikotSetId,
+  washLog: Pick<TrikotWashLogRow, 'set_id' | 'created_at'>[],
+  transferLog: Pick<TrikotTransferLogRow, 'set_id' | 'from_player_id' | 'created_at'>[]
+): string | null {
+  const latestWashAt = washLog
+    .filter((w) => w.set_id === setId)
+    .reduce((max, w) => (w.created_at > max ? w.created_at : max), '');
+  const latestTransfer = transferLog
+    .filter((t) => t.set_id === setId)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  if (!latestTransfer || latestTransfer.created_at <= latestWashAt) return null;
+  return latestTransfer.from_player_id;
 }

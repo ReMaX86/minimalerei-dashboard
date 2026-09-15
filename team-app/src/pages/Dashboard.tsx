@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ErrorNote } from '../components/ErrorNote';
 import { UpcomingTrainings } from '../components/UpcomingTrainings';
 import { WeeklyTrainingTimes } from '../components/WeeklyTrainingTimes';
 import { AbsenceSection } from '../components/AbsenceSection';
@@ -12,7 +13,7 @@ import { usePushStatus } from '../hooks/usePushStatus';
 import { fmtDate, fmtDateShort, fmtTime } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
 import { computeReminders, type ReminderItem } from '../lib/reminders';
-import { pendingWasherFor } from '../lib/trikots';
+import { latestTransferFrom, pendingWasherFor } from '../lib/trikots';
 import {
   OFFICIATING_TASK_LABELS,
   STAT_POINT_VALUES,
@@ -35,6 +36,8 @@ import {
   type Training,
   type TrainingOverride,
   type TrikotSet,
+  type TrikotSetId,
+  type TrikotTransferLogRow,
   type TrikotWashLogRow
 } from '../types/database';
 
@@ -47,6 +50,8 @@ interface DashboardData {
   playerNextTask: (OfficiatingTask & { officiating_games: OfficiatingGame }) | null;
   trainerNextOfficiatingGame: (OfficiatingGame & { tasks: OfficiatingTask[] }) | null;
   trikotSets: TrikotSet[];
+  trikotWashLog: TrikotWashLogRow[];
+  trikotTransferLog: TrikotTransferLogRow[];
   players: Record<string, Player>;
   announcements: Announcement[];
   carpoolOffers: CarpoolOffer[];
@@ -68,7 +73,20 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [absenceVersion, setAbsenceVersion] = useState(0);
   const [trainingVersion, setTrainingVersion] = useState(0);
+  const [trikotVersion, setTrikotVersion] = useState(0);
   const [showUpcomingAbsences, setShowUpcomingAbsences] = useState(false);
+  // Direkte Trikot-Übergabe (siehe Migration 0048): eigener State statt
+  // pro-Set, da realistisch immer nur ein Set gleichzeitig übergeben wird —
+  // die setId im State legt fest, für welches Set gerade der
+  // Auswahl-Dialog offen ist.
+  const [transferringSetId, setTransferringSetId] = useState<TrikotSetId | null>(null);
+  const [transferTargetId, setTransferTargetId] = useState('');
+  const [transferring, setTransferring] = useState(false);
+  // Eigener Fehler-State statt des Seiten-weiten `error` oben — der würde
+  // bei einem Fehlschlag das komplette Dashboard durch die Fehlermeldung
+  // ersetzen (siehe `if (error) return ...` weiter unten), für einen
+  // fehlgeschlagenen Trikot-Übergabe-Versuch viel zu einschneidend.
+  const [transferError, setTransferError] = useState<string | null>(null);
   // Trainers/admin-players get the full Kampfgericht overview so they can
   // plan; a read-only Betrachter (e.g. Abteilungsleiter) gets to see the
   // same overview, just with no way to assign/edit anything. Captains/
@@ -86,7 +104,7 @@ export function Dashboard() {
       setError(null);
       const today = new Date().toISOString().slice(0, 10);
 
-      const [gameRes, trikotRes, playersRes, announcementsRes] = await Promise.all([
+      const [gameRes, trikotRes, trikotWashRes, trikotTransferRes, playersRes, announcementsRes] = await Promise.all([
         supabase
           .from('games')
           .select('*')
@@ -97,6 +115,8 @@ export function Dashboard() {
           .limit(1)
           .maybeSingle(),
         supabase.from('trikot_sets').select('*').order('id'),
+        supabase.from('trikot_wash_log').select('*'),
+        supabase.from('trikot_transfer_log').select('*'),
         supabase.from('players').select('*').eq('is_active', true),
         flags.announcements
           ? supabase
@@ -107,6 +127,8 @@ export function Dashboard() {
               .limit(5)
           : Promise.resolve({ data: [] as Announcement[], error: null })
       ]);
+      const trikotWashLog = (trikotWashRes.data as TrikotWashLogRow[]) ?? [];
+      const trikotTransferLog = (trikotTransferRes.data as TrikotTransferLogRow[]) ?? [];
 
       let playerNextTask: DashboardData['playerNextTask'] = null;
       let trainerNextOfficiatingGame: DashboardData['trainerNextOfficiatingGame'] = null;
@@ -249,8 +271,7 @@ export function Dashboard() {
           // rückwirkend fürs zuletzt gespielte Spiel.
           let trikotReminder: Parameters<typeof computeReminders>[5] = null;
           {
-            const { data: washRows } = await supabase.from('trikot_wash_log').select('*');
-            const washLog = (washRows as TrikotWashLogRow[] | null) ?? [];
+            const washLog = trikotWashLog;
             const allPlayers = Object.values(playersById);
 
             if (nextGame && nextGame.game_date === today) {
@@ -398,7 +419,7 @@ export function Dashboard() {
 
       if (cancelled) return;
 
-      if (gameRes.error || trikotRes.error) {
+      if (gameRes.error || trikotRes.error || trikotWashRes.error || trikotTransferRes.error) {
         setError('Fehler beim Laden der Startseite.');
         return;
       }
@@ -410,6 +431,8 @@ export function Dashboard() {
         playerNextTask,
         trainerNextOfficiatingGame,
         trikotSets: (trikotRes.data as TrikotSet[]) ?? [],
+        trikotWashLog,
+        trikotTransferLog,
         players: playersById,
         announcements: (announcementsRes.data as Announcement[]) ?? [],
         carpoolOffers,
@@ -437,7 +460,8 @@ export function Dashboard() {
     flags.absences,
     flags.stats,
     absenceVersion,
-    trainingVersion
+    trainingVersion,
+    trikotVersion
   ]);
 
   // Live-Anzeigetafel fürs laufende Spiel: der große Initial-Load oben läuft
@@ -519,6 +543,25 @@ export function Dashboard() {
   const ownSetId = player
     ? data.trikotSets.find((s) => s.current_holder_id === player.id)?.id ?? null
     : null;
+
+  async function transferSet(setId: TrikotSetId, toPlayerId: string) {
+    setTransferring(true);
+    setTransferError(null);
+    try {
+      const { error: rpcError } = await supabase.rpc('transfer_trikot_set', {
+        p_set_id: setId,
+        p_to_player_id: toPlayerId
+      });
+      if (rpcError) throw rpcError;
+      setTransferringSetId(null);
+      setTransferTargetId('');
+      setTrikotVersion((v) => v + 1);
+    } catch {
+      setTransferError('Übergabe konnte nicht gespeichert werden.');
+    } finally {
+      setTransferring(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -803,6 +846,81 @@ export function Dashboard() {
         </section>
       )}
 
+      {role === 'player' &&
+        player &&
+        data.trikotSets
+          .filter((set) => set.current_holder_id === player.id)
+          .map((set) => {
+            const needsThisSet = !!data.nextGame && benoetigterSatz(data.nextGame) === set.id;
+            const isPicking = transferringSetId === set.id;
+            return (
+              <section key={set.id} className="card">
+                <SectionTitle icon="🧺" title="Deine Trikots" />
+                <p className="mt-2 text-sm font-semibold text-tbw-navyDark">
+                  Du hast aktuell den {set.id === 'weiss' ? 'weißen' : 'schwarzen'} Trikotsatz.
+                </p>
+                <p className="mt-0.5 text-xs text-tbw-ink/50">
+                  {needsThisSet && data.nextGame
+                    ? `Bitte zum nächsten Einsatz am ${fmtDate(data.nextGame.game_date)} gegen ${data.nextGame.opponent} mitbringen.`
+                    : 'Bitte zum nächsten Einsatz mit diesem Set mitbringen.'}
+                </p>
+
+                {!isPicking ? (
+                  <button
+                    className="mt-2 text-xs font-bold text-tbw-navy"
+                    onClick={() => {
+                      setTransferringSetId(set.id);
+                      setTransferTargetId('');
+                      setTransferError(null);
+                    }}
+                  >
+                    Set übergeben?
+                  </button>
+                ) : (
+                  <div className="mt-3 space-y-2 rounded-xl bg-tbw-bg p-3">
+                    <p className="text-sm text-tbw-ink/70">An wen?</p>
+                    <select
+                      className="input"
+                      value={transferTargetId}
+                      onChange={(e) => setTransferTargetId(e.target.value)}
+                    >
+                      <option value="">Spieler wählen…</option>
+                      {Object.values(data.players)
+                        .filter((p) => p.id !== player.id)
+                        .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                    </select>
+                    {transferError && <ErrorNote message={transferError} />}
+                    <div className="flex gap-2">
+                      <button
+                        className="btn-primary flex-1 !py-2 text-sm"
+                        disabled={!transferTargetId || transferring}
+                        onClick={() => transferSet(set.id, transferTargetId)}
+                      >
+                        {transferring ? 'Speichere…' : 'Bestätigen'}
+                      </button>
+                      <button
+                        className="btn-secondary flex-1 !py-2 text-sm"
+                        disabled={transferring}
+                        onClick={() => {
+                          setTransferringSetId(null);
+                          setTransferTargetId('');
+                          setTransferError(null);
+                        }}
+                      >
+                        Abbrechen
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            );
+          })}
+
       {flags.absences && role === 'player' && (
         <AbsenceSection onChange={() => setAbsenceVersion((v) => v + 1)} />
       )}
@@ -893,25 +1011,33 @@ export function Dashboard() {
       <section className="card">
         <SectionTitle icon="👕" title="Wer hat die Trikots?" />
         <div className="mt-2 grid grid-cols-2 gap-3">
-          {data.trikotSets.map((set) => (
-            <div
-              key={set.id}
-              className={`rounded-xl p-3 ${
-                set.id === ownSetId ? 'bg-tbw-gold/15 ring-2 ring-tbw-gold' : 'bg-tbw-bg'
-              }`}
-            >
-              <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
-                {set.label.split(' · ').map((part, i) => (
-                  <span key={i} className="block">
-                    {part}
-                  </span>
-                ))}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-tbw-navyDark">
-                {set.current_holder_id ? data.players[set.current_holder_id]?.name ?? '—' : 'Niemand'}
-              </p>
-            </div>
-          ))}
+          {data.trikotSets.map((set) => {
+            const transferredFrom = latestTransferFrom(set.id, data.trikotWashLog, data.trikotTransferLog);
+            return (
+              <div
+                key={set.id}
+                className={`rounded-xl p-3 ${
+                  set.id === ownSetId ? 'bg-tbw-gold/15 ring-2 ring-tbw-gold' : 'bg-tbw-bg'
+                }`}
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
+                  {set.label.split(' · ').map((part, i) => (
+                    <span key={i} className="block">
+                      {part}
+                    </span>
+                  ))}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-tbw-navyDark">
+                  {set.current_holder_id ? data.players[set.current_holder_id]?.name ?? '—' : 'Niemand'}
+                </p>
+                {transferredFrom && (
+                  <p className="mt-0.5 text-[10px] text-tbw-ink/40">
+                    Übergeben von {data.players[transferredFrom]?.name ?? '?'}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 
