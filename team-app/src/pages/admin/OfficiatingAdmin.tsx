@@ -98,11 +98,14 @@ export function OfficiatingAdmin() {
   async function assign(taskId: string, playerId: string | null) {
     setError(null);
     try {
-      const { error: updError } = await supabase
-        .from('officiating_tasks')
-        .update({ assigned_player_id: playerId })
-        .eq('id', taskId);
-      if (updError) throw updError;
+      // Läuft über dieselbe RPC wie die Zuteilung auf der Kampfgericht-Seite
+      // (statt eines direkten .update()), damit jede Änderung in
+      // officiating_assignment_log protokolliert wird (siehe Migration 0050).
+      const { error: rpcError } = await supabase.rpc('admin_assign_officiating_task', {
+        p_task_id: taskId,
+        p_player_id: playerId
+      });
+      if (rpcError) throw rpcError;
       await load();
     } catch {
       setError('Zuweisung fehlgeschlagen.');

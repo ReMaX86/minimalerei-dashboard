@@ -9,6 +9,7 @@ const SETTINGS: ReminderSettings = {
   squad_reminder_days_before: 3,
   training_reminder_days_before: 1,
   officiating_season_min: 2,
+  officiating_signup_deadline: null,
   training_push_offset_1_min: 1440,
   training_push_offset_2_min: 60,
   training_push_offset_3_min: 30,

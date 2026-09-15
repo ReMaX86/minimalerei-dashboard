@@ -1932,6 +1932,30 @@ hier die getroffenen Entscheidungen samt Begründung:
   die Mitfahrgelegenheit jetzt mit `embedded` direkt am Ende der "Nächster Spieltag"-Karte statt
   danach als eigene Karte — dieselbe Karte, ein Abschnitt mehr, macht auf einen Blick klar, dass
   sich beides auf denselben Termin bezieht.
+- **Nachtrag: Kampfgericht-Selbstverwaltung mit Meldefrist + Änderungs-Log (Migration `0050`).**
+  Bisher konnte ein Spieler eine offene Position zwar selbst übernehmen ("Ich übernehme"), aber nie
+  wieder rückgängig machen — laut Kommentar in Migration 0001 bewusst so, "das ist der Job des
+  Trainers". Das wurde als zu starr empfunden: Spieler sollen sich bis zu einer vom Trainer
+  festgelegten Meldefrist (`reminder_settings.officiating_signup_deadline`, Admin → Funktionen →
+  Erinnerungen; leer = keine Frist, dauerhaft frei änderbar) noch frei um- und abmelden können.
+  Ab dieser Frist werden die Zuteilungen "fix" — Spieler verlieren dann jegliche Selbstverwaltung
+  (weder Übernehmen noch Abwählen), spontane Ausfälle laufen ab da nur noch privat (z. B.
+  WhatsApp) mit anschließender manueller Änderung durch Trainer **oder Kapitän/Co-Kapitän** (neu:
+  die Zuteilungs-Dropdowns auf der Kampfgericht-Seite, bisher nur für `isAdmin`, sind jetzt auch für
+  `is_captain`/`is_co_captain` sichtbar — passend zur bereits bestehenden Kapitän-Sonderrolle aus
+  Migration `0017`). Damit trotz dieser Freiheit nachvollziehbar bleibt, wer wann was geändert hat,
+  schreibt jeder der drei Wege (Selbst-Übernahme, Selbst-Abwahl, Trainer/Kapitän-Zuteilung) jetzt
+  einen Eintrag in die neue Tabelle `officiating_assignment_log` (from/to-Spieler + ein per
+  `current_actor_label()` aufgelöster Klartext-Name inkl. Rollenhinweis beim Trainer) — sichtbar
+  in einem neuen, einklappbaren "Letzte Änderungen"-Abschnitt unten auf der Kampfgericht-Seite.
+  Technisch bündelt eine neue RPC `admin_assign_officiating_task()` jetzt sowohl den
+  Trainer-Dropdown auf dieser Seite als auch den bisherigen direkten `.update()` in
+  `OfficiatingAdmin.tsx`, damit wirklich jede Zuteilungsänderung protokolliert wird; die neue RPC
+  `release_officiating_task()` ist das Gegenstück zum bestehenden `claim_officiating_task()` (beide
+  prüfen die Meldefrist serverseitig, nicht nur in der UI). Die alte RLS-Policy, die einer/einem
+  Spieler:in einen offenen Slot auch per direktem Tabellen-Write erlaubte, wurde entfernt — jede
+  Spieler-Änderung läuft jetzt ausschließlich über die beiden RPCs, sonst ließe sich die
+  Meldefrist-Prüfung und Protokollierung umgehen.
 
 ## Projektstruktur
 
