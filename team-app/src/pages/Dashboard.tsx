@@ -45,6 +45,7 @@ const RESULT_LABELS = { sieg: 'Sieg', niederlage: 'Niederlage', unentschieden: '
 
 interface DashboardData {
   nextGame: Game | null;
+  upcomingGames: Game[];
   playerInSquad: boolean | null;
   myConfirmation: SquadConfirmation | null;
   playerNextTask: (OfficiatingTask & { officiating_games: OfficiatingGame }) | null;
@@ -104,29 +105,43 @@ export function Dashboard() {
       setError(null);
       const today = new Date().toISOString().slice(0, 10);
 
-      const [gameRes, trikotRes, trikotWashRes, trikotTransferRes, playersRes, announcementsRes] = await Promise.all([
-        supabase
-          .from('games')
-          .select('*')
-          .gte('game_date', today)
-          .is('stats_finalized_at', null)
-          .order('game_date')
-          .order('game_time')
-          .limit(1)
-          .maybeSingle(),
-        supabase.from('trikot_sets').select('*').order('id'),
-        supabase.from('trikot_wash_log').select('*'),
-        supabase.from('trikot_transfer_log').select('*'),
-        supabase.from('players').select('*').eq('is_active', true),
-        flags.announcements
-          ? supabase
-              .from('announcements')
-              .select('*')
-              .order('pinned', { ascending: false })
-              .order('created_at', { ascending: false })
-              .limit(5)
-          : Promise.resolve({ data: [] as Announcement[], error: null })
-      ]);
+      const [gameRes, upcomingGamesRes, trikotRes, trikotWashRes, trikotTransferRes, playersRes, announcementsRes] =
+        await Promise.all([
+          supabase
+            .from('games')
+            .select('*')
+            .gte('game_date', today)
+            .is('stats_finalized_at', null)
+            .order('game_date')
+            .order('game_time')
+            .limit(1)
+            .maybeSingle(),
+          // Für die "Deine Trikots"-Karte: das EINE `nextGame` oben ist das
+          // nächste Spiel überhaupt, das aber nicht zwangsläufig das eigene
+          // Set braucht (z. B. hält man "Schwarz", aber das nächste Spiel ist
+          // ein Heimspiel, das "Weiß" braucht) — dafür eine breitere Liste,
+          // um darin das nächste Spiel mit dem passenden Satz zu finden.
+          supabase
+            .from('games')
+            .select('*')
+            .gte('game_date', today)
+            .is('stats_finalized_at', null)
+            .order('game_date')
+            .order('game_time')
+            .limit(20),
+          supabase.from('trikot_sets').select('*').order('id'),
+          supabase.from('trikot_wash_log').select('*'),
+          supabase.from('trikot_transfer_log').select('*'),
+          supabase.from('players').select('*').eq('is_active', true),
+          flags.announcements
+            ? supabase
+                .from('announcements')
+                .select('*')
+                .order('pinned', { ascending: false })
+                .order('created_at', { ascending: false })
+                .limit(5)
+            : Promise.resolve({ data: [] as Announcement[], error: null })
+        ]);
       const trikotWashLog = (trikotWashRes.data as TrikotWashLogRow[]) ?? [];
       const trikotTransferLog = (trikotTransferRes.data as TrikotTransferLogRow[]) ?? [];
 
@@ -419,13 +434,14 @@ export function Dashboard() {
 
       if (cancelled) return;
 
-      if (gameRes.error || trikotRes.error || trikotWashRes.error || trikotTransferRes.error) {
+      if (gameRes.error || upcomingGamesRes.error || trikotRes.error || trikotWashRes.error || trikotTransferRes.error) {
         setError('Fehler beim Laden der Startseite.');
         return;
       }
 
       setData({
         nextGame: nextGame ?? null,
+        upcomingGames: (upcomingGamesRes.data as Game[]) ?? [],
         playerInSquad,
         myConfirmation,
         playerNextTask,
@@ -851,7 +867,12 @@ export function Dashboard() {
         data.trikotSets
           .filter((set) => set.current_holder_id === player.id)
           .map((set) => {
-            const needsThisSet = !!data.nextGame && benoetigterSatz(data.nextGame) === set.id;
+            // data.nextGame ist das nächste Spiel überhaupt, braucht aber
+            // nicht zwangsläufig gerade dieses Set (z. B. hält man
+            // "Schwarz", aber das nächste Spiel ist ein Heimspiel, das
+            // "Weiß" braucht) — deshalb stattdessen das nächste Spiel MIT
+            // dem passenden Satz aus der breiteren Liste heraussuchen.
+            const neededGame = data.upcomingGames.find((g) => benoetigterSatz(g) === set.id) ?? null;
             const isPicking = transferringSetId === set.id;
             return (
               <section key={set.id} className="card">
@@ -860,8 +881,8 @@ export function Dashboard() {
                   Du hast aktuell den {set.id === 'weiss' ? 'weißen' : 'schwarzen'} Trikotsatz.
                 </p>
                 <p className="mt-0.5 text-xs text-tbw-ink/50">
-                  {needsThisSet && data.nextGame
-                    ? `Bitte zum nächsten Einsatz am ${fmtDate(data.nextGame.game_date)} gegen ${data.nextGame.opponent} mitbringen.`
+                  {neededGame
+                    ? `Bitte zum nächsten Einsatz am ${fmtDate(neededGame.game_date)} gegen ${neededGame.opponent} mitbringen.`
                     : 'Bitte zum nächsten Einsatz mit diesem Set mitbringen.'}
                 </p>
 

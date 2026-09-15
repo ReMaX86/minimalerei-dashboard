@@ -1854,8 +1854,7 @@ hier die getroffenen Entscheidungen samt Begründung:
   Captains/Co-Captains oder vom Trainer, jederzeit (kein Spielbezug wie beim Wasch-Flow).
   Startseite (persönlicher Bereich): neue "Deine Trikots"-Karte für jeden Spieler, der aktuell
   ein Set hält — "Du hast aktuell den weißen/schwarzen Trikotsatz", mit Hinweis auf den nächsten
-  Einsatz (nur falls das nächste Spiel tatsächlich dieses Set braucht, sonst ein allgemeiner
-  Hinweis) sowie einem "Set übergeben?"-Aufklapper mit Spieler-Auswahl. "Wer hat die
+  Einsatz sowie einem "Set übergeben?"-Aufklapper mit Spieler-Auswahl. "Wer hat die
   Trikots?" (Startseite + Trikots-Reiter) zeigt unter dem aktuellen Halter jetzt zusätzlich
   "Übergeben von X", sobald der letzte Vorgang für dieses Set eine Übergabe statt eine
   Wasch-Bestätigung war — ermittelt clientseitig über `latestTransferFrom()`
@@ -1866,6 +1865,16 @@ hier die getroffenen Entscheidungen samt Begründung:
   `0004`) räumt jetzt zusätzlich `trikot_transfer_log` mit leer — sonst hätte ein Reset alte
   Übergaben stehen lassen und der "Übergeben von"-Hinweis wäre fälschlich unter einem frisch auf
   "Niemand" zurückgesetzten Set hängen geblieben.
+- **Nachtrag: "Deine Trikots" nannte nur einen allgemeinen Hinweis statt des nächsten Termins.**
+  Der Einsatz-Hinweis prüfte bisher nur, ob `nextGame` (das nächste Spiel überhaupt) zufällig das
+  eigene Set braucht — hält man z. B. "Schwarz" (für Auswärtsspiele), das nächste Spiel ist aber
+  ein Heimspiel (braucht "Weiß"), fiel die Karte auf einen allgemeinen "Bitte zum nächsten
+  Einsatz mitbringen" zurück, obwohl der eigentliche Termin (das nächste Auswärtsspiel) bereits
+  feststand. `Dashboard.tsx` lädt dafür jetzt zusätzlich die nächsten 20 anstehenden Spiele
+  (`upcomingGames`, nicht nur das eine `nextGame`) und sucht darin client-seitig per
+  `benoetigterSatz()` das erste Spiel, das wirklich das gehaltene Set braucht — die Karte nennt
+  jetzt also Datum und Gegner des tatsächlich relevanten nächsten Einsatzes, nicht mehr nur des
+  nächsten Spiels überhaupt.
 
 ## Projektstruktur
 
