@@ -2008,6 +2008,9 @@ hier die getroffenen Entscheidungen samt Begründung:
   Eigener `respondError`/`responding`-State (nicht der seitenweite `error`) und ein neuer
   `squadVersion`-Zähler in der Haupt-`useEffect`-Abhängigkeitsliste lösen nach einer Antwort einen
   Reload aus — dasselbe Muster wie schon bei `trikotVersion` für die Trikot-Übergabe.
+- **Nachtrag: Push-Text der Kader-Zusage-Erinnerung konkretisiert.** War bisher eine reine Frage
+  ("Bist du beim Spiel gegen X dabei?"), ohne explizite Handlungsaufforderung — auf Wunsch des
+  Nutzers jetzt direkter: "Bitte zu- oder absagen fürs Spiel gegen X." (`api/send-squad-reminders.ts`).
 
 ## Projektstruktur
 
