@@ -56,6 +56,13 @@ export interface ReminderSettings {
   // übernehmen/abwählen (siehe Migration 0050); danach sind sie fix und
   // Änderungen laufen nur noch über Trainer/Kapitän. null = unbegrenzt.
   officiating_signup_deadline: string | null;
+  // Dasselbe fürs Kader-Zusage/Absage-Erinnerung (siehe
+  // api/send-squad-reminders.ts) — trotz "_min"-Namen (Minuten in der DB,
+  // konsistent mit den anderen Push-Offsets) im Admin als ganze Tage
+  // gedacht (Default 5/3/1 Tage vorher).
+  squad_push_offset_1_min: number;
+  squad_push_offset_2_min: number;
+  squad_push_offset_3_min: number;
 }
 
 export type PlayerPosition = 'pg' | 'sg' | 'sf' | 'pf' | 'c';

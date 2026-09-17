@@ -19,6 +19,11 @@ interface ReminderForm {
   officiating_push_offset_1_min: string;
   officiating_push_offset_2_min: string;
   officiating_push_offset_3_min: string;
+  // Anders als bei den beiden obigen (Stunden) hält das Formular hier ganze
+  // Tage — siehe daysToMinutes/minutesToDaysStr.
+  squad_push_offset_1_min: string;
+  squad_push_offset_2_min: string;
+  squad_push_offset_3_min: string;
 }
 
 // Minuten (Datenbank) <-> Stunden (Admin-Eingabe) — die drei
@@ -37,6 +42,17 @@ function hoursStrToMinutes(hours: string): number {
   return Math.max(0, Math.round((Number(hours) || 0) * 60));
 }
 
+// Dieselbe Umrechnung fürs Kader-Zusage-Erinnerung, nur in ganzen Tagen
+// statt Stunden — passend zur Bitte "5 Tage vorher + 3 Tage vorher + 1 Tag
+// vorher" statt eines Stunden-Werts.
+function minutesToDaysStr(minutes: number): string {
+  return String(minutes / (60 * 24));
+}
+
+function daysStrToMinutes(days: string): number {
+  return Math.max(0, Math.round((Number(days) || 0) * 60 * 24));
+}
+
 function reminderFormFromSettings(row: ReminderSettings): ReminderForm {
   return {
     enabled: row.enabled,
@@ -48,7 +64,10 @@ function reminderFormFromSettings(row: ReminderSettings): ReminderForm {
     training_push_offset_3_min: minutesToHoursStr(row.training_push_offset_3_min),
     officiating_push_offset_1_min: minutesToHoursStr(row.officiating_push_offset_1_min),
     officiating_push_offset_2_min: minutesToHoursStr(row.officiating_push_offset_2_min),
-    officiating_push_offset_3_min: minutesToHoursStr(row.officiating_push_offset_3_min)
+    officiating_push_offset_3_min: minutesToHoursStr(row.officiating_push_offset_3_min),
+    squad_push_offset_1_min: minutesToDaysStr(row.squad_push_offset_1_min),
+    squad_push_offset_2_min: minutesToDaysStr(row.squad_push_offset_2_min),
+    squad_push_offset_3_min: minutesToDaysStr(row.squad_push_offset_3_min)
   };
 }
 
@@ -106,7 +125,10 @@ export function FeatureFlagsAdmin() {
           training_push_offset_3_min: hoursStrToMinutes(reminderForm.training_push_offset_3_min),
           officiating_push_offset_1_min: hoursStrToMinutes(reminderForm.officiating_push_offset_1_min),
           officiating_push_offset_2_min: hoursStrToMinutes(reminderForm.officiating_push_offset_2_min),
-          officiating_push_offset_3_min: hoursStrToMinutes(reminderForm.officiating_push_offset_3_min)
+          officiating_push_offset_3_min: hoursStrToMinutes(reminderForm.officiating_push_offset_3_min),
+          squad_push_offset_1_min: daysStrToMinutes(reminderForm.squad_push_offset_1_min),
+          squad_push_offset_2_min: daysStrToMinutes(reminderForm.squad_push_offset_2_min),
+          squad_push_offset_3_min: daysStrToMinutes(reminderForm.squad_push_offset_3_min)
         })
         .eq('id', 1);
       if (updError) throw updError;
@@ -326,6 +348,49 @@ export function FeatureFlagsAdmin() {
                 onChange={(e) =>
                   setReminderForm({ ...reminderForm, officiating_push_offset_3_min: e.target.value })
                 }
+              />
+            </label>
+          </div>
+
+          <div className="space-y-2 border-t border-black/5 pt-3">
+            <p className="text-sm font-semibold text-tbw-navyDark">Push-Erinnerung für Kader-Zusage</p>
+            <p className="text-xs text-tbw-ink/50">
+              Bis zu drei Zeitpunkte vor Spielbeginn, zu denen Spieler im veröffentlichten Kader ohne
+              Zu-/Absage per Push erinnert werden (in ganzen Tagen, 0 = aus). Nur Spieler, die im Kader
+              stehen und noch nicht geantwortet haben, bekommen die Push. Wirkt nur, wenn
+              "Push-Benachrichtigungen" unter Funktionen aktiviert ist.
+            </p>
+            <label className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-tbw-ink/70">1. Erinnerung (Tage vorher, z. B. 5)</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                className="input !w-20 text-center"
+                value={reminderForm.squad_push_offset_1_min}
+                onChange={(e) => setReminderForm({ ...reminderForm, squad_push_offset_1_min: e.target.value })}
+              />
+            </label>
+            <label className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-tbw-ink/70">2. Erinnerung (Tage vorher, z. B. 3)</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                className="input !w-20 text-center"
+                value={reminderForm.squad_push_offset_2_min}
+                onChange={(e) => setReminderForm({ ...reminderForm, squad_push_offset_2_min: e.target.value })}
+              />
+            </label>
+            <label className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-tbw-ink/70">3. Erinnerung (Tage vorher, z. B. 1)</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                className="input !w-20 text-center"
+                value={reminderForm.squad_push_offset_3_min}
+                onChange={(e) => setReminderForm({ ...reminderForm, squad_push_offset_3_min: e.target.value })}
               />
             </label>
           </div>

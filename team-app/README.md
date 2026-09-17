@@ -272,6 +272,43 @@ Manuell/testweise auslösen: derselbe `net.http_post`-Aufruf wie oben, nur mit
 `/api/send-officiating-reminders` als URL. Wieder entfernen:
 `select cron.unschedule('officiating-reminders');`
 
+**Fünfte Benachrichtigungsart: Kader-Zusage-Erinnerung** (Migration `0051`,
+`api/send-squad-reminders.ts`). Erinnert Spieler, die für ein veröffentlichtes Spiel im Kader
+stehen (`game_squad.is_selected`) und noch nicht geantwortet haben (`game_squad.confirmation
+= 'pending'`), an ihre Zu-/Absage — zu bis zu drei Zeitpunkten vor Spielbeginn (Default: 5
+Tage/3 Tage/1 Tag vorher; **im Admin unter Funktionen -> Erinnerungen -> "Push-Erinnerung für
+Kader-Zusage" in ganzen Tagen änderbar, 0 = abgeschaltet**). Anders als bei den anderen beiden
+Push-Erinnerungen ist die Eingabe hier bewusst in Tagen statt Stunden (`minutesToDaysStr`/
+`daysStrToMinutes` in `FeatureFlagsAdmin.tsx`) — gespeichert wird trotzdem in Minuten wie bei
+Training/Kampfgericht (5 Tage = 7200 Minuten), damit dieselbe "X Minuten vor Spielbeginn"-
+Schwellenlogik wiederverwendet werden kann. Technisch eng an die Kampfgericht-Erinnerung
+angelehnt (bewusste Kopien statt lokaler Imports, siehe dortige Begründung): dieselbe
+`berlinTimeToUtc()`-Zeitzonen-Umrechnung, derselbe Claim-vor-Versand-Mechanismus gegen
+doppelten Versand, dieselbe "mehrere unabhängige Spiele in einem Durchlauf"-Struktur wie beim
+Kampfgericht (nicht die einzelne "nächster Termin"-Ermittlung wie beim Training). Dedupliziert
+wird wie beim Training pro Spieler+Termin (`squad_reminder_log`: `game_id` + `player_id` +
+`reminder_type`) — hier ohne zusätzlichen `session_date`-Schlüssel, da ein Spiel anders als ein
+wiederkehrendes Training nur einmal stattfindet.
+
+Setup zusätzlich zu den Schritten oben — derselbe `pg_cron`-Job-Takt reicht aus, nur ein
+weiterer `cron.schedule(...)`-Eintrag mit dieser URL (dieselben Vercel-Env-Vars, kein neues
+Secret nötig):
+```sql
+select cron.schedule(
+  'squad-reminders',
+  '*/10 * * * *',
+  $$
+  select net.http_post(
+    url := 'https://<deine-vercel-domain>/api/send-squad-reminders',
+    headers := jsonb_build_object('x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>')
+  );
+  $$
+);
+```
+Manuell/testweise auslösen: derselbe `net.http_post`-Aufruf wie oben, nur mit
+`/api/send-squad-reminders` als URL. Wieder entfernen:
+`select cron.unschedule('squad-reminders');`
+
 **Drei weitere Benachrichtigungsarten: Training abgesagt, Kader veröffentlicht,
 Kader-Absage.** Alle drei nach demselben Muster wie "neue Meldung" — je ein eigener
 Datenbank-Trigger (INSERT/UPDATE) ruft eine eigene, in sich geschlossene Vercel-Function auf.
