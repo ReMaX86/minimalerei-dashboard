@@ -75,6 +75,9 @@ export function Dashboard() {
   const [absenceVersion, setAbsenceVersion] = useState(0);
   const [trainingVersion, setTrainingVersion] = useState(0);
   const [trikotVersion, setTrikotVersion] = useState(0);
+  const [squadVersion, setSquadVersion] = useState(0);
+  const [responding, setResponding] = useState(false);
+  const [respondError, setRespondError] = useState<string | null>(null);
   const [showUpcomingAbsences, setShowUpcomingAbsences] = useState(false);
   // Direkte Trikot-Übergabe (siehe Migration 0048): eigener State statt
   // pro-Set, da realistisch immer nur ein Set gleichzeitig übergeben wird —
@@ -477,7 +480,8 @@ export function Dashboard() {
     flags.stats,
     absenceVersion,
     trainingVersion,
-    trikotVersion
+    trikotVersion,
+    squadVersion
   ]);
 
   // Live-Anzeigetafel fürs laufende Spiel: der große Initial-Load oben läuft
@@ -576,6 +580,28 @@ export function Dashboard() {
       setTransferError('Übergabe konnte nicht gespeichert werden.');
     } finally {
       setTransferring(false);
+    }
+  }
+
+  // Dieselbe RPC wie die Kader-Zu-/Absage auf der Spiele-Seite
+  // (respond_to_squad, siehe Spiele.tsx) — der Kader-Reiter war für die
+  // eigentliche Ja/Nein-Antwort offenbar zu versteckt, deshalb dieselbe
+  // Aktion zusätzlich direkt auf der "Nächstes Spiel"-Karte der Startseite.
+  async function respondToSquad(confirmed: boolean) {
+    if (!data?.nextGame) return;
+    setResponding(true);
+    setRespondError(null);
+    try {
+      const { error: rpcError } = await supabase.rpc('respond_to_squad', {
+        p_game_id: data.nextGame.id,
+        p_confirmed: confirmed
+      });
+      if (rpcError) throw rpcError;
+      setSquadVersion((v) => v + 1);
+    } catch {
+      setRespondError('Rückmeldung konnte nicht gespeichert werden.');
+    } finally {
+      setResponding(false);
     }
   }
 
@@ -777,11 +803,44 @@ export function Dashboard() {
                     </Link>
                   )}
                 </div>
-                {data.playerInSquad && data.myConfirmation === 'pending' && (
-                  <Link to="/spiele?kader=1" className="mt-2 block text-sm font-bold text-tbw-red">
-                    ⚠️ Bitte Teilnahme bestätigen
-                  </Link>
+                {data.playerInSquad && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {data.myConfirmation === 'confirmed' ? (
+                      <>
+                        <span className="pill pill-ok">✓ Zugesagt</span>
+                        <button
+                          type="button"
+                          disabled={responding}
+                          onClick={() => respondToSquad(false)}
+                          className="text-xs font-semibold text-tbw-ink/40 underline disabled:opacity-40"
+                        >
+                          Doch nicht?
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-sm font-semibold text-tbw-red">Kannst du?</span>
+                        <button
+                          type="button"
+                          disabled={responding}
+                          onClick={() => respondToSquad(true)}
+                          className="pill pill-ok disabled:opacity-40"
+                        >
+                          ✓ Kann
+                        </button>
+                        <button
+                          type="button"
+                          disabled={responding}
+                          onClick={() => respondToSquad(false)}
+                          className="pill pill-open disabled:opacity-40"
+                        >
+                          ✗ Kann nicht
+                        </button>
+                      </>
+                    )}
+                  </div>
                 )}
+                {respondError && <ErrorNote message={respondError} />}
               </div>
             )}
           </div>
