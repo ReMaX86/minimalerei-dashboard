@@ -15,7 +15,10 @@ const SETTINGS: ReminderSettings = {
   training_push_offset_3_min: 30,
   officiating_push_offset_1_min: 7200,
   officiating_push_offset_2_min: 1440,
-  officiating_push_offset_3_min: 120
+  officiating_push_offset_3_min: 120,
+  squad_push_offset_1_min: 7200,
+  squad_push_offset_2_min: 4320,
+  squad_push_offset_3_min: 1440
 };
 
 describe('computeReminders', () => {
