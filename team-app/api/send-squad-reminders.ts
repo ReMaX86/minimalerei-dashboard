@@ -293,7 +293,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const firstName = c.player.name.split(' ')[0];
       const payload = JSON.stringify({
         title: `Kader ${fmtWeekdayShort(c.game.game_date)} ${fmtTime(c.game.game_time)} Uhr`,
-        body: `${firstName}, bist du beim Spiel gegen ${c.game.opponent} dabei?`,
+        body: `${firstName}, bitte zu- oder absagen fürs Spiel gegen ${c.game.opponent}.`,
         url: '/spiele?kader=1'
       });
 
