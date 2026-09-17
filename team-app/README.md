@@ -1999,6 +1999,15 @@ hier die getroffenen Entscheidungen samt Begründung:
   `OfficiatingAdmin.tsx` (Admin → Kampfgericht), mit eigenem Speichern-Button statt Teil des
   gemeinsamen "Erinnerungen speichern"-Formulars. Rein clientseitige Verschiebung derselben
   `reminder_settings.officiating_signup_deadline`-Spalte — keine Migration nötig.
+- **Nachtrag: Kader-Zu-/Absage direkt auf der Startseite.** Die "Nächstes Spiel"-Karte zeigte
+  bisher nur einen Warnhinweis ("⚠️ Bitte Teilnahme bestätigen") mit Link zur Kader-Liste auf der
+  Spiele-Seite — die eigentliche Ja/Nein-Antwort war dadurch einen Klick zu weit weg und wirkte
+  laut Nutzer "etwas versteckt". `Dashboard.tsx` hat jetzt dieselben ✓ Kann/✗ Kann nicht-Buttons
+  (bzw. "✓ Zugesagt" + "Doch nicht?" nach einer Zusage) direkt in der Karte, optisch identisch zur
+  bestehenden Kader-Liste auf `Spiele.tsx` — beide rufen dieselbe RPC `respond_to_squad()` auf.
+  Eigener `respondError`/`responding`-State (nicht der seitenweite `error`) und ein neuer
+  `squadVersion`-Zähler in der Haupt-`useEffect`-Abhängigkeitsliste lösen nach einer Antwort einen
+  Reload aus — dasselbe Muster wie schon bei `trikotVersion` für die Trikot-Übergabe.
 
 ## Projektstruktur
 
