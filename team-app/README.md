@@ -2105,6 +2105,23 @@ hier die getroffenen Entscheidungen samt Begründung:
   `Game`-Type deklariert — war bisher nur zur Laufzeit vorhanden, da `select('*')`) sowie
   `stats_finalized_at` als zusätzliche Bedingungen — der Button erscheint jetzt, sobald es
   überhaupt etwas zurückzusetzen gibt, nicht erst ab einem fertigen Endstand.
+- **Nachtrag: 3er-Push kam im echten Spiel trotz korrekt auslösendem Trigger nie an.** Über
+  `net._http_response` millisekundengenau mit den echten `fg3_made`-Events in `game_stat_events`
+  abgeglichen: `game_stat_events_notify_three_pointer` hat bei jedem der 3er sauber ausgelöst und
+  auch tatsächlich einen Request an `/api/send-three-pointer` abgesetzt — der kam aber jedes Mal
+  mit `401 Unauthorized` zurück. Ursache: beim ersten Anlegen des Triggers (siehe oben, "trigger
+  already exists"-Vorfall) wurde `notify_three_pointer()` einmal ohne das `PUSH_WEBHOOK_SECRET`
+  ausgeführt — die Funktion trug seitdem ein falsches/leeres Secret, unabhängig vom Trigger selbst.
+  Fix: `notify_three_pointer()` per Hand mit dem korrekten, aus dem funktionierenden
+  `training-reminders`-Cronjob übernommenen Secret neu angelegt (`create or replace function`,
+  Trigger unverändert, da er die Funktion nur über den Namen referenziert). Nicht als Migration
+  committet, aus denselben Gründen wie beim ursprünglichen Trigger-Setup (Secret würde sonst im
+  Git-Verlauf landen).
+- **Nachtrag: Live-Ticker auf der Startseite zeigte den Spielstand ohne erkennbare Zuordnung, wer
+  welche Zahl hat.** Die große "42:38"-Anzeige in der "Nächstes Spiel"-Kachel (Dashboard.tsx) hatte
+  keine Beschriftung, welche Zahl zu TB Wülfrath und welche zum Gegner gehört — für Zuschauer ohne
+  Tracking-Kontext nicht erkennbar. Fix: kleine Zeile "TB Wülfrath – {Gegner}" oberhalb des
+  Spielstands ergänzt, in derselben Reihenfolge wie die Zahlen daneben.
 
 ## Projektstruktur
 
