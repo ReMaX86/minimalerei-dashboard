@@ -2082,6 +2082,20 @@ hier die getroffenen Entscheidungen samt Begründung:
   clientseitig in `rotation.ts` lebt, nicht in SQL) und schreibt den Log-Eintrag als Nebeneffekt.
   Sichtbar direkt im "Verlauf"-Abschnitt der Trikots-Seite: bei einer Abweichung zwischen Vorschlag
   und tatsächlicher Bestätigung erscheint eine zusätzliche Zeile "Vorschlag war X, bestätigt von Y".
+- **Nachtrag: Zwischenstand-Push nach Viertelwechsel blieb beim ersten echten Spiel stumm
+  (Migration `0053`).** Ursache über `net._http_response` live nachvollzogen: vor dem Anpfiff
+  wurde im Tracker (vermutlich beim Ausprobieren) mehrfach kurz hintereinander durch die Viertel
+  geklickt, bevor auch nur ein Punkt erfasst war. `announce_quarter_score()` (Migration `0042`)
+  erhöhte den Ratchet `last_announced_quarter` dabei trotzdem — unabhängig davon, ob überhaupt ein
+  gültiger Spielstand existierte. Die Push selbst brach zwar sauber mit `"game_or_score_not_found"`
+  ab (kein Fehler, kein Absturz), aber der Ratchet stand danach schon auf "erledigt" — und weil er
+  nie wieder runtergeht, konnten die echten Viertelwechsel später im tatsächlichen Spiel dieselben
+  Quarter-Nummern nicht mehr auslösen, ohne dass irgendwo ein sichtbarer Fehler auftauchte. Fix:
+  der Ratchet darf jetzt nur noch vorrücken, wenn zu diesem Zeitpunkt bereits ein gültiger
+  Spielstand existiert (`final_score_us is not null`, laut `recalc_game_score()` aus Migration
+  `0028` erst ab dem ersten erfassten Stats-Event der Fall) — ein Klicken durch die Viertel vor dem
+  ersten Korb verbraucht den Ratchet dadurch nicht mehr. Kein Client-Code betroffen (reine
+  SQL-Funktionsänderung, keine neue Migration-Reihenfolge-Abhängigkeit zum Deploy).
 
 ## Projektstruktur
 
