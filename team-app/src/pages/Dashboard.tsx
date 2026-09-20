@@ -755,7 +755,12 @@ export function Dashboard() {
                     {refreshingLive ? 'Aktualisiert…' : '🔄 Aktualisieren'}
                   </button>
                 </div>
-                <p className="headline mt-1 text-center text-6xl tabular-nums">
+                <div className="mt-1 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wide text-white/50">
+                  <span>TB Wülfrath</span>
+                  <span className="text-white/30">–</span>
+                  <span className="truncate">{data.nextGame.opponent}</span>
+                </div>
+                <p className="headline text-center text-6xl tabular-nums">
                   {data.nextGame.final_score_us ?? 0}:{data.nextGame.final_score_opponent ?? 0}
                 </p>
                 {data.lastScoreEvent && (
