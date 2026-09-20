@@ -217,6 +217,20 @@ export interface TrikotTransferLogRow {
   created_at: string;
 }
 
+// Wer war laut Rotation vorgeschlagen, wer hat am Ende tatsächlich
+// bestätigt? Beantwortet die Frage "wurde der Vorschlag abgelehnt und wer
+// wurde stattdessen gewählt?", ohne dass das nachträglich erfragt werden
+// muss — siehe Migration 0052.
+export interface TrikotHandoverLogRow {
+  id: string;
+  game_id: string;
+  set_id: TrikotSetId;
+  suggested_player_id: string | null;
+  confirmed_player_id: string;
+  changed_by_label: string;
+  created_at: string;
+}
+
 export interface OfficiatingGame {
   id: string;
   game_date: string;
