@@ -535,6 +535,54 @@ select net.http_post(
 );
 ```
 
+**Neunte Benachrichtigungsart: Dreier-Push** (`api/send-three-pointer.ts`), Erweiterung des
+Live-Tickers auf Wunsch des Nutzers. Sobald im Live-Stats-Tracker ein Dreier fürs eigene Team
+erfasst wird, geht sofort eine Push mit Spielstand raus — Titel "💥 Bang!", Text "\<Vorname> from
+Downtown — TB Wülfrath \<Stand> \<Gegner>". Anders als bei Viertelwechsel/Spielende (Ratchet auf
+einer eigenen Spalte) reicht hier ein simpler `after insert`-Trigger auf `game_stat_events`, der
+nur bei `team = 'us' and stat_type = 'fg3_made'` feuert — jedes INSERT ist bereits ein
+eigenständiger, echter Treffer, es gibt also nichts zu deduplizieren. Bewusst nur `after insert`,
+nicht `after delete`: ein versehentlich erfasster Dreier, der per "Zurück" im Tracker sofort
+wieder gelöscht wird, hat die Push zu dem Zeitpunkt aber schon verschickt — dasselbe akzeptierte
+Restrisiko wie beim bewusst weggelassenen OT-Push oben. Keine neue Migration nötig (keine neue
+Spalte, `games`/`players`/`push_subscriptions` haben bereits `service_role`-Rechte) — nur der
+Trigger selbst, wieder von Hand angelegt (enthält den Webhook-Secret im Klartext):
+
+```sql
+create or replace function public.notify_three_pointer()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.team = 'us' and new.stat_type = 'fg3_made' then
+    perform net.http_post(
+      url := 'https://<deine-vercel-domain>/api/send-three-pointer',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+      body := jsonb_build_object('record', jsonb_build_object('game_id', new.game_id, 'player_id', new.player_id))
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create trigger game_stat_events_notify_three_pointer
+after insert on public.game_stat_events
+for each row execute function public.notify_three_pointer();
+```
+
+Testweise nur an sich selbst schicken (`test_user_id`, siehe oben) — beliebige echte `game_id`
+und `player_id` (aus `players`, eigenes Team) einsetzen:
+
+```sql
+select net.http_post(
+  url := 'https://team-app-two-orpin.vercel.app/api/send-three-pointer',
+  headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+  body := jsonb_build_object('record', jsonb_build_object('game_id', '<game-id>', 'player_id', '<player-id>', 'test_user_id', '<eigene auth_user_id>'))
+);
+```
+
 **Tracking zurücksetzen** (Migration `0043`, `GamesAdmin.tsx`): im Admin unter Spiele gibt es bei
 jedem Spiel mit erfassten Stats jetzt einen roten "Tracking zurücksetzen"-Button (nur sichtbar,
 wenn `gameResult()` einen Endstand liefert). Löscht per RPC `reset_game_stats()`
