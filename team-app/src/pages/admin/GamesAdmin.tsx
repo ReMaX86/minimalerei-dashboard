@@ -341,14 +341,19 @@ export function GamesAdmin() {
                     Endstand nachtragen
                   </button>
                 )}
-                {flags.stats && gameResult(g) && (
-                  <button
-                    className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red"
-                    onClick={() => resetStats(g.id)}
-                  >
-                    Tracking zurücksetzen
-                  </button>
-                )}
+                {flags.stats &&
+                  // Nicht nur bei vorhandenem Endstand zeigen (der existiert erst
+                  // ab dem ersten erfassten Korb) — sonst wäre der Reset-Button
+                  // ausgerechnet dann unsichtbar, wenn versehentlich schon durch
+                  // die Viertel geklickt wurde, aber noch kein Punkt erfasst ist.
+                  (gameResult(g) || g.last_announced_quarter > 0 || g.stats_finalized_at) && (
+                    <button
+                      className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red"
+                      onClick={() => resetStats(g.id)}
+                    >
+                      Tracking zurücksetzen
+                    </button>
+                  )}
                 <button className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red" onClick={() => remove(g.id)}>
                   Löschen
                 </button>

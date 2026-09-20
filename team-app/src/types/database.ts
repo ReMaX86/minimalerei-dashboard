@@ -182,6 +182,12 @@ export interface Game {
   final_score_opponent: number | null;
   stats_finalized_at: string | null;
   squad_decline_pending: boolean;
+  // Ratchet für die Viertelwechsel-Push (Migration 0042) — 0 = noch kein
+  // Viertel angesagt. Wird in GamesAdmin.tsx genutzt, um "Tracking
+  // zurücksetzen" auch dann anzuzeigen, wenn schon durch die Viertel
+  // geklickt wurde, aber noch kein Punkt erfasst ist (sonst wäre der
+  // Reset ausgerechnet in genau diesem Fall unsichtbar).
+  last_announced_quarter: number;
   created_at: string;
 }
 

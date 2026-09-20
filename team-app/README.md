@@ -2096,6 +2096,15 @@ hier die getroffenen Entscheidungen samt Begründung:
   `0028` erst ab dem ersten erfassten Stats-Event der Fall) — ein Klicken durch die Viertel vor dem
   ersten Korb verbraucht den Ratchet dadurch nicht mehr. Kein Client-Code betroffen (reine
   SQL-Funktionsänderung, keine neue Migration-Reihenfolge-Abhängigkeit zum Deploy).
+- **Nachtrag: "Tracking zurücksetzen" war ausgerechnet in genau diesem Fall unsichtbar.** Direkte
+  Folge des Bugs oben: der Button in `GamesAdmin.tsx` war bisher nur sichtbar, wenn schon ein
+  Endstand existiert (`gameResult(g)`) — der entsteht laut `recalc_game_score()` (Migration `0028`)
+  aber erst ab dem ersten erfassten Punkt. Genau die Situation "durch die Viertel geklickt, aber
+  noch kein Korb erfasst" machte den Reset-Button damit unsichtbar, obwohl er dafür gedacht ist.
+  Sichtbarkeit erweitert um `last_announced_quarter > 0` (Migration `0042`, jetzt auch im
+  `Game`-Type deklariert — war bisher nur zur Laufzeit vorhanden, da `select('*')`) sowie
+  `stats_finalized_at` als zusätzliche Bedingungen — der Button erscheint jetzt, sobald es
+  überhaupt etwas zurückzusetzen gibt, nicht erst ab einem fertigen Endstand.
 
 ## Projektstruktur
 
