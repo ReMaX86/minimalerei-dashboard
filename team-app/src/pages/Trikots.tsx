@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
-import { fmtDate, fmtDateShort } from '../lib/format';
+import { fmtDate, fmtDateShort, fmtTime, hasKickedOff } from '../lib/format';
 import { latestTransferFrom, pendingWasherFor } from '../lib/trikots';
 import {
   benoetigterSatz,
@@ -12,6 +12,7 @@ import {
   type Player,
   type TrikotSetId,
   type TrikotSet,
+  type TrikotHandoverLogRow,
   type TrikotTransferLogRow,
   type TrikotWashLogRow
 } from '../types/database';
@@ -25,6 +26,7 @@ interface State {
   sets: TrikotSet[];
   washLog: TrikotWashLogRow[];
   transferLog: TrikotTransferLogRow[];
+  handoverLog: TrikotHandoverLogRow[];
 }
 
 interface ConfirmTarget {
@@ -52,16 +54,25 @@ export function Trikots() {
     setError(null);
     const today = new Date().toISOString().slice(0, 10);
 
-    const [gameRes, pastGameRes, playersRes, setsRes, washRes, transferRes] = await Promise.all([
+    const [gameRes, pastGameRes, playersRes, setsRes, washRes, transferRes, handoverRes] = await Promise.all([
       supabase.from('games').select('*').gte('game_date', today).order('game_date').order('game_time').limit(1).maybeSingle(),
       supabase.from('games').select('*').lt('game_date', today).order('game_date', { ascending: false }).order('game_time', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('players').select('*').eq('is_active', true),
       supabase.from('trikot_sets').select('*').order('id'),
       supabase.from('trikot_wash_log').select('*').order('created_at', { ascending: false }),
-      supabase.from('trikot_transfer_log').select('*').order('created_at', { ascending: false })
+      supabase.from('trikot_transfer_log').select('*').order('created_at', { ascending: false }),
+      supabase.from('trikot_handover_log').select('*').order('created_at', { ascending: false })
     ]);
 
-    if (gameRes.error || pastGameRes.error || playersRes.error || setsRes.error || washRes.error || transferRes.error) {
+    if (
+      gameRes.error ||
+      pastGameRes.error ||
+      playersRes.error ||
+      setsRes.error ||
+      washRes.error ||
+      transferRes.error ||
+      handoverRes.error
+    ) {
       setError('Fehler beim Laden der Trikot-Daten.');
       return;
     }
@@ -86,7 +97,8 @@ export function Trikots() {
       players: (playersRes.data as Player[]) ?? [],
       sets: (setsRes.data as TrikotSet[]) ?? [],
       washLog: (washRes.data as TrikotWashLogRow[]) ?? [],
-      transferLog: (transferRes.data as TrikotTransferLogRow[]) ?? []
+      transferLog: (transferRes.data as TrikotTransferLogRow[]) ?? [],
+      handoverLog: (handoverRes.data as TrikotHandoverLogRow[]) ?? []
     });
   }, []);
 
@@ -98,7 +110,10 @@ export function Trikots() {
   if (!state) return <LoadingSpinner />;
 
   const today = new Date().toISOString().slice(0, 10);
-  const isGameDay = !!state.nextGame && state.nextGame.game_date === today;
+  // Nicht "ab dem Spieltag" (00:00 Uhr), sondern erst ab tatsächlichem
+  // Anpfiff — die Übergabe passiert real erst nach dem Spiel in der
+  // Kabine, vorher hat der Vorschlagene die Trikots schlicht noch nicht.
+  const gameStarted = !!state.nextGame && hasKickedOff(state.nextGame.game_date, state.nextGame.game_time);
 
   const washCount: Record<string, number> = {};
   state.washLog.forEach((row) => {
@@ -129,6 +144,7 @@ export function Trikots() {
   async function confirmHandover(
     target: ConfirmTarget,
     playerId: string,
+    suggestedPlayerId: string,
     setters: {
       setConfirming: (v: boolean) => void;
       setPickingAlternate: (v: boolean) => void;
@@ -141,7 +157,8 @@ export function Trikots() {
       const { error: rpcError } = await supabase.rpc('confirm_trikot_handover', {
         p_set_id: target.setId,
         p_player_id: playerId,
-        p_game_id: target.gameId
+        p_game_id: target.gameId,
+        p_suggested_player_id: suggestedPlayerId
       });
       if (rpcError) throw rpcError;
       setters.setPickingAlternate(false);
@@ -187,7 +204,7 @@ export function Trikots() {
             <div className="mt-3 flex gap-2">
               <button
                 onClick={() =>
-                  confirmHandover({ gameId: state.pastGame!.id, setId: pastNeededSet }, pastSuggestion.id, {
+                  confirmHandover({ gameId: state.pastGame!.id, setId: pastNeededSet }, pastSuggestion.id, pastSuggestion.id, {
                     setConfirming: setPastConfirming,
                     setPickingAlternate: setPastPickingAlternate,
                     setAlternateId: setPastAlternateId
@@ -224,7 +241,7 @@ export function Trikots() {
               <div className="flex gap-2">
                 <button
                   onClick={() =>
-                    confirmHandover({ gameId: state.pastGame!.id, setId: pastNeededSet }, pastAlternateId, {
+                    confirmHandover({ gameId: state.pastGame!.id, setId: pastNeededSet }, pastAlternateId, pastSuggestion.id, {
                       setConfirming: setPastConfirming,
                       setPickingAlternate: setPastPickingAlternate,
                       setAlternateId: setPastAlternateId
@@ -287,15 +304,17 @@ export function Trikots() {
                 nimmt das Set nach diesem Spiel zum Waschen mit nach Hause
               </p>
 
-              {!isGameDay && (
-                <p className="mt-2 text-xs text-tbw-ink/40">Bestätigen kann {suggestion.name} ab dem Spieltag.</p>
+              {!gameStarted && (
+                <p className="mt-2 text-xs text-tbw-ink/40">
+                  Bestätigen kann {suggestion.name} ab Spielbeginn ({fmtTime(state.nextGame.game_time)} Uhr).
+                </p>
               )}
 
-              {isGameDay && canConfirm && !pickingAlternate && (
+              {gameStarted && canConfirm && !pickingAlternate && (
                 <div className="mt-3 flex gap-2">
                   <button
                     onClick={() =>
-                      confirmHandover({ gameId: state.nextGame!.id, setId: neededSet }, suggestion.id, {
+                      confirmHandover({ gameId: state.nextGame!.id, setId: neededSet }, suggestion.id, suggestion.id, {
                         setConfirming,
                         setPickingAlternate,
                         setAlternateId
@@ -316,7 +335,7 @@ export function Trikots() {
                 </div>
               )}
 
-              {isGameDay && canConfirm && pickingAlternate && (
+              {gameStarted && canConfirm && pickingAlternate && (
                 <div className="mt-3 space-y-2 rounded-xl bg-tbw-bg p-3">
                   <p className="text-sm text-tbw-ink/70">Wer nimmt das Set stattdessen mit nach Hause?</p>
                   <select
@@ -336,7 +355,7 @@ export function Trikots() {
                   <div className="flex gap-2">
                     <button
                       onClick={() =>
-                        confirmHandover({ gameId: state.nextGame!.id, setId: neededSet }, alternateId, {
+                        confirmHandover({ gameId: state.nextGame!.id, setId: neededSet }, alternateId, suggestion.id, {
                           setConfirming,
                           setPickingAlternate,
                           setAlternateId
@@ -481,11 +500,25 @@ export function Trikots() {
           // ein Set zwischendurch mal nur weitergereicht statt gewaschen
           // wurde.
           type HistoryRow =
-            | { kind: 'wash'; id: string; created_at: string; setId: TrikotSetId; playerId: string }
+            | { kind: 'wash'; id: string; created_at: string; setId: TrikotSetId; playerId: string; gameId: string | null }
             | { kind: 'transfer'; id: string; created_at: string; setId: TrikotSetId; fromId: string | null; toId: string };
+          // Vorschlag laut Rotation zum tatsächlich bestätigten Spieler pro
+          // Spiel+Set — nur bei Abweichung unten als Hinweis angezeigt (siehe
+          // Migration 0052, trikot_handover_log).
+          const handoverByGameSet: Record<string, TrikotHandoverLogRow> = {};
+          state.handoverLog.forEach((h) => {
+            handoverByGameSet[`${h.game_id}:${h.set_id}`] = h;
+          });
           const history: HistoryRow[] = [
             ...state.washLog.map(
-              (w): HistoryRow => ({ kind: 'wash', id: w.id, created_at: w.created_at, setId: w.set_id, playerId: w.player_id })
+              (w): HistoryRow => ({
+                kind: 'wash',
+                id: w.id,
+                created_at: w.created_at,
+                setId: w.set_id,
+                playerId: w.player_id,
+                gameId: w.game_id
+              })
             ),
             ...state.transferLog.map(
               (t): HistoryRow => ({
@@ -502,18 +535,33 @@ export function Trikots() {
           return history.length === 0 ? (
             <p className="text-sm text-tbw-ink/50">Noch keine Übergaben erfasst.</p>
           ) : (
-            <ul className="space-y-1 text-sm">
-              {history.slice(0, 15).map((row) => (
-                <li key={`${row.kind}-${row.id}`} className="flex items-center justify-between">
-                  <span className="text-tbw-ink/70">
-                    {row.setId === 'weiss' ? 'Weiß' : 'Schwarz'}{' '}
-                    {row.kind === 'wash'
-                      ? `→ ${playersById[row.playerId]?.name ?? '?'}`
-                      : `${row.fromId ? playersById[row.fromId]?.name ?? '?' : '?'} → ${playersById[row.toId]?.name ?? '?'} (übergeben)`}
-                  </span>
-                  <span className="text-xs text-tbw-ink/40">{fmtDateShort(row.created_at.slice(0, 10))}</span>
-                </li>
-              ))}
+            <ul className="space-y-1.5 text-sm">
+              {history.slice(0, 15).map((row) => {
+                const handover =
+                  row.kind === 'wash' && row.gameId ? handoverByGameSet[`${row.gameId}:${row.setId}`] : undefined;
+                const suggestedButNotConfirmed =
+                  handover?.suggested_player_id && handover.suggested_player_id !== handover.confirmed_player_id
+                    ? (playersById[handover.suggested_player_id]?.name ?? '?')
+                    : null;
+                return (
+                  <li key={`${row.kind}-${row.id}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-tbw-ink/70">
+                        {row.setId === 'weiss' ? 'Weiß' : 'Schwarz'}{' '}
+                        {row.kind === 'wash'
+                          ? `→ ${playersById[row.playerId]?.name ?? '?'}`
+                          : `${row.fromId ? playersById[row.fromId]?.name ?? '?' : '?'} → ${playersById[row.toId]?.name ?? '?'} (übergeben)`}
+                      </span>
+                      <span className="text-xs text-tbw-ink/40">{fmtDateShort(row.created_at.slice(0, 10))}</span>
+                    </div>
+                    {suggestedButNotConfirmed && (
+                      <p className="text-xs text-tbw-ink/40">
+                        Vorschlag war {suggestedButNotConfirmed}, bestätigt von {handover!.changed_by_label}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           );
         })()}

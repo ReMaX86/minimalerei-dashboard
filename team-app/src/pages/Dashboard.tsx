@@ -10,7 +10,7 @@ import { WeeklyTrainingTimes } from '../components/WeeklyTrainingTimes';
 import { AbsenceSection } from '../components/AbsenceSection';
 import { PushNotificationCard } from '../components/PushNotificationCard';
 import { usePushStatus } from '../hooks/usePushStatus';
-import { fmtDate, fmtDateShort, fmtTime } from '../lib/format';
+import { fmtDate, fmtDateShort, fmtTime, hasKickedOff } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
 import { computeReminders, type ReminderItem } from '../lib/reminders';
 import { latestTransferFrom, pendingWasherFor } from '../lib/trikots';
@@ -283,16 +283,17 @@ export function Dashboard() {
             trainingReminder = { date: nextOcc.date, hasResponded: !!rsvpRow, onAbsence };
           }
 
-          // Trikot-Übergabe: erst ab dem Spieltag relevant (vorher zeigt die
+          // Trikot-Übergabe: erst ab Anpfiff relevant (vorher zeigt die
           // Trikots-Seite den Vorschlag nur informativ ohne Bestätigen-
-          // Button an) — danach so lange, bis sie bestätigt wurde, auch
+          // Button an — die Übergabe passiert real erst nach dem Spiel in
+          // der Kabine) — danach so lange, bis sie bestätigt wurde, auch
           // rückwirkend fürs zuletzt gespielte Spiel.
           let trikotReminder: Parameters<typeof computeReminders>[5] = null;
           {
             const washLog = trikotWashLog;
             const allPlayers = Object.values(playersById);
 
-            if (nextGame && nextGame.game_date === today) {
+            if (nextGame && hasKickedOff(nextGame.game_date, nextGame.game_time)) {
               const { data: squadRows } = await supabase.from('game_squad').select('*').eq('game_id', nextGame.id);
               const pending = pendingWasherFor(nextGame, (squadRows as GameSquadRow[]) ?? [], allPlayers, washLog);
               if (pending?.player.id === player.id) {
@@ -313,7 +314,11 @@ export function Dashboard() {
                 .limit(1)
                 .maybeSingle();
               const pastGame = pastGameRow as Game | null;
-              if (pastGame) {
+              // Ohne diese Prüfung würde ein heute noch nicht begonnenes
+              // Spiel (nextGame oben deshalb bewusst übersprungen) über die
+              // <=today-Abfrage hier trotzdem wieder mit reinrutschen — der
+              // Anpfiff-Check muss also auch hier gelten, nicht nur oben.
+              if (pastGame && hasKickedOff(pastGame.game_date, pastGame.game_time)) {
                 const { data: pastSquadRows } = await supabase.from('game_squad').select('*').eq('game_id', pastGame.id);
                 const pending = pendingWasherFor(pastGame, (pastSquadRows as GameSquadRow[]) ?? [], allPlayers, washLog);
                 if (pending?.player.id === player.id) {

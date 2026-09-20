@@ -26,6 +26,18 @@ export function isFuture(iso: string): boolean {
   return new Date(iso + 'T00:00:00') >= today;
 }
 
+// Ist der Anpfiff eines Spiels schon erreicht? Trikots werden laut Verein
+// tatsächlich erst NACH dem Spiel in der Kabine geklärt/übergeben, nicht
+// schon irgendwann am Spieltag davor — die Bestätigung der Trikot-Übergabe
+// ist deshalb erst ab dieser Uhrzeit sinnvoll, nicht schon ab 00:00 Uhr des
+// Spieltags. Läuft im Browser (nicht auf dem Vercel-Server), der lokalen
+// Zeitzone des Geräts reicht deshalb ein einfacher `new Date()`-Vergleich —
+// keine Berlin-Umrechnung wie bei den serverseitigen Push-Funktionen nötig.
+// `now` optional für testbare Aufrufe.
+export function hasKickedOff(game_date: string, game_time: string, now: Date = new Date()): boolean {
+  return new Date(`${game_date}T${game_time}`) <= now;
+}
+
 // Ganze Kalendertage zwischen heute und `iso` (negativ, wenn `iso` in der
 // Vergangenheit liegt). `today` optional für testbare Aufrufe.
 export function daysUntil(iso: string, today: Date = new Date()): number {

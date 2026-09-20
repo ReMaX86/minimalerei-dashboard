@@ -2059,6 +2059,29 @@ hier die getroffenen Entscheidungen samt Begründung:
 - **Nachtrag: Push-Text der Kader-Zusage-Erinnerung konkretisiert.** War bisher eine reine Frage
   ("Bist du beim Spiel gegen X dabei?"), ohne explizite Handlungsaufforderung — auf Wunsch des
   Nutzers jetzt direkter: "Bitte zu- oder absagen fürs Spiel gegen X." (`api/send-squad-reminders.ts`).
+- **Nachtrag: Trikot-Übergabe erst ab Anpfiff bestätigbar + Übergabe-Protokoll (Migration `0052`).**
+  Live aufgefallen: die Bestätigung der Trikot-Übergabe war bisher schon ab 00:00 Uhr des Spieltags
+  möglich ("ab dem Spieltag") — tatsächlich werden die Trikots aber erst NACH dem Spiel in der
+  Kabine geklärt und mitgenommen, die Anzeige "X hat die Trikots seit heute" konnte also schon
+  Stunden vor dem eigentlichen Anpfiff auftauchen, obwohl real noch niemand etwas mitgenommen
+  hatte. Neuer Helfer `hasKickedOff(game_date, game_time)` (`lib/format.ts`, mit Tests) ersetzt
+  den bisherigen reinen Datums-Vergleich überall dort, wo bisher nur "ist heute Spieltag?" geprüft
+  wurde: der Bestätigen-Button auf der Trikots-Seite (`gameStarted` statt `isGameDay`, Hinweistext
+  jetzt "ab Spielbeginn (HH:MM Uhr)" statt "ab dem Spieltag") sowie die zugehörige Fallback-Abfrage
+  für die "Für dich zu erledigen"-Erinnerung auf der Startseite (sonst hätte ein heute noch nicht
+  begonnenes Spiel über die dortige `<=today`-Abfrage die gleiche verfrühte Erinnerung ausgelöst).
+  Läuft komplett im Browser (nicht auf dem Vercel-Server wie die Push-Functions), ein einfacher
+  `new Date()`-Vergleich in der Geräte-Zeitzone reicht deshalb aus, keine Berlin-Umrechnung nötig.
+
+  Zusätzlich (auf Nutzeranfrage, da sich beim obigen Anlass nicht mehr nachvollziehen ließ, ob ein
+  vorgeschlagener Spieler über "Kann nicht" abgelehnt oder direkt jemand anderes bestätigt wurde):
+  neue Tabelle `trikot_handover_log` protokolliert ab jetzt zu jeder Bestätigung, wer laut Rotation
+  vorgeschlagen war und wer tatsächlich bestätigt hat (plus `current_actor_label()`-Name der
+  bestätigenden Person, wiederverwendet aus Migration `0050`). `confirm_trikot_handover()` bekommt
+  dafür einen neuen Parameter `p_suggested_player_id` (vom Client mitgegeben, da die Rotationslogik
+  clientseitig in `rotation.ts` lebt, nicht in SQL) und schreibt den Log-Eintrag als Nebeneffekt.
+  Sichtbar direkt im "Verlauf"-Abschnitt der Trikots-Seite: bei einer Abweichung zwischen Vorschlag
+  und tatsächlicher Bestätigung erscheint eine zusätzliche Zeile "Vorschlag war X, bestätigt von Y".
 
 ## Projektstruktur
 

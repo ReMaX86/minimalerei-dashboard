@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysUntil, shortPlayerName } from './format';
+import { daysUntil, hasKickedOff, shortPlayerName } from './format';
 
 describe('shortPlayerName', () => {
   it('shortens a two-part name to first name + last initial', () => {
@@ -32,5 +32,27 @@ describe('daysUntil', () => {
 
   it('ignores the time-of-day portion of `today`', () => {
     expect(daysUntil('2026-09-11', new Date('2026-09-10T23:59:00'))).toBe(1);
+  });
+});
+
+describe('hasKickedOff', () => {
+  it('is false before the game starts, even on game day', () => {
+    expect(hasKickedOff('2026-09-20', '16:00', new Date('2026-09-20T10:00:00'))).toBe(false);
+  });
+
+  it('is true exactly at kickoff', () => {
+    expect(hasKickedOff('2026-09-20', '16:00', new Date('2026-09-20T16:00:00'))).toBe(true);
+  });
+
+  it('is true after kickoff', () => {
+    expect(hasKickedOff('2026-09-20', '16:00', new Date('2026-09-20T18:00:00'))).toBe(true);
+  });
+
+  it('is false on a day before the game', () => {
+    expect(hasKickedOff('2026-09-20', '16:00', new Date('2026-09-19T23:00:00'))).toBe(false);
+  });
+
+  it('is true on a day after the game', () => {
+    expect(hasKickedOff('2026-09-20', '16:00', new Date('2026-09-21T00:00:00'))).toBe(true);
   });
 });
