@@ -2400,6 +2400,28 @@ hier die getroffenen Entscheidungen samt Begründung:
   vollen `timestamptz`-Zeitstempel statt eines reinen Datums, `new Date(iso)` rechnet den
   Zeitzonen-Versatz dabei korrekt in die lokale Anzeigezeit des Betrachters um) — zeigt jetzt z. B.
   "Stand 21.09. 16:00 Uhr" statt nur "Stand 21.09.".
+- **Nachtrag: KRITISCHER SICHERHEITS-FIX — Zugangscodes waren für jeden Angemeldeten lesbar
+  (Migration `0058`).** Im Rahmen einer Sicherheits-Review festgestellt: `players.access_code`
+  und `viewers.access_code` standen in derselben Tabellenzeile wie `name`/`is_active`, die absichtlich
+  breit lesbar sein müssen (jeder Screen listet Spieler mit Namen). Die RLS-Policy
+  "auth.uid() is not null" erlaubte deshalb jedem — auch ohne Zugangscode — per
+  `supabase.auth.signInAnonymously()` (Anonymous Sign-Ins sind aktiviert, siehe Setup) gefolgt von
+  `select * from players`/`viewers` alle Zugangscodes im Klartext auszulesen. Der Zugangscode ist
+  aber das einzige Login-Merkmal eines Spielers/Betrachters — wer ihn kennt, kann sich dauerhaft
+  als diese Person ausgeben (Kader, Trikot-Übernahmen, Kampfgericht, persönliches Profil). Row-Level-
+  Security kann keine einzelne Spalte ausblenden, nur ganze Zeilen — deshalb wandert `access_code`
+  jetzt in eigene Tabellen `player_access_codes`/`viewer_access_codes` (RLS an, bewusst keine
+  Policy = kompletter Client-Deny, exakt das Muster, das `player_auth_links` schon seit
+  `0001_init.sql` nutzt), erreichbar nur über SECURITY-DEFINER-RPCs. Alle Funktionen, die den Code
+  lesen/schreiben (`redeem_access_code`, `redeem_viewer_code`, `regenerate_access_code`,
+  `regenerate_viewer_access_code`, `create_player`, `create_viewer`, `generate_access_code`) wurden
+  entsprechend umgebaut; zwei neue trainer-only RPCs `list_player_access_codes()`/
+  `list_viewer_access_codes()` versorgen die Admin-Listen (`PlayersAdmin.tsx`/`ViewersAdmin.tsx`),
+  die den Code bisher direkt aus der Zeile gelesen haben. Kein anderer Screen hat je auf
+  `access_code` zugegriffen (geprüft). **Migration `0058_secure_access_codes.sql` muss vor dem
+  nächsten Deploy im SQL-Editor laufen** — der Client verlässt sich sofort auf die neue Rückgabeform
+  von `create_player`/`create_viewer` (Tabellenzeile `{ player, access_code }` statt Code als Feld
+  der `players`/`viewers`-Zeile).
 
 ## Projektstruktur
 

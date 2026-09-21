@@ -149,7 +149,6 @@ export const OFFICIATING_TASK_LABELS: Record<OfficiatingTaskType, string> = {
 export interface Player {
   id: string;
   name: string;
-  access_code: string;
   auth_user_id: string | null;
   is_active: boolean;
   is_admin: boolean;
@@ -173,7 +172,6 @@ export interface Trainer {
 export interface Viewer {
   id: string;
   name: string;
-  access_code: string;
   is_active: boolean;
   created_at: string;
 }
