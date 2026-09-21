@@ -2181,6 +2181,19 @@ hier die getroffenen Entscheidungen samt Begründung:
   oben): erste Spalte ("Spieler") in `th`/`td` mit `sticky left-0` versehen, plus `bg-white` (Farbe
   von `.card`) und `z-10`, damit darunter liegende Zellen beim Scrollen nicht durchscheinen, sowie
   ein dezenter rechter Rand zur optischen Abgrenzung.
+- **Nachtrag: Team-Summenzeile im Box-Score.** Neue Funktion `computeTeamTotals(boxScore)` in
+  `gameStats.ts` summiert alle Spalten (Punkte, Treffer/Versuche, Rebounds, Assists, ...) über die
+  bereits berechneten Spieler-Zeilen — bewusst aus den fertigen `PlayerBoxScore`-Zeilen statt erneut
+  aus den Events, damit die Summe garantiert zur sichtbaren Tabelle passt. Die Trefferquoten der
+  Team-Zeile (2P%/3P%/FW%) werden dabei aus den summierten Treffern/Versuchen neu berechnet
+  (`fgPct()` auf die Summen angewendet) statt die einzelnen Prozentwerte zu mitteln — eine "Quote
+  aus Quoten" wäre bei unterschiedlicher Versuchszahl pro Spieler falsch. Die +/- -Spalte der
+  Team-Zeile ist bewusst NICHT die Summe der einzelnen +/- -Werte, sondern schlicht der tatsächliche
+  Punktabstand (`teamScore.us - teamScore.opponent`) — jeder Korb fließt oben in bis zu 5
+  Spieler-+/- -Werte gleichzeitig ein, eine Summe würde also mehrfach zählen und wäre um ein
+  Vielfaches zu hoch. Angezeigt als `<tfoot>`-Zeile unterhalb aller Spieler, optisch abgesetzt
+  (`bg-tbw-bg`, fett, dickerer oberer Rand), mit derselben Sticky-Behandlung wie die
+  Spieler-Namensspalte darüber.
 
 ## Projektstruktur
 

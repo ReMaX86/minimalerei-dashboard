@@ -11,6 +11,7 @@ import {
   computePlusMinus,
   computeQuarterScores,
   computeTeamScore,
+  computeTeamTotals,
   fgPct,
   fmtPlusMinus,
   quarterLabel
@@ -561,6 +562,7 @@ export function GameStatsTracker() {
   }
 
   const boxScore = computeBoxScore(events);
+  const teamTotals = computeTeamTotals(boxScore);
   // fallbackOnCourtIds greift nur, solange zu einem Event noch kein
   // Log-Eintrag existiert — siehe computePlusMinus()-Kommentar in
   // gameStats.ts.
@@ -1054,6 +1056,53 @@ export function GameStatsTracker() {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  {(() => {
+                    // Team-+/- ist bewusst der tatsächliche Punktabstand
+                    // (teamScore.us - teamScore.opponent), NICHT die Summe
+                    // der einzelnen +/- -Werte oben — jeder Korb fließt dort
+                    // in bis zu 5 Spieler-Werte gleichzeitig ein, eine
+                    // Summe würde also mehrfach zählen.
+                    const teamNet = teamScore.us - teamScore.opponent;
+                    return (
+                      <tr className="border-t-2 border-tbw-navy/10 bg-tbw-bg font-bold text-tbw-navyDark">
+                        <td className="sticky left-0 z-10 border-r border-black/5 bg-tbw-bg py-1.5 pr-2">Team</td>
+                        <td className="px-1 py-1.5 text-right">{teamTotals.points}</td>
+                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">
+                          {teamTotals.fg2m}/{teamTotals.fg2a}
+                        </td>
+                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/40">
+                          {fgPct(teamTotals.fg2m, teamTotals.fg2a)}
+                        </td>
+                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">
+                          {teamTotals.fg3m}/{teamTotals.fg3a}
+                        </td>
+                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/40">
+                          {fgPct(teamTotals.fg3m, teamTotals.fg3a)}
+                        </td>
+                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">
+                          {teamTotals.ftm}/{teamTotals.fta}
+                        </td>
+                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/40">
+                          {fgPct(teamTotals.ftm, teamTotals.fta)}
+                        </td>
+                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">{teamTotals.rebounds}</td>
+                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">{teamTotals.assists}</td>
+                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">{teamTotals.steals}</td>
+                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">{teamTotals.blocks}</td>
+                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">{teamTotals.turnovers}</td>
+                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">{teamTotals.fouls}</td>
+                        <td
+                          className={`py-1.5 pl-1 text-right ${
+                            teamNet > 0 ? 'text-status-ok' : teamNet < 0 ? 'text-tbw-red' : 'text-tbw-ink/40'
+                          }`}
+                        >
+                          {fmtPlusMinus(teamNet)}
+                        </td>
+                      </tr>
+                    );
+                  })()}
+                </tfoot>
               </table>
             </div>
           </div>
