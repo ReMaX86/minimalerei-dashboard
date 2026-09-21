@@ -7,7 +7,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { MeetingPointFields, EMPTY_MEETING_POINT, type MeetingPointFormValue } from '../components/MeetingPointFields';
 import { CarpoolSection } from '../components/CarpoolSection';
-import { fmtDate, fmtDateShort, fmtTime } from '../lib/format';
+import { fmtDate, fmtDateTimeShort, fmtTime } from '../lib/format';
 import {
   gameResult,
   meetingPoints,
@@ -292,7 +292,7 @@ export function Spiele() {
         </table>
       </div>
       <p className="mt-2 text-[10px] text-tbw-ink/40">
-        Quelle: basketball-bund.net · Stand {fmtDateShort(state.leagueStandings[0].updated_at.slice(0, 10))}
+        Quelle: basketball-bund.net · Stand {fmtDateTimeShort(state.leagueStandings[0].updated_at)}
       </p>
     </section>
   );
