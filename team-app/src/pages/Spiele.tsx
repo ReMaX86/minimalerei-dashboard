@@ -242,11 +242,13 @@ export function Spiele() {
     <section className="card">
       <p className="text-sm font-bold text-tbw-navyDark">Tabelle</p>
       <div className="mt-2 overflow-x-auto">
-        <table className="w-full min-w-[480px] text-left text-xs">
+        <table className="text-left text-xs">
           <thead>
             <tr className="text-tbw-ink/40">
               <th className="py-1 pr-2 font-semibold">#</th>
-              <th className="sticky left-0 z-10 border-r border-black/5 bg-white py-1 pr-2 font-semibold">Team</th>
+              <th className="sticky left-0 z-10 whitespace-nowrap border-r border-black/5 bg-white py-1 pr-2 font-semibold">
+                Team
+              </th>
               <th className="px-1 py-1 text-right font-semibold">Sp</th>
               <th className="px-1 py-1 text-right font-semibold">S-N</th>
               <th className="px-1 py-1 text-right font-semibold">Pkt</th>
@@ -261,7 +263,7 @@ export function Spiele() {
                   {row.rang}
                 </td>
                 <td
-                  className={`sticky left-0 z-10 border-r border-black/5 py-1.5 pr-2 font-semibold ${
+                  className={`sticky left-0 z-10 whitespace-nowrap border-r border-black/5 py-1.5 pr-2 font-semibold ${
                     row.is_own_team ? 'bg-tbw-gold/10 text-tbw-gold' : 'bg-white text-tbw-navyDark'
                   }`}
                 >
