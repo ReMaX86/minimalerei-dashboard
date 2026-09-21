@@ -2122,6 +2122,16 @@ hier die getroffenen Entscheidungen samt Begründung:
   keine Beschriftung, welche Zahl zu TB Wülfrath und welche zum Gegner gehört — für Zuschauer ohne
   Tracking-Kontext nicht erkennbar. Fix: kleine Zeile "TB Wülfrath – {Gegner}" oberhalb des
   Spielstands ergänzt, in derselben Reihenfolge wie die Zahlen daneben.
+- **Nachtrag: "Wer hat die Trikots?"-Anzeige blieb nach einer bestätigten Übergabe an einen
+  Ersatz-Wäscher auf "Niemand" stehen (Migration `0054`).** Eigene Regression aus Migration `0052`:
+  beim Hinzufügen von `trikot_handover_log` wurde `confirm_trikot_handover()` komplett neu
+  geschrieben und dabei die `update trikot_sets set current_holder_id = ..., since = ...`-Zeile aus
+  der ursprünglichen Fassung (Migration `0001`/`0017`) versehentlich weggelassen. Die Bestätigung
+  landete danach zwar korrekt in `trikot_wash_log` (Wasch-Zähler stimmte) und im neuen
+  `trikot_handover_log` (Verlauf zeigte "Vorschlag war X, bestätigt von Y" korrekt an), aber
+  `trikot_sets.current_holder_id`/`since` — wovon die große "Wer hat die Trikots?"-Kachel gespeist
+  wird — wurde nie mehr aktualisiert. Fix: die fehlende Zeile wieder ergänzt, Rest der Funktion
+  unverändert. Reine additive SQL-Korrektur (kein Signatur-Wechsel, kein Client-Code betroffen).
 
 ## Projektstruktur
 
