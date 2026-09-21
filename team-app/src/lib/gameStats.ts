@@ -96,6 +96,48 @@ export function computeBoxScore(events: GameStatEvent[]): PlayerBoxScore[] {
   return [...byPlayer.values()].sort((a, b) => b.points - a.points);
 }
 
+export type TeamBoxScoreTotals = Omit<PlayerBoxScore, 'playerId'>;
+
+// Team-Summenzeile für den Box-Score, z. B. die 3P-Quote des gesamten
+// Teams. Bewusst aus den bereits berechneten Zeilen aufsummiert statt
+// erneut aus den Events, damit die Zahlen garantiert mit der oben
+// angezeigten Tabelle übereinstimmen. Die Trefferquoten selbst werden NICHT
+// hier berechnet (dafür fgPct() auf die summierten made/attempted-Werte
+// anwenden) — eine Quote aus Quoten mitteln wäre falsch.
+export function computeTeamTotals(boxScore: PlayerBoxScore[]): TeamBoxScoreTotals {
+  const totals: TeamBoxScoreTotals = {
+    points: 0,
+    fg2m: 0,
+    fg2a: 0,
+    fg3m: 0,
+    fg3a: 0,
+    ftm: 0,
+    fta: 0,
+    rebounds: 0,
+    assists: 0,
+    steals: 0,
+    blocks: 0,
+    turnovers: 0,
+    fouls: 0
+  };
+  for (const b of boxScore) {
+    totals.points += b.points;
+    totals.fg2m += b.fg2m;
+    totals.fg2a += b.fg2a;
+    totals.fg3m += b.fg3m;
+    totals.fg3a += b.fg3a;
+    totals.ftm += b.ftm;
+    totals.fta += b.fta;
+    totals.rebounds += b.rebounds;
+    totals.assists += b.assists;
+    totals.steals += b.steals;
+    totals.blocks += b.blocks;
+    totals.turnovers += b.turnovers;
+    totals.fouls += b.fouls;
+  }
+  return totals;
+}
+
 export interface TeamScore {
   us: number;
   opponent: number;

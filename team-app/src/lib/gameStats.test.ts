@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { computeBoxScore, computePlusMinus, computeQuarterScores, computeTeamScore, fgPct, fmtPlusMinus, quarterLabel } from './gameStats';
+import {
+  computeBoxScore,
+  computePlusMinus,
+  computeQuarterScores,
+  computeTeamScore,
+  computeTeamTotals,
+  fgPct,
+  fmtPlusMinus,
+  quarterLabel
+} from './gameStats';
 import type { GameLineupLogRow, GameStatEvent, StatType } from '../types/database';
 
 let nextId = 1;
@@ -52,6 +61,53 @@ describe('computeBoxScore', () => {
     ];
     const box = computeBoxScore(events);
     expect(box.map((b) => b.playerId)).toEqual(['p2', 'p1']);
+  });
+});
+
+describe('computeTeamTotals', () => {
+  it('sums every column across all box score rows', () => {
+    const events: GameStatEvent[] = [
+      ev({ team: 'us', player_id: 'p1', stat_type: 'fg3_made' }),
+      ev({ team: 'us', player_id: 'p1', stat_type: 'fg3_miss' }),
+      ev({ team: 'us', player_id: 'p1', stat_type: 'rebound' }),
+      ev({ team: 'us', player_id: 'p2', stat_type: 'fg3_made' }),
+      ev({ team: 'us', player_id: 'p2', stat_type: 'fg2_made' }),
+      ev({ team: 'us', player_id: 'p2', stat_type: 'foul' })
+    ];
+    const totals = computeTeamTotals(computeBoxScore(events));
+    expect(totals).toEqual({
+      points: 3 + 3 + 2,
+      fg2m: 1,
+      fg2a: 1,
+      fg3m: 2,
+      fg3a: 3,
+      ftm: 0,
+      fta: 0,
+      rebounds: 1,
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      fouls: 1
+    });
+  });
+
+  it('returns all zeros for an empty box score', () => {
+    expect(computeTeamTotals([])).toEqual({
+      points: 0,
+      fg2m: 0,
+      fg2a: 0,
+      fg3m: 0,
+      fg3a: 0,
+      ftm: 0,
+      fta: 0,
+      rebounds: 0,
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      fouls: 0
+    });
   });
 });
 
