@@ -833,8 +833,18 @@ enthalten), kein zusätzlicher Dienst.
    Erwartete Erfolgsmeldung: `{"updated": 12}` (Anzahl Zeilen). `{"skipped":"no_rows_parsed"}`
    bedeutet, das Parsing hat auf der aktuellen Seite keine Tabelle gefunden — dann bitte melden,
    dann wird das Parsing anhand der echten Seite nachgebessert.
-5. Danach im **Admin -> Funktionen** das Feature `Liga-Tabelle` aktivieren — erst jetzt taucht
-   die "Tabelle"-Karte unter "Spiele" überhaupt auf.
+5. Danach im **Admin -> Funktionen** das Feature `Liga-Tabelle` aktivieren — erst jetzt zeigt der
+   "Tabelle"-Tab unter "Spiele" auch tatsächlich Inhalt (siehe Nachtrag direkt darunter).
+
+**Nachtrag: Tabelle prominenter platziert (Tabs statt ganz unten auf der Seite).** Auf
+Nutzeranfrage — die Tabelle stand vorher als letzte Karte weit unten auf `/spiele`, kaum zu
+finden. `Spiele.tsx` zeigt jetzt oben weiterhin immer das nächste Spiel (unverändert), direkt
+darunter zwei Tabs: "Spielplan" (bündelt "Nächste Spiele", "Weitere Spieltage anzeigen" und
+"Vergangene Spiele" — bisher eigenständige Karten) und "Tabelle" (die Liga-Tabelle). **"Tabelle"
+ist der Default-Tab.** Ist das Feature `standings` aus oder wurde noch nie erfolgreich
+synchronisiert, zeigt der Tab statt der leeren Fläche einen erklärenden Hinweistext ("Tabelle ist
+aktuell nicht verfügbar."), damit der vorausgewählte Tab nie einfach leer wirkt. Reiner UI-State
+(`useState`, kein Persistieren der Auswahl nötig) — kein neuer Datenbank-Zugriff.
 
 ## Design
 
