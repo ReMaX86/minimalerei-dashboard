@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computeBoxScore, computeQuarterScores, computeTeamScore, fgPct, quarterLabel } from './gameStats';
-import type { GameStatEvent, StatType } from '../types/database';
+import { computeBoxScore, computePlusMinus, computeQuarterScores, computeTeamScore, fgPct, fmtPlusMinus, quarterLabel } from './gameStats';
+import type { GameLineupLogRow, GameStatEvent, StatType } from '../types/database';
 
 let nextId = 1;
 function ev(
@@ -78,6 +78,56 @@ describe('computeQuarterScores', () => {
       { quarter: 1, us: 2, opponent: 1 },
       { quarter: 2, us: 3, opponent: 0 }
     ]);
+  });
+});
+
+function lineup(onCourtPlayerIds: string[], created_at: string): GameLineupLogRow {
+  return { id: `l${nextId++}`, game_id: 'g1', on_court_player_ids: onCourtPlayerIds, created_at };
+}
+
+describe('computePlusMinus', () => {
+  it('credits/debits only the players on court at the time of each event', () => {
+    const events: GameStatEvent[] = [
+      ev({ team: 'us', player_id: 'p1', stat_type: 'fg2_made', created_at: '2026-09-08T18:01:00Z' }),
+      // Nach Wechsel p1 raus, p3 rein: p3 bekommt den nächsten eigenen Korb
+      // gutgeschrieben, p1 nicht mehr.
+      ev({ team: 'us', player_id: 'p3', stat_type: 'fg3_made', created_at: '2026-09-08T18:05:00Z' }),
+      // Gegentreffer während derselben Aufstellung zieht allen auf dem Feld ab.
+      ev({ team: 'opponent', stat_type: 'fg2_made', created_at: '2026-09-08T18:06:00Z' })
+    ];
+    const lineupLog = [lineup(['p1', 'p2'], '2026-09-08T18:00:00Z'), lineup(['p2', 'p3'], '2026-09-08T18:03:00Z')];
+    expect(computePlusMinus(events, lineupLog, [])).toEqual({
+      p1: 2,
+      p2: 2 + 3 - 2,
+      p3: 3 - 2
+    });
+  });
+
+  it('falls back to the given player ids when no lineup log exists yet', () => {
+    const events: GameStatEvent[] = [
+      ev({ team: 'us', player_id: 'p1', stat_type: 'fg2_made', created_at: '2026-09-08T18:01:00Z' }),
+      ev({ team: 'opponent', stat_type: 'ft_made', created_at: '2026-09-08T18:02:00Z' })
+    ];
+    expect(computePlusMinus(events, [], ['p1', 'p2'])).toEqual({ p1: 1, p2: 1 });
+  });
+
+  it('ignores non-scoring stats', () => {
+    const events: GameStatEvent[] = [ev({ team: 'us', player_id: 'p1', stat_type: 'rebound', created_at: '2026-09-08T18:01:00Z' })];
+    expect(computePlusMinus(events, [], ['p1'])).toEqual({});
+  });
+});
+
+describe('fmtPlusMinus', () => {
+  it('prefixes positive values with a plus sign', () => {
+    expect(fmtPlusMinus(8)).toBe('+8');
+  });
+
+  it('uses a real minus sign for negative values', () => {
+    expect(fmtPlusMinus(-3)).toBe('−3');
+  });
+
+  it('shows a plain 0 without a sign', () => {
+    expect(fmtPlusMinus(0)).toBe('0');
   });
 });
 
