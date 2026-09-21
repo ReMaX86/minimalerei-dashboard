@@ -2194,6 +2194,10 @@ hier die getroffenen Entscheidungen samt Begründung:
   Vielfaches zu hoch. Angezeigt als `<tfoot>`-Zeile unterhalb aller Spieler, optisch abgesetzt
   (`bg-tbw-bg`, fett, dickerer oberer Rand), mit derselben Sticky-Behandlung wie die
   Spieler-Namensspalte darüber.
+- **Nachtrag: Box-Score-Namensspalte gekürzt.** Zeigte bisher den vollen Namen — bei der jetzt
+  deutlich breiteren Tabelle (%-Spalten, +/-) nimmt das zu viel von der ohnehin knappen sticky
+  Spalte weg. Nutzt jetzt dieselbe `shortPlayerName()` aus `format.ts`, die im Tracker bereits an
+  anderer Stelle (Picker, Bank-Pills) verwendet wird ("Marc Rewald" → "Marc R.").
 
 ## Projektstruktur
 
