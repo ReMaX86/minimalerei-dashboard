@@ -2315,6 +2315,15 @@ hier die getroffenen Entscheidungen samt Begründung:
   `https://maps.apple.com/?q=...` — ein echter https-Universal-Link (bewusst kein
   `maps://`-Schema, das im Browser auf anderen Plattformen als ungültiges Protokoll fehlschlagen
   könnte), akzeptiert wie zuvor bei Google Maps reinen Freitext als Suchbegriff.
+- **Nachtrag: Liga-Tabelle füllt auf breiten Bildschirmen (Desktop-Browser) nicht die
+  Kartenbreite aus.** Direkter Nebeneffekt des vorherigen Fixes (`w-full` entfernt, damit die
+  Tabelle auf dem Handy nicht in die schmale Container-Breite gepresst wird statt zu scrollen) —
+  auf einem breiten Bildschirm blieb die Tabelle dadurch bei ihrer kompakten Inhaltsbreite stehen,
+  mit viel ungenutztem Weißraum daneben. Fix: `min-w-full` (= `min-width: 100%`) statt `w-full`
+  (= `width: 100%`) — im Unterschied zu `width` deckelt `min-width` die Tabelle nicht auf die
+  schmale Container-Breite (kann also weiterhin über ihre Inhaltsbreite hinaus wachsen und auf
+  dem Handy zuverlässig scrollen), erzwingt aber, dass sie mindestens 100 % des Containers
+  einnimmt — auf breiten Bildschirmen also bis zur vollen Kartenbreite streckt.
 
 ## Projektstruktur
 

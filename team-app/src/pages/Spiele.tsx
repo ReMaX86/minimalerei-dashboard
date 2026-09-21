@@ -242,7 +242,7 @@ export function Spiele() {
     <section className="card">
       <p className="text-sm font-bold text-tbw-navyDark">Tabelle</p>
       <div className="mt-2 overflow-x-auto">
-        <table className="text-left text-xs">
+        <table className="min-w-full text-left text-xs">
           <thead>
             <tr className="text-tbw-ink/40">
               <th className="py-1 pr-2 font-semibold">#</th>
