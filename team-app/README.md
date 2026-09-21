@@ -2310,6 +2310,11 @@ hier die getroffenen Entscheidungen samt Begründung:
   "1-0" konnte dadurch am Bindestrich umbrechen, ebenso die Kopfzeile "S-N". Fix:
   `whitespace-nowrap` auf die betroffene Kopf- und Datenzelle ergänzt (plus vorsorglich auf die
   "Körbe"-Spalte, "100 : 71" hätte am Doppelpunkt dasselbe Problem gehabt).
+- **Nachtrag: `mapsUrl()` öffnet jetzt Apple Maps statt Google Maps.** Auf Nutzeranfrage — das
+  Team nutzt durchgehend iPhones, "Karten" (Apple Maps) ist die bevorzugte App. Link geändert auf
+  `https://maps.apple.com/?q=...` — ein echter https-Universal-Link (bewusst kein
+  `maps://`-Schema, das im Browser auf anderen Plattformen als ungültiges Protokoll fehlschlagen
+  könnte), akzeptiert wie zuvor bei Google Maps reinen Freitext als Suchbegriff.
 
 ## Projektstruktur
 

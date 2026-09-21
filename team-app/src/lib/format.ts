@@ -12,12 +12,15 @@ export function fmtTime(time: string): string {
   return time.slice(0, 5);
 }
 
-// Google Maps akzeptiert bewusst reinen Freitext als Suchbegriff
-// (Hallenname oder komplette Adresse aus dem "Halle / Adresse"-Feld) und
-// geocodiert selbst — auf iOS/Android öffnet ein Klick darauf je nach
-// installierten Apps direkt die native Karten-App statt nur im Browser.
+// Apple-Maps-Link statt Google Maps (auf Nutzeranfrage — Team nutzt
+// durchgehend iPhones, siehe README). https://maps.apple.com/?q=... ist ein
+// echter https-Universal-Link (kein maps://-Schema, das auf anderen
+// Plattformen/Browsern als ungültiges Protokoll fehlschlagen könnte) — auf
+// iOS öffnet ein Klick darauf direkt die "Karten"-App, akzeptiert wie bei
+// Google Maps reinen Freitext als Suchbegriff (Hallenname oder komplette
+// Adresse aus dem "Halle / Adresse"-Feld) und geocodiert selbst.
 export function mapsUrl(location: string): string {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+  return `https://maps.apple.com/?q=${encodeURIComponent(location)}`;
 }
 
 // "Marc Rewald" -> "Marc R." — für die großen Spieler-Buttons im

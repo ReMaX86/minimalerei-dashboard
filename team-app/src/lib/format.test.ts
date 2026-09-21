@@ -16,9 +16,9 @@ describe('shortPlayerName', () => {
 });
 
 describe('mapsUrl', () => {
-  it('builds a Google Maps search link with the location URL-encoded', () => {
+  it('builds an Apple Maps search link with the location URL-encoded', () => {
     expect(mapsUrl('Halle Wülfrath, Am Diek 22, 42489 Wülfrath')).toBe(
-      'https://www.google.com/maps/search/?api=1&query=Halle%20W%C3%BClfrath%2C%20Am%20Diek%2022%2C%2042489%20W%C3%BClfrath'
+      'https://maps.apple.com/?q=Halle%20W%C3%BClfrath%2C%20Am%20Diek%2022%2C%2042489%20W%C3%BClfrath'
     );
   });
 });
