@@ -2295,6 +2295,14 @@ hier die getroffenen Entscheidungen samt Begründung:
   deutlich breiteren Tabelle (%-Spalten, +/-) nimmt das zu viel von der ohnehin knappen sticky
   Spalte weg. Nutzt jetzt dieselbe `shortPlayerName()` aus `format.ts`, die im Tracker bereits an
   anderer Stelle (Picker, Bank-Pills) verwendet wird ("Marc Rewald" → "Marc R.").
+- **Nachtrag: Adresse in der "Nächstes Spiel"-Kachel klickbar.** Auf Nutzeranfrage: neue
+  Hilfsfunktion `mapsUrl(location)` in `format.ts` baut einen Google-Maps-Such-Link
+  (`https://www.google.com/maps/search/?api=1&query=...`) aus dem Freitext im
+  `location`-Feld ("Halle / Adresse", von Hand im Admin gepflegt) — Google Maps geocodiert
+  reinen Freitext selbst, es muss also nicht zwischen Hallenname und vollständiger Adresse
+  unterschieden werden. Auf `Dashboard.tsx` ist die Adresse jetzt ein Link (📍-Icon, gepunktet
+  unterstrichen, `target="_blank"`) statt reinem Text — öffnet je nach installierten Apps direkt
+  die native Karten-App statt nur den Browser.
 
 ## Projektstruktur
 
