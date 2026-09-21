@@ -4,7 +4,14 @@ export type OfficiatingTaskType = 'uhr' | 'anschreiber' | 'zeit';
 // Optionale Zusatzfunktionen, die ein Trainer pro Team an-/ausschalten kann
 // (Admin -> Funktionen). Neuer Key hier + eine Zeile in Migration/Seed, dann
 // ist eine neue Funktion schaltbar.
-export type FeatureKey = 'announcements' | 'carpool' | 'player_profiles' | 'absences' | 'stats' | 'push_notifications';
+export type FeatureKey =
+  | 'announcements'
+  | 'carpool'
+  | 'player_profiles'
+  | 'absences'
+  | 'stats'
+  | 'push_notifications'
+  | 'standings';
 
 export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: string }> = {
   push_notifications: {
@@ -32,6 +39,11 @@ export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: st
   stats: {
     label: 'Punkte & Ergebnisse',
     description: 'Live-Stats-Tracking während des Spiels — Endstand und Box-Score ergeben sich automatisch daraus.'
+  },
+  standings: {
+    label: 'Liga-Tabelle',
+    description:
+      'Zeigt die aktuelle Tabelle vom DBB unter "Spiele" an. Erst einschalten, wenn der tägliche Sync-Job eingerichtet ist (siehe README) — sonst bleibt die Karte leer.'
   }
 };
 
@@ -442,6 +454,24 @@ export interface GameLineupLogRow {
   game_id: string;
   on_court_player_ids: string[];
   created_at: string;
+}
+
+// Liga-Tabelle vom DBB (Migration 0056) — per Scraping befüllt, siehe
+// api/sync-league-standings.ts.
+export interface LeagueStandingRow {
+  id: string;
+  liga_id: string;
+  rang: number;
+  team_name: string;
+  is_own_team: boolean;
+  spiele: number;
+  siege: number;
+  niederlagen: number;
+  punkte: number;
+  koerbe_erzielt: number;
+  koerbe_erhalten: number;
+  diff: number;
+  updated_at: string;
 }
 
 export type GameResult = 'sieg' | 'niederlage' | 'unentschieden';
