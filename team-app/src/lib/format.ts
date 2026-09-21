@@ -12,6 +12,17 @@ export function fmtTime(time: string): string {
   return time.slice(0, 5);
 }
 
+// Für einen vollen Zeitstempel (timestamptz, z. B. league_standings.updated_at)
+// — anders als fmtDateShort() (reines Datum ohne Uhrzeit-Anteil) braucht das
+// hier ein echtes Date-Objekt, damit new Date() den Zeitzonen-Versatz aus
+// dem ISO-String korrekt in die lokale Anzeigezeit umrechnet.
+export function fmtDateTimeShort(iso: string): string {
+  const d = new Date(iso);
+  const datePart = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+  const timePart = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  return `${datePart} ${timePart} Uhr`;
+}
+
 // Apple-Maps-Link statt Google Maps (auf Nutzeranfrage — Team nutzt
 // durchgehend iPhones, siehe README). https://maps.apple.com/?q=... ist ein
 // echter https-Universal-Link (kein maps://-Schema, das auf anderen

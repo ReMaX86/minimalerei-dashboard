@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysUntil, hasKickedOff, mapsUrl, shortPlayerName } from './format';
+import { daysUntil, fmtDateTimeShort, hasKickedOff, mapsUrl, shortPlayerName } from './format';
 
 describe('shortPlayerName', () => {
   it('shortens a two-part name to first name + last initial', () => {
@@ -20,6 +20,12 @@ describe('mapsUrl', () => {
     expect(mapsUrl('Halle Wülfrath, Am Diek 22, 42489 Wülfrath')).toBe(
       'https://maps.apple.com/?q=Halle%20W%C3%BClfrath%2C%20Am%20Diek%2022%2C%2042489%20W%C3%BClfrath'
     );
+  });
+});
+
+describe('fmtDateTimeShort', () => {
+  it('formats a full timestamp as day.month + time', () => {
+    expect(fmtDateTimeShort('2026-09-21T08:05:00.000Z')).toBe('21.09. 08:05 Uhr');
   });
 });
 

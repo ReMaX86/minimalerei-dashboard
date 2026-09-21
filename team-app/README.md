@@ -810,7 +810,7 @@ enthalten), kein zusätzlicher Dienst.
    ```sql
    select cron.schedule(
      'sync-league-standings',
-     '0 6 * * *',
+     '0 6,14,21 * * *',
      $$
      select net.http_post(
        url := 'https://<deine-vercel-domain>/api/sync-league-standings',
@@ -819,6 +819,12 @@ enthalten), kein zusätzlicher Dienst.
      $$
    );
    ```
+   Dreimal täglich (auf Nutzeranfrage) — `pg_cron` läuft in UTC, die Stunden `6,14,21` entsprechen
+   damit aktuell (Sommerzeit, MESZ = UTC+2) 8/16/23 Uhr deutscher Zeit. **Achtung:** das verschiebt
+   sich in der Winterzeit (MEZ = UTC+1) automatisch um eine Stunde nach hinten (9/17/24 Uhr) — bei
+   Bedarf zur Zeitumstellung mit `select cron.alter_job((select jobid from cron.job where jobname
+   = 'sync-league-standings'), schedule := '0 7,15,22 * * *');` auf `7,15,22` (= weiterhin 8/16/23
+   Uhr deutscher Zeit) nachjustieren.
 4. Manuell/testweise auslösen, ohne auf den nächsten Lauf zu warten:
    ```sql
    select net.http_post(
@@ -2324,6 +2330,15 @@ hier die getroffenen Entscheidungen samt Begründung:
   schmale Container-Breite (kann also weiterhin über ihre Inhaltsbreite hinaus wachsen und auf
   dem Handy zuverlässig scrollen), erzwingt aber, dass sie mindestens 100 % des Containers
   einnimmt — auf breiten Bildschirmen also bis zur vollen Kartenbreite streckt.
+- **Nachtrag: Sync-Takt auf 3× täglich erhöht + Uhrzeit im "Stand"-Hinweis ergänzt.** Auf
+  Nutzeranfrage: Cron-Schedule von `0 6 * * *` (einmal täglich) auf `0 6,14,21 * * *` (8/16/23 Uhr
+  deutscher Zeit, siehe Setup-Abschnitt oben inkl. Winterzeit-Hinweis) geändert. Der
+  "Quelle"-Hinweis unter der Tabelle zeigte bisher nur das Datum des letzten Syncs — bei mehreren
+  Läufen pro Tag reicht das nicht mehr, um zu erkennen, wie aktuell der Stand ist. Neue
+  Hilfsfunktion `fmtDateTimeShort(iso)` in `format.ts` (nimmt anders als `fmtDateShort()` einen
+  vollen `timestamptz`-Zeitstempel statt eines reinen Datums, `new Date(iso)` rechnet den
+  Zeitzonen-Versatz dabei korrekt in die lokale Anzeigezeit des Betrachters um) — zeigt jetzt z. B.
+  "Stand 21.09. 16:00 Uhr" statt nur "Stand 21.09.".
 
 ## Projektstruktur
 
