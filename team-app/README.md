@@ -583,12 +583,73 @@ select net.http_post(
 );
 ```
 
+**Zehnte Benachrichtigungsart: "Spiel gestartet"-Push** (`api/send-game-started.ts`, Migration
+`0057`), auf Nutzeranfrage. Sobald im Live-Stats-Tracker der erste wurfrelevante Treffer erfasst
+wird — egal ob eigener Korb oder Gegentreffer — geht eine Push raus, damit man auf der Startseite
+mitbekommt, dass gerade live getrackt wird, ohne extra nachschauen zu müssen: Titel "🔴 Live:
+Spiel gestartet", Text "TB Wülfrath \<Stand> \<Gegner> — jetzt live mitverfolgen.". Anders als
+beim Dreier-Push (jeder Treffer ist ein eigenständiges Ereignis) braucht es hier eine echte
+Deduplizierung, sonst würde bei jedem weiteren Korb erneut "Spiel gestartet" verschickt — dafür
+das neue Feld `games.game_started_announced_at` (null bis zum ersten Treffer), das der Trigger
+atomar per `update ... where game_started_announced_at is null` claimt: nur der Aufruf, der das
+Feld tatsächlich von `null` auf `now()` setzen konnte, verschickt die Push. Funktioniert auch bei
+zwei Personen, die gleichzeitig tracken, ohne doppelten Versand. `reset_game_stats()` setzt das
+Feld beim "Tracking zurücksetzen" (siehe unten) mit zurück auf `null`.
+
+1. **Migration ausführen**: `supabase/migrations/0057_game_started_push.sql` im SQL-Editor laufen
+   lassen (legt `games.game_started_announced_at` an und erweitert `reset_game_stats()`).
+2. **Trigger anlegen** (von Hand, enthält den Webhook-Secret im Klartext):
+   ```sql
+   create or replace function public.notify_game_started()
+   returns trigger
+   language plpgsql
+   security definer
+   set search_path = public
+   as $$
+   begin
+     if new.stat_type not in ('fg2_made', 'fg3_made', 'ft_made') then
+       return new;
+     end if;
+
+     update public.games
+       set game_started_announced_at = now()
+       where id = new.game_id and game_started_announced_at is null;
+
+     if found then
+       perform net.http_post(
+         url := 'https://<deine-vercel-domain>/api/send-game-started',
+         headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+         body := jsonb_build_object('record', jsonb_build_object('game_id', new.game_id))
+       );
+     end if;
+
+     return new;
+   end;
+   $$;
+
+   create trigger game_stat_events_notify_game_started
+   after insert on public.game_stat_events
+   for each row execute function public.notify_game_started();
+   ```
+
+Testweise nur an sich selbst schicken (`test_user_id`, siehe oben) — beliebige echte `game_id`
+mit bereits vorhandenem Spielstand einsetzen (sonst `{"skipped":"game_or_score_not_found"}`):
+
+```sql
+select net.http_post(
+  url := 'https://team-app-two-orpin.vercel.app/api/send-game-started',
+  headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+  body := jsonb_build_object('record', jsonb_build_object('game_id', '<game-id>', 'test_user_id', '<eigene auth_user_id>'))
+);
+```
+
 **Tracking zurücksetzen** (Migration `0043`, `GamesAdmin.tsx`): im Admin unter Spiele gibt es bei
 jedem Spiel mit erfassten Stats jetzt einen roten "Tracking zurücksetzen"-Button (nur sichtbar,
 wenn `gameResult()` einen Endstand liefert). Löscht per RPC `reset_game_stats()`
 (trainer-only, wie `reopen_game_stats`) alle `game_stat_events`, die Aufstellung
-(`game_court_state`) und einen eventuell noch aktiven Tracking-Lock (`game_stat_sessions`) für
-dieses eine Spiel und setzt `stats_finalized_at`/`last_announced_quarter` zurück — der Endstand
+(`game_court_state`), die Aufstellungs-Historie (`game_lineup_log`) und einen eventuell noch
+aktiven Tracking-Lock (`game_stat_sessions`) für dieses eine Spiel und setzt
+`stats_finalized_at`/`last_announced_quarter`/`game_started_announced_at` zurück — der Endstand
 wird dabei automatisch wieder `null` (derselbe `recalc_game_score()`-Trigger aus Migration `0028`,
 der auch beim normalen Live-Tracking läuft). Gedacht für Testdaten (z. B. beim Ausprobieren des
 Live-Tickers vor der Saison, siehe oben) oder falsch erfasste Spiele, nicht für den normalen

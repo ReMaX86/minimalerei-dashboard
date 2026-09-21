@@ -200,6 +200,12 @@ export interface Game {
   // geklickt wurde, aber noch kein Punkt erfasst ist (sonst wäre der
   // Reset ausgerechnet in genau diesem Fall unsichtbar).
   last_announced_quarter: number;
+  // Dedup-Marker für die "Spiel gestartet"-Push (Migration 0057) — null bis
+  // zum ersten wurfrelevanten game_stat_events-Eintrag, danach der
+  // Zeitpunkt, zu dem die Push verschickt wurde. Vom Client nirgends
+  // gesetzt, nur zur Vollständigkeit des Typs (select('*') liefert es
+  // ohnehin mit).
+  game_started_announced_at: string | null;
   created_at: string;
 }
 
