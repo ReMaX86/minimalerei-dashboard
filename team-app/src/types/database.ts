@@ -433,6 +433,17 @@ export interface GamePlayerNumber {
   number: number;
 }
 
+// Historie jeder Aufstellungsänderung (Startaufstellung + jede Einwechslung)
+// mit Zeitstempel — anders als game_court_state (hält nur den *aktuellen*
+// Stand, wird bei jedem Wechsel überschrieben) für die +/- -Berechnung nötig,
+// die für jeden Korb wissen muss, wer zu diesem Zeitpunkt auf dem Feld stand.
+export interface GameLineupLogRow {
+  id: string;
+  game_id: string;
+  on_court_player_ids: string[];
+  created_at: string;
+}
+
 export type GameResult = 'sieg' | 'niederlage' | 'unentschieden';
 
 // "us" vs. "opponent" statt "home"/"away", damit Sieg/Niederlage unabhängig

@@ -6,12 +6,21 @@ import { Avatar } from '../components/Avatar';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { useScrollResetOnChange } from '../hooks/useScrollResetOnChange';
-import { computeBoxScore, computeQuarterScores, computeTeamScore, fgPct, quarterLabel } from '../lib/gameStats';
+import {
+  computeBoxScore,
+  computePlusMinus,
+  computeQuarterScores,
+  computeTeamScore,
+  fgPct,
+  fmtPlusMinus,
+  quarterLabel
+} from '../lib/gameStats';
 import { fmtDate, fmtTime, shortPlayerName } from '../lib/format';
 import {
   STAT_TYPE_LABELS,
   type Game,
   type GameCourtState,
+  type GameLineupLogRow,
   type GamePlayerNumber,
   type GameStatEvent,
   type GameStatSessionState,
@@ -167,6 +176,7 @@ export function GameStatsTracker() {
   const [substituting, setSubstituting] = useState(false);
   const [outgoingId, setOutgoingId] = useState<string | null>(null);
   const [events, setEvents] = useState<GameStatEvent[]>([]);
+  const [lineupLog, setLineupLog] = useState<GameLineupLogRow[]>([]);
   // Trikotnummern für dieses Spiel (ändern sich von Spiel zu Spiel, siehe
   // Migration 0044) — numbers ist der gespeicherte Stand, numberDrafts die
   // Texteingaben während der Bearbeitung (Strings, damit ein leeres Feld
@@ -187,17 +197,19 @@ export function GameStatsTracker() {
 
   const loadPlayersAndEvents = useCallback(async () => {
     if (!gameId) return;
-    const [playersRes, eventsRes, squadRes, courtRes, numbersRes] = await Promise.all([
+    const [playersRes, eventsRes, squadRes, courtRes, numbersRes, lineupLogRes] = await Promise.all([
       supabase.from('players').select('*').eq('is_active', true).order('name'),
       supabase.from('game_stat_events').select('*').eq('game_id', gameId).order('created_at'),
       supabase.from('game_squad').select('player_id').eq('game_id', gameId).eq('is_selected', true),
       supabase.from('game_court_state').select('*').eq('game_id', gameId).maybeSingle(),
-      supabase.from('game_player_numbers').select('player_id, number').eq('game_id', gameId)
+      supabase.from('game_player_numbers').select('player_id, number').eq('game_id', gameId),
+      supabase.from('game_lineup_log').select('*').eq('game_id', gameId).order('created_at')
     ]);
     setPlayers((playersRes.data as Player[]) ?? []);
     setEvents((eventsRes.data as GameStatEvent[]) ?? []);
     setSquadPlayerIds(((squadRes.data as { player_id: string }[]) ?? []).map((r) => r.player_id));
     setOnCourtIds((courtRes.data as GameCourtState | null)?.on_court_player_ids ?? []);
+    setLineupLog((lineupLogRes.data as GameLineupLogRow[]) ?? []);
     setNumbers(
       Object.fromEntries(
         ((numbersRes.data as Pick<GamePlayerNumber, 'player_id' | 'number'>[]) ?? []).map((r) => [r.player_id, r.number])
@@ -207,6 +219,10 @@ export function GameStatsTracker() {
 
   // Optimistisch lokal setzen und im Hintergrund speichern — bleibt über
   // eine Übernahme des Trackings hinweg erhalten (siehe Migration 0029).
+  // Zusätzlich ein Log-Eintrag (Migration 0055, für die +/- -Berechnung) —
+  // dessen echter created_at-Zeitstempel kommt aus der DB zurück und wird
+  // direkt lokal ergänzt, damit +/- schon während des laufenden Trackens
+  // stimmt und nicht erst nach einem Neuladen.
   const persistOnCourt = useCallback(
     (next: string[]) => {
       setOnCourtIds(next);
@@ -216,6 +232,18 @@ export function GameStatsTracker() {
         .upsert({ game_id: gameId, on_court_player_ids: next, updated_at: new Date().toISOString() }, { onConflict: 'game_id' })
         .then(({ error: upsertError }) => {
           if (upsertError) setError('Aufstellung konnte nicht gespeichert werden.');
+        });
+      supabase
+        .from('game_lineup_log')
+        .insert({ game_id: gameId, on_court_player_ids: next })
+        .select()
+        .single()
+        .then(({ data, error: logError }) => {
+          if (logError) {
+            setError('Aufstellungswechsel konnte nicht protokolliert werden.');
+          } else if (data) {
+            setLineupLog((prev) => [...prev, data as GameLineupLogRow]);
+          }
         });
     },
     [gameId]
@@ -533,6 +561,14 @@ export function GameStatsTracker() {
   }
 
   const boxScore = computeBoxScore(events);
+  // fallbackOnCourtIds greift nur, solange zu einem Event noch kein
+  // Log-Eintrag existiert — siehe computePlusMinus()-Kommentar in
+  // gameStats.ts.
+  const plusMinusByPlayer = computePlusMinus(
+    events,
+    lineupLog,
+    trackablePlayers.map((p) => p.id)
+  );
   // Bei einem von Hand nachgetragenen Endstand (siehe GamesAdmin.tsx
   // "Endstand nachtragen") gibt es keine game_stat_events, aus denen sich
   // ein Punktestand berechnen ließe — dann den in games.final_score_us/
@@ -955,7 +991,9 @@ export function GameStatsTracker() {
               <table className="w-full min-w-[680px] text-left text-xs">
                 <thead>
                   <tr className="text-tbw-ink/40">
-                    <th className="py-1 pr-2 font-semibold">Spieler</th>
+                    <th className="sticky left-0 z-10 border-r border-black/5 bg-white py-1 pr-2 font-semibold">
+                      Spieler
+                    </th>
                     <th className="px-1 py-1 text-right font-semibold">Pkt</th>
                     <th className="px-1 py-1 text-right font-semibold">2P</th>
                     <th className="px-1 py-1 text-right font-semibold">2P%</th>
@@ -968,13 +1006,14 @@ export function GameStatsTracker() {
                     <th className="px-1 py-1 text-right font-semibold">Stl</th>
                     <th className="px-1 py-1 text-right font-semibold">Blk</th>
                     <th className="px-1 py-1 text-right font-semibold">TO</th>
-                    <th className="pl-1 py-1 text-right font-semibold">PF</th>
+                    <th className="px-1 py-1 text-right font-semibold">PF</th>
+                    <th className="pl-1 py-1 text-right font-semibold">+/-</th>
                   </tr>
                 </thead>
                 <tbody>
                   {boxScore.map((b) => (
                     <tr key={b.playerId} className="border-t border-black/5">
-                      <td className="py-1.5 pr-2 font-semibold text-tbw-navyDark">
+                      <td className="sticky left-0 z-10 border-r border-black/5 bg-white py-1.5 pr-2 font-semibold text-tbw-navyDark">
                         <div className="flex items-center gap-2">
                           {playersById[b.playerId] && <Avatar player={playersById[b.playerId]} size="xs" />}
                           {numPrefix(b.playerId)}
@@ -999,7 +1038,19 @@ export function GameStatsTracker() {
                       <td className="px-1 py-1.5 text-right text-tbw-ink/60">{b.steals}</td>
                       <td className="px-1 py-1.5 text-right text-tbw-ink/60">{b.blocks}</td>
                       <td className="px-1 py-1.5 text-right text-tbw-ink/60">{b.turnovers}</td>
-                      <td className="py-1.5 pl-1 text-right text-tbw-ink/60">{b.fouls}</td>
+                      <td className="px-1 py-1.5 text-right text-tbw-ink/60">{b.fouls}</td>
+                      {(() => {
+                        const pm = plusMinusByPlayer[b.playerId] ?? 0;
+                        return (
+                          <td
+                            className={`py-1.5 pl-1 text-right font-semibold ${
+                              pm > 0 ? 'text-status-ok' : pm < 0 ? 'text-tbw-red' : 'text-tbw-ink/40'
+                            }`}
+                          >
+                            {fmtPlusMinus(pm)}
+                          </td>
+                        );
+                      })()}
                     </tr>
                   ))}
                 </tbody>

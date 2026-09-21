@@ -2158,6 +2158,29 @@ hier die getroffenen Entscheidungen samt Begründung:
   mit `game_stat_events` einiges an zusätzlicher Sorgfalt (z. B. was zählt, wenn während eines
   Assist/Rebound-Events kurz vorher wenige Sekunden nicht sauber gewechselt wurde) — nicht
   umgesetzt, da nicht angefragt.
+- **Nachtrag: +/- doch angefragt und eingebaut (Migration `0055`).** Neue Tabelle
+  `game_lineup_log` protokolliert ab jetzt jede Aufstellungsänderung (Startaufstellung UND jede
+  Ein-/Auswechslung) mit echtem Zeitstempel, geschrieben parallel zu `game_court_state` in
+  `persistOnCourt()` — dessen "nur aktueller Stand"-Modell bleibt dafür unverändert, die neue
+  Tabelle historisiert nur zusätzlich. Neue reine Funktion `computePlusMinus(events, lineupLog,
+  fallbackOnCourtIds)` in `gameStats.ts`: für jeden wurfrelevanten Treffer (eigener wie gegnerischer)
+  den zu diesem Zeitpunkt laut Log aktuellen Aufstellungs-Stand ermitteln (letzter Eintrag mit
+  `created_at <= event.created_at`) und allen dort gelisteten Spielern den Punktewert gutschreiben
+  (eigener Treffer) bzw. abziehen (Gegentreffer). `fallbackOnCourtIds` greift nur, wenn zu einem
+  Event noch gar kein Log-Eintrag existiert — planmäßig der Fall bei einem Kader mit höchstens 5
+  trackbaren Spielern (dann blendet `useCourtSplit` die Aufstellungs-Auswahl komplett aus, da
+  ohnehin alle die ganze Zeit spielen) sowie defensiv für ein vor Einführung dieses Features
+  getracktes Spiel ohne jede Historie — dort werden pauschal alle Kader-Spieler als durchgehend auf
+  dem Feld angenommen. Anzeige als neue letzte Spalte "+/-" im Box-Score, grün bei positivem, rot bei
+  negativem Wert (`fmtPlusMinus()`, echtes Minuszeichen U+2212 statt Bindestrich). `reset_game_stats()`
+  (Migration `0043`) räumt die neue Tabelle beim "Tracking zurücksetzen" mit auf — sonst bliebe eine
+  alte Aufstellungs-Historie stehen und würde die Berechnung beim erneuten Tracken verfälschen (siehe
+  die Trikot-Regression weiter oben, diesmal direkt mitgedacht statt nachträglich gefixt).
+- **Nachtrag: Box-Score-Tabelle — Spieler-Spalte beim horizontalen Scrollen fixiert.** Auf
+  Nutzeranfrage (die Tabelle ist inzwischen breiter als der Bildschirm, siehe die %- und +/- -Spalten
+  oben): erste Spalte ("Spieler") in `th`/`td` mit `sticky left-0` versehen, plus `bg-white` (Farbe
+  von `.card`) und `z-10`, damit darunter liegende Zellen beim Scrollen nicht durchscheinen, sowie
+  ein dezenter rechter Rand zur optischen Abgrenzung.
 
 ## Projektstruktur
 
