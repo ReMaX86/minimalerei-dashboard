@@ -10,7 +10,7 @@ import { WeeklyTrainingTimes } from '../components/WeeklyTrainingTimes';
 import { AbsenceSection } from '../components/AbsenceSection';
 import { PushNotificationCard } from '../components/PushNotificationCard';
 import { usePushStatus } from '../hooks/usePushStatus';
-import { fmtDate, fmtDateShort, fmtTime, hasKickedOff } from '../lib/format';
+import { fmtDate, fmtDateShort, fmtTime, hasKickedOff, mapsUrl } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
 import { computeReminders, type ReminderItem } from '../lib/reminders';
 import { latestTransferFrom, pendingWasherFor } from '../lib/trikots';
@@ -697,7 +697,14 @@ export function Dashboard() {
             <p className="text-base font-bold text-tbw-navyDark">
               {fmtDate(data.nextGame.game_date)} · {fmtTime(data.nextGame.game_time)} Uhr
             </p>
-            <p className="text-sm text-tbw-ink/70">{data.nextGame.location}</p>
+            <a
+              href={mapsUrl(data.nextGame.location)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-sm text-tbw-navy underline decoration-dotted underline-offset-2"
+            >
+              📍 {data.nextGame.location}
+            </a>
 
             {meetingPoints(data.nextGame).length > 0 && (
               <div className="mt-2 rounded-xl bg-tbw-bg px-3 py-2">

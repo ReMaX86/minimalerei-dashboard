@@ -12,6 +12,14 @@ export function fmtTime(time: string): string {
   return time.slice(0, 5);
 }
 
+// Google Maps akzeptiert bewusst reinen Freitext als Suchbegriff
+// (Hallenname oder komplette Adresse aus dem "Halle / Adresse"-Feld) und
+// geocodiert selbst — auf iOS/Android öffnet ein Klick darauf je nach
+// installierten Apps direkt die native Karten-App statt nur im Browser.
+export function mapsUrl(location: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+}
+
 // "Marc Rewald" -> "Marc R." — für die großen Spieler-Buttons im
 // Live-Stats-Tracker, wo der volle Name zu breit wäre.
 export function shortPlayerName(fullName: string): string {

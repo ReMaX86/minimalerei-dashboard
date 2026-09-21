@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysUntil, hasKickedOff, shortPlayerName } from './format';
+import { daysUntil, hasKickedOff, mapsUrl, shortPlayerName } from './format';
 
 describe('shortPlayerName', () => {
   it('shortens a two-part name to first name + last initial', () => {
@@ -12,6 +12,14 @@ describe('shortPlayerName', () => {
 
   it('leaves a single-word name unchanged', () => {
     expect(shortPlayerName('Cristiano')).toBe('Cristiano');
+  });
+});
+
+describe('mapsUrl', () => {
+  it('builds a Google Maps search link with the location URL-encoded', () => {
+    expect(mapsUrl('Halle Wülfrath, Am Diek 22, 42489 Wülfrath')).toBe(
+      'https://www.google.com/maps/search/?api=1&query=Halle%20W%C3%BClfrath%2C%20Am%20Diek%2022%2C%2042489%20W%C3%BClfrath'
+    );
   });
 });
 
