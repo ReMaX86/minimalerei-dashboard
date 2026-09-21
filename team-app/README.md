@@ -2139,6 +2139,25 @@ hier die getroffenen Entscheidungen samt Begründung:
   zu Q2 wechseln?"), bevor `selectQuarter()` tatsächlich umschaltet und — bei Q2–Q4 — die
   Live-Ticker-Push auslöst. Bei "Abbrechen" bleibt alles unverändert. Selbes `window.confirm()`-Muster
   wie bereits bei "Spiel beenden" in derselben Datei, kein neuer UI-Baustein nötig.
+- **Nachtrag: Box-Score — Trefferquoten-Spalten und Team-Zuordnung im Score-Header.** Zwei
+  Anpassungen. (1) Neue Spalten `2P%`/`3P%`/`FW%` direkt hinter den jeweiligen Wurfspalten, via
+  neuer Hilfsfunktion `fgPct(made, attempted)` in `gameStats.ts` (zeigt "–" statt "0%" ohne jeden
+  Versuch). (2) Der Score-Header (`GameStatsTracker.tsx`, sticky oben — gilt für Live-Tracking UND
+  die reine Box-Score-Ansicht, da beides dieselbe Route/Komponente nutzt) hatte dasselbe Problem wie
+  zuvor der Live-Ticker auf der Startseite: keine erkennbare Zuordnung, welche Zahl zu wem gehört.
+  Zeile "TB Wülfrath – {Gegner}" ergänzt, eigener Score zusätzlich in Gold hervorgehoben (`text-tbw-gold`,
+  dieselbe Akzentfarbe wie sonst im Team-Kontext).
+- **Nachtrag: +/- (Plus/Minus) bewusst nicht eingebaut.** Auf Nutzeranfrage geprüft: +/- ist die
+  Punktedifferenz, die sich ansammelt, während ein bestimmter Spieler auf dem Feld steht (jeder
+  Korb der eigenen Mannschaft +, jeder Gegentreffer − für alle 5 gerade aktiven Spieler). Keine
+  feste, von der Anzahl Ballaktionen unabhängige Formel — sie braucht zwingend eine lückenlose
+  Historie, WANN welche Aufstellung auf dem Feld stand. `game_court_state` (Migration `0029`) hält
+  aber nur die *aktuelle* Aufstellung als Snapshot (wird bei jeder Auswechslung überschrieben, keine
+  Historie) — aus den bestehenden Daten lässt sich +/- also nicht rückwirkend berechnen. Würde eine
+  neue Tabelle brauchen, die jede Auswechslung mit Zeitstempel protokolliert, und beim Verknüpfen
+  mit `game_stat_events` einiges an zusätzlicher Sorgfalt (z. B. was zählt, wenn während eines
+  Assist/Rebound-Events kurz vorher wenige Sekunden nicht sauber gewechselt wurde) — nicht
+  umgesetzt, da nicht angefragt.
 
 ## Projektstruktur
 

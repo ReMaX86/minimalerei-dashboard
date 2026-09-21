@@ -134,6 +134,14 @@ export function computeQuarterScores(events: GameStatEvent[]): QuarterScore[] {
     .map(([quarter, score]) => ({ quarter, ...score }));
 }
 
+// Trefferquote für eine Wurfart, z. B. "50%" — "–" statt "0%" ohne jeden
+// Versuch, damit ein noch torloser Spieler nicht wie 0% Trefferquote
+// aussieht.
+export function fgPct(made: number, attempted: number): string {
+  if (attempted === 0) return '–';
+  return `${Math.round((made / attempted) * 100)}%`;
+}
+
 // Für Q1-Q4 "Q1".."Q4", danach "OT", "2. OT", ...
 export function quarterLabel(quarter: number): string {
   if (quarter <= 4) return `Q${quarter}`;

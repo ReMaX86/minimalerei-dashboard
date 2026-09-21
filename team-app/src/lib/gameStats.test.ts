@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeBoxScore, computeQuarterScores, computeTeamScore, quarterLabel } from './gameStats';
+import { computeBoxScore, computeQuarterScores, computeTeamScore, fgPct, quarterLabel } from './gameStats';
 import type { GameStatEvent, StatType } from '../types/database';
 
 let nextId = 1;
@@ -78,6 +78,18 @@ describe('computeQuarterScores', () => {
       { quarter: 1, us: 2, opponent: 1 },
       { quarter: 2, us: 3, opponent: 0 }
     ]);
+  });
+});
+
+describe('fgPct', () => {
+  it('rounds made/attempted to a percentage', () => {
+    expect(fgPct(1, 2)).toBe('50%');
+    expect(fgPct(2, 3)).toBe('67%');
+    expect(fgPct(0, 3)).toBe('0%');
+  });
+
+  it('shows a dash instead of 0% when no attempts were made', () => {
+    expect(fgPct(0, 0)).toBe('–');
   });
 });
 

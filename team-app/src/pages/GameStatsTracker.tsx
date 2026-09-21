@@ -6,7 +6,7 @@ import { Avatar } from '../components/Avatar';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { useScrollResetOnChange } from '../hooks/useScrollResetOnChange';
-import { computeBoxScore, computeQuarterScores, computeTeamScore, quarterLabel } from '../lib/gameStats';
+import { computeBoxScore, computeQuarterScores, computeTeamScore, fgPct, quarterLabel } from '../lib/gameStats';
 import { fmtDate, fmtTime, shortPlayerName } from '../lib/format';
 import {
   STAT_TYPE_LABELS,
@@ -582,8 +582,15 @@ export function GameStatsTracker() {
             {fmtDate(game.game_date)} · {fmtTime(game.game_time)} Uhr
           </p>
         )}
-        <p className="mt-2 text-center text-3xl font-extrabold">
-          {teamScore.us} : {teamScore.opponent}
+        {game && (
+          <div className="mt-2 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wide text-white/50">
+            <span className="text-tbw-gold">TB Wülfrath</span>
+            <span className="text-white/30">–</span>
+            <span className="truncate">{game.opponent}</span>
+          </div>
+        )}
+        <p className="text-center text-3xl font-extrabold">
+          <span className="text-tbw-gold">{teamScore.us}</span> : {teamScore.opponent}
         </p>
         {quarterScores.length > 0 && (
           <p className="mt-1 text-center text-xs text-white/50">
@@ -945,14 +952,17 @@ export function GameStatsTracker() {
           <div className="card mt-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Box-Score</p>
             <div className="mt-2 overflow-x-auto">
-              <table className="w-full min-w-[520px] text-left text-xs">
+              <table className="w-full min-w-[680px] text-left text-xs">
                 <thead>
                   <tr className="text-tbw-ink/40">
                     <th className="py-1 pr-2 font-semibold">Spieler</th>
                     <th className="px-1 py-1 text-right font-semibold">Pkt</th>
                     <th className="px-1 py-1 text-right font-semibold">2P</th>
+                    <th className="px-1 py-1 text-right font-semibold">2P%</th>
                     <th className="px-1 py-1 text-right font-semibold">3P</th>
+                    <th className="px-1 py-1 text-right font-semibold">3P%</th>
                     <th className="px-1 py-1 text-right font-semibold">FW</th>
+                    <th className="px-1 py-1 text-right font-semibold">FW%</th>
                     <th className="px-1 py-1 text-right font-semibold">Reb</th>
                     <th className="px-1 py-1 text-right font-semibold">Ast</th>
                     <th className="px-1 py-1 text-right font-semibold">Stl</th>
@@ -975,12 +985,15 @@ export function GameStatsTracker() {
                       <td className="px-1 py-1.5 text-right text-tbw-ink/60">
                         {b.fg2m}/{b.fg2a}
                       </td>
+                      <td className="px-1 py-1.5 text-right text-tbw-ink/40">{fgPct(b.fg2m, b.fg2a)}</td>
                       <td className="px-1 py-1.5 text-right text-tbw-ink/60">
                         {b.fg3m}/{b.fg3a}
                       </td>
+                      <td className="px-1 py-1.5 text-right text-tbw-ink/40">{fgPct(b.fg3m, b.fg3a)}</td>
                       <td className="px-1 py-1.5 text-right text-tbw-ink/60">
                         {b.ftm}/{b.fta}
                       </td>
+                      <td className="px-1 py-1.5 text-right text-tbw-ink/40">{fgPct(b.ftm, b.fta)}</td>
                       <td className="px-1 py-1.5 text-right text-tbw-ink/60">{b.rebounds}</td>
                       <td className="px-1 py-1.5 text-right text-tbw-ink/60">{b.assists}</td>
                       <td className="px-1 py-1.5 text-right text-tbw-ink/60">{b.steals}</td>
