@@ -250,7 +250,7 @@ export function Spiele() {
                 Team
               </th>
               <th className="px-1 py-1 text-right font-semibold">Sp</th>
-              <th className="px-1 py-1 text-right font-semibold">S-N</th>
+              <th className="whitespace-nowrap px-1 py-1 text-right font-semibold">S-N</th>
               <th className="px-1 py-1 text-right font-semibold">Pkt</th>
               <th className="px-1 py-1 text-right font-semibold">Körbe</th>
               <th className="pl-1 py-1 text-right font-semibold">Diff.</th>
@@ -270,7 +270,7 @@ export function Spiele() {
                   {row.team_name}
                 </td>
                 <td className="px-1 py-1.5 text-right text-tbw-ink/60">{row.spiele}</td>
-                <td className="px-1 py-1.5 text-right text-tbw-ink/60">
+                <td className="whitespace-nowrap px-1 py-1.5 text-right text-tbw-ink/60">
                   {row.siege}-{row.niederlagen}
                 </td>
                 <td
@@ -280,7 +280,7 @@ export function Spiele() {
                 >
                   {row.punkte}
                 </td>
-                <td className="px-1 py-1.5 text-right text-tbw-ink/60">
+                <td className="whitespace-nowrap px-1 py-1.5 text-right text-tbw-ink/60">
                   {row.koerbe_erzielt}:{row.koerbe_erhalten}
                 </td>
                 <td className="py-1.5 pl-1 text-right text-tbw-ink/60">

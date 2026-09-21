@@ -2303,6 +2303,13 @@ hier die getroffenen Entscheidungen samt Begründung:
   unterschieden werden. Auf `Dashboard.tsx` ist die Adresse jetzt ein Link (📍-Icon, gepunktet
   unterstrichen, `target="_blank"`) statt reinem Text — öffnet je nach installierten Apps direkt
   die native Karten-App statt nur den Browser.
+- **Nachtrag: "S-N"-Spalte der Liga-Tabelle brach auf schmalen Handy-Bildschirmen (iPhone) in
+  zwei Zeilen um.** Nebeneffekt der vorherigen Änderung (Team-Spalte auf Inhaltsbreite begrenzt,
+  `w-full`/`min-w-[...]` entfernt): ohne diese Mindestbreite gab der Browser den schmalen
+  Zahlen-Spalten bei `table-layout: auto` teils weniger Platz, als ihr Inhalt am Stück braucht —
+  "1-0" konnte dadurch am Bindestrich umbrechen, ebenso die Kopfzeile "S-N". Fix:
+  `whitespace-nowrap` auf die betroffene Kopf- und Datenzelle ergänzt (plus vorsorglich auf die
+  "Körbe"-Spalte, "100 : 71" hätte am Doppelpunkt dasselbe Problem gehabt).
 
 ## Projektstruktur
 
