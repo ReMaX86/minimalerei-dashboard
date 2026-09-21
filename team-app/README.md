@@ -759,6 +759,73 @@ Per Playwright verifiziert: Formular öffnen, Werte eintragen, Speichern → kor
 `PATCH`-Request, "Endstand: 55:48 · Sieg · Stats abgeschlossen" erscheint, Button wechselt zu
 "Tracking zurücksetzen".
 
+### 8. Liga-Tabelle (DBB-Sync)
+
+Optionale Zusatzfunktion (Feature-Flag `standings`, siehe Admin -> Funktionen), auf
+Nutzeranfrage: zeigt die aktuelle Tabelle der eigenen Liga unter "Spiele" an, mit der eigenen
+Mannschaft farblich hervorgehoben. Der DBB (basketball-bund.net) bietet dafür keine öffentliche
+API — die Seite ist eine alte, rein serverseitig gerenderte JSP-Anwendung, und der sichtbare
+"Export (Excel)"-Button ruft nur eine JavaScript-Funktion auf statt einer festen URL, ist also
+nicht direkt automatisiert abrufbar. Die Daten kommen daher per Scraping der öffentlich
+erreichbaren HTML-Tabellenseite (`api/sync-league-standings.ts`, per `pg_cron` einmal täglich
+aufgerufen), geparst mit `cheerio` und in `public.league_standings` (Migration `0056`)
+geschrieben — bei jedem Lauf wird die komplette Tabelle für die konfigurierte `liga_id` gelöscht
+und neu eingefügt (Rang UND Mannschaftszusammensetzung können sich jede Runde ändern, ein
+einfacher Full-Refresh ist robuster als Diffing).
+
+**Wichtiger Hinweis:** die genaue HTML-Struktur der DBB-Seite konnte beim Bauen dieser Funktion
+nicht live geprüft werden (die Entwicklungsumgebung hatte keinen Netzwerkzugriff auf
+basketball-bund.net) — das Parsing sucht die Tabelle deshalb bewusst robust über ihre
+Kopfzeilen-Texte ("Rang"/"Name" statt feste CSS-Klassen) und ordnet Spalten über die
+Kopfzeilen-Reihenfolge zu, statt feste Spaltenpositionen anzunehmen. Ein Smoke-Test gegen eine
+Beispiel-HTML-Seite (nachgebaut nach einem Screenshot der echten Tabelle) hat alle Werte korrekt
+extrahiert, inkl. Umlaut-Dekodierung ("TB Wülfrath" korrekt erkannt) — trotzdem lohnt sich nach
+dem ersten echten Sync-Lauf ein Blick auf den JSON-Response bzw. `net._http_response` (siehe
+unten), falls die Tabelle in der App leer bleibt.
+
+Läuft komplett kostenlos: Vercel-Serverless-Function wie die Push-Funktionen (Hobby-Tarif
+enthalten), kein zusätzlicher Dienst.
+
+**Setup:**
+
+1. **Migration ausführen**: `supabase/migrations/0056_league_standings.sql` im SQL-Editor
+   laufen lassen (legt die Tabelle, ihre Policies und das Feature-Flag `standings` an, standardmäßig
+   ausgeschaltet).
+2. **Liga-ID prüfen**: die Zahl aus der DBB-URL (`...&liga_id=54636`) — standardmäßig fest im
+   Code hinterlegt (`54636`, die aktuelle Liga von TB Wülfrath Herren). Falls sich die Liga mal
+   ändert (Auf-/Abstieg), als Vercel-Env-Var `DBB_LIGA_ID` mit dem neuen Wert überschreiben, kein
+   Redeploy des Codes nötig.
+3. **Cron-Job anlegen** (nutzt denselben `PUSH_WEBHOOK_SECRET` wie die anderen Cron-Jobs, kein
+   neues Secret nötig):
+   ```sql
+   select cron.schedule(
+     'sync-league-standings',
+     '0 6 * * *',
+     $$
+     select net.http_post(
+       url := 'https://<deine-vercel-domain>/api/sync-league-standings',
+       headers := jsonb_build_object('x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>')
+     );
+     $$
+   );
+   ```
+4. Manuell/testweise auslösen, ohne auf den nächsten Lauf zu warten:
+   ```sql
+   select net.http_post(
+     url := 'https://<deine-vercel-domain>/api/sync-league-standings',
+     headers := jsonb_build_object('x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>')
+   );
+   ```
+   Ergebnis prüfen:
+   ```sql
+   select status_code, content, created from net._http_response order by created desc limit 5;
+   ```
+   Erwartete Erfolgsmeldung: `{"updated": 12}` (Anzahl Zeilen). `{"skipped":"no_rows_parsed"}`
+   bedeutet, das Parsing hat auf der aktuellen Seite keine Tabelle gefunden — dann bitte melden,
+   dann wird das Parsing anhand der echten Seite nachgebessert.
+5. Danach im **Admin -> Funktionen** das Feature `Liga-Tabelle` aktivieren — erst jetzt taucht
+   die "Tabelle"-Karte unter "Spiele" überhaupt auf.
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten

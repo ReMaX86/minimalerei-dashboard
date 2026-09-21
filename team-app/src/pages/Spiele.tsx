@@ -7,13 +7,14 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { MeetingPointFields, EMPTY_MEETING_POINT, type MeetingPointFormValue } from '../components/MeetingPointFields';
 import { CarpoolSection } from '../components/CarpoolSection';
-import { fmtDate, fmtTime } from '../lib/format';
+import { fmtDate, fmtDateShort, fmtTime } from '../lib/format';
 import {
   gameResult,
   meetingPoints,
   playerAbsenceOn,
   type Game,
   type GameSquadRow,
+  type LeagueStandingRow,
   type Player,
   type PlayerAbsence
 } from '../types/database';
@@ -31,6 +32,7 @@ interface State {
   squad: GameSquadRow[];
   players: Player[];
   absences: PlayerAbsence[];
+  leagueStandings: LeagueStandingRow[];
 }
 
 function GameListItem({ game }: { game: Game }) {
@@ -104,7 +106,7 @@ export function Spiele() {
   const load = useCallback(async () => {
     setError(null);
     const today = new Date().toISOString().slice(0, 10);
-    const [gamesRes, playersRes, pastGamesRes] = await Promise.all([
+    const [gamesRes, playersRes, pastGamesRes, standingsRes] = await Promise.all([
       supabase
         .from('games')
         .select('*')
@@ -122,9 +124,12 @@ export function Spiele() {
             .order('game_date', { ascending: false })
             .order('game_time', { ascending: false })
             .limit(15)
-        : Promise.resolve({ data: [] as Game[], error: null })
+        : Promise.resolve({ data: [] as Game[], error: null }),
+      flags.standings
+        ? supabase.from('league_standings').select('*').order('rang')
+        : Promise.resolve({ data: [] as LeagueStandingRow[], error: null })
     ]);
-    if (gamesRes.error || playersRes.error || pastGamesRes.error) {
+    if (gamesRes.error || playersRes.error || pastGamesRes.error || standingsRes.error) {
       setError('Fehler beim Laden der Spiele.');
       return;
     }
@@ -150,9 +155,10 @@ export function Spiele() {
       pastGames: (pastGamesRes.data as Game[]) ?? [],
       squad,
       absences,
-      players: ((playersRes.data as Player[]) ?? []).sort((a, b) => a.name.localeCompare(b.name, 'de'))
+      players: ((playersRes.data as Player[]) ?? []).sort((a, b) => a.name.localeCompare(b.name, 'de')),
+      leagueStandings: (standingsRes.data as LeagueStandingRow[]) ?? []
     });
-  }, [flags.absences, flags.stats]);
+  }, [flags.absences, flags.stats, flags.standings]);
 
   useEffect(() => {
     load().catch(() => setError('Fehler beim Laden der Spiele.'));
@@ -226,11 +232,72 @@ export function Spiele() {
     </section>
   );
 
+  // Sortierung kommt schon aus der Query (order('rang')) — hier nur noch
+  // anzeigen. Leer, solange flags.standings aus ist oder der tägliche
+  // Sync (api/sync-league-standings.ts) noch nie erfolgreich lief.
+  const leagueStandingsSection = flags.standings && state.leagueStandings.length > 0 && (
+    <section className="card">
+      <p className="text-sm font-bold text-tbw-navyDark">Tabelle</p>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full min-w-[480px] text-left text-xs">
+          <thead>
+            <tr className="text-tbw-ink/40">
+              <th className="py-1 pr-2 font-semibold">#</th>
+              <th className="sticky left-0 z-10 border-r border-black/5 bg-white py-1 pr-2 font-semibold">Team</th>
+              <th className="px-1 py-1 text-right font-semibold">Sp</th>
+              <th className="px-1 py-1 text-right font-semibold">S-N</th>
+              <th className="px-1 py-1 text-right font-semibold">Pkt</th>
+              <th className="px-1 py-1 text-right font-semibold">Körbe</th>
+              <th className="pl-1 py-1 text-right font-semibold">Diff.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {state.leagueStandings.map((row) => (
+              <tr key={row.id} className={`border-t border-black/5 ${row.is_own_team ? 'bg-tbw-gold/10' : ''}`}>
+                <td className={`py-1.5 pr-2 ${row.is_own_team ? 'font-bold text-tbw-gold' : 'text-tbw-ink/60'}`}>
+                  {row.rang}
+                </td>
+                <td
+                  className={`sticky left-0 z-10 border-r border-black/5 py-1.5 pr-2 font-semibold ${
+                    row.is_own_team ? 'bg-tbw-gold/10 text-tbw-gold' : 'bg-white text-tbw-navyDark'
+                  }`}
+                >
+                  {row.team_name}
+                </td>
+                <td className="px-1 py-1.5 text-right text-tbw-ink/60">{row.spiele}</td>
+                <td className="px-1 py-1.5 text-right text-tbw-ink/60">
+                  {row.siege}-{row.niederlagen}
+                </td>
+                <td
+                  className={`px-1 py-1.5 text-right font-bold ${
+                    row.is_own_team ? 'text-tbw-gold' : 'text-tbw-navyDark'
+                  }`}
+                >
+                  {row.punkte}
+                </td>
+                <td className="px-1 py-1.5 text-right text-tbw-ink/60">
+                  {row.koerbe_erzielt}:{row.koerbe_erhalten}
+                </td>
+                <td className="py-1.5 pl-1 text-right text-tbw-ink/60">
+                  {row.diff > 0 ? `+${row.diff}` : row.diff}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-[10px] text-tbw-ink/40">
+        Quelle: basketball-bund.net · Stand {fmtDateShort(state.leagueStandings[0].updated_at.slice(0, 10))}
+      </p>
+    </section>
+  );
+
   if (!state.nextGame) {
     return (
       <div className="space-y-4">
         <p className="card text-sm text-tbw-ink/50">Kein anstehendes Spiel geplant.</p>
         {pastGamesSection}
+        {leagueStandingsSection}
       </div>
     );
   }
@@ -627,6 +694,7 @@ export function Spiele() {
       )}
 
       {pastGamesSection}
+      {leagueStandingsSection}
     </div>
   );
 }
