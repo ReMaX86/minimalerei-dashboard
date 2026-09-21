@@ -773,15 +773,25 @@ geschrieben — bei jedem Lauf wird die komplette Tabelle für die konfigurierte
 und neu eingefügt (Rang UND Mannschaftszusammensetzung können sich jede Runde ändern, ein
 einfacher Full-Refresh ist robuster als Diffing).
 
-**Wichtiger Hinweis:** die genaue HTML-Struktur der DBB-Seite konnte beim Bauen dieser Funktion
-nicht live geprüft werden (die Entwicklungsumgebung hatte keinen Netzwerkzugriff auf
-basketball-bund.net) — das Parsing sucht die Tabelle deshalb bewusst robust über ihre
-Kopfzeilen-Texte ("Rang"/"Name" statt feste CSS-Klassen) und ordnet Spalten über die
-Kopfzeilen-Reihenfolge zu, statt feste Spaltenpositionen anzunehmen. Ein Smoke-Test gegen eine
-Beispiel-HTML-Seite (nachgebaut nach einem Screenshot der echten Tabelle) hat alle Werte korrekt
-extrahiert, inkl. Umlaut-Dekodierung ("TB Wülfrath" korrekt erkannt) — trotzdem lohnt sich nach
-dem ersten echten Sync-Lauf ein Blick auf den JSON-Response bzw. `net._http_response` (siehe
-unten), falls die Tabelle in der App leer bleibt.
+Das Parsing sucht die Tabelle über ihre Kopfzeilen-Texte ("Rang"/"Name" statt feste CSS-Klassen)
+und ordnet Spalten über die Kopfzeilen-Reihenfolge zu, statt feste Spaltenpositionen anzunehmen.
+
+**Nachtrag: erster echter Sync-Lauf zeigte falsche Werte (leere Namen, Punkte/Körbe immer 0).**
+Die HTML-Struktur der DBB-Seite konnte beim ersten Bauen dieser Funktion nicht live geprüft
+werden (die Entwicklungsumgebung hatte keinen Netzwerkzugriff auf basketball-bund.net) — ein
+Smoke-Test gegen eine nachgebaute Beispielseite lief zwar sauber durch, wich aber in einem
+entscheidenden Detail von der echten Seite ab. Ursache, nach Prüfung des echten Seitenquelltexts
+(vom Nutzer per "Seitenquelltext anzeigen" geschickt): jede Kopfzeilen-Zelle verschachtelt ihr
+Label in eine eigene kleine Tabelle (`<td><table><tr><td>Rang</td></tr></table></td>`) — `.find('td')`
+auf die erste `<tr>` traf dadurch sowohl die äußere als auch die innere Zelle und verdoppelte die
+erkannte Spaltenanzahl (7 echte Spalten wurden als 14 erkannt), wodurch sich jede
+Spaltenzuordnung verschob (z. B. landete "Name" auf den eigentlichen "Spiele"-Werten). Fix: die
+Zellen-Erkennung nutzt jetzt `.children('td, th')` statt `.find('th, td')` — bleibt bei den
+direkten Kind-Zellen der Zeile, ignoriert also die verschachtelten inneren Tabellen, `.text()`
+liest den (verschachtelten) Inhalt trotzdem korrekt aus. Gegen den echten, vom Nutzer
+geschickten Seitenquelltext erneut smoke-getestet — jetzt exakt die richtigen Werte, inklusive
+korrekter Umlaut-Erkennung ("TB Wülfrath"). Nach diesem Fix zeigte ein erneuter manueller
+Sync-Lauf gegen die echte Live-Seite `{"updated":12}` mit korrekten Werten.
 
 Läuft komplett kostenlos: Vercel-Serverless-Function wie die Push-Funktionen (Hobby-Tarif
 enthalten), kein zusätzlicher Dienst.

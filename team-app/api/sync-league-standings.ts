@@ -56,7 +56,15 @@ function parseStandings(html: string): ParsedRow[] {
   $('table').each((_, tbl) => {
     if (dataTable) return;
     const $tbl = $(tbl);
-    const firstRowCells = $tbl.find('tr').first().find('th, td');
+    // Bewusst .children() statt .find(): jede Kopfzeilen-Zelle der echten
+    // DBB-Seite verschachtelt ihr Label in eine eigene kleine Tabelle
+    // (<td><table><tr><td>Rang</td></tr></table></td>) — .find('td') würde
+    // sowohl die äußere als auch die innere Zelle treffen und die
+    // Spaltenzuordnung dadurch verdoppeln/verschieben (live so aufgefallen:
+    // "Name" landete auf den Werten der "Spiele"-Spalte usw.). .children()
+    // bleibt bei den direkten Kind-Zellen der Zeile, .text() liest trotzdem
+    // den kompletten (verschachtelten) Zellinhalt korrekt aus.
+    const firstRowCells = $tbl.find('tr').first().children('td, th');
     const headerTexts = firstRowCells.map((__, el) => $(el).text().trim().toLowerCase()).get();
     if (headerTexts.some((t) => t.includes('rang')) && headerTexts.some((t) => t.includes('name'))) {
       dataTable = $tbl;
@@ -81,7 +89,7 @@ function parseStandings(html: string): ParsedRow[] {
     .find('tr')
     .slice(1)
     .each((_, tr) => {
-      const cells = $(tr).find('td');
+      const cells = $(tr).children('td');
       if (cells.length === 0) return;
       const cellText = (i: number) => (i >= 0 && i < cells.length ? $(cells.get(i)).text().trim() : '');
 
