@@ -14,6 +14,7 @@ const EMPTY_DETAILS = {
 
 export function PlayersAdmin() {
   const [players, setPlayers] = useState<Player[] | null>(null);
+  const [codes, setCodes] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -25,16 +26,23 @@ export function PlayersAdmin() {
 
   const load = useCallback(async () => {
     setError(null);
-    const { data, error: loadError } = await supabase
-      .from('players')
-      .select('*')
-      .order('is_active', { ascending: false })
-      .order('name');
-    if (loadError) {
+    const [{ data, error: loadError }, { data: codeRows, error: codesError }] = await Promise.all([
+      supabase.from('players').select('*').order('is_active', { ascending: false }).order('name'),
+      supabase.rpc('list_player_access_codes')
+    ]);
+    if (loadError || codesError) {
       setError('Fehler beim Laden der Spielerliste.');
       return;
     }
     setPlayers((data as Player[]) ?? []);
+    setCodes(
+      Object.fromEntries(
+        ((codeRows as { player_id: string; access_code: string }[] | null) ?? []).map((r) => [
+          r.player_id,
+          r.access_code
+        ])
+      )
+    );
   }, []);
 
   useEffect(() => {
@@ -49,7 +57,8 @@ export function PlayersAdmin() {
     try {
       const { data, error: rpcError } = await supabase.rpc('create_player', { p_name: name.trim() });
       if (rpcError) throw rpcError;
-      setNewCode({ name: name.trim(), code: (data as Player).access_code });
+      const row = (data as { player: Player; access_code: string }[])[0];
+      setNewCode({ name: name.trim(), code: row.access_code });
       setName('');
       await load();
     } catch {
@@ -196,7 +205,7 @@ export function PlayersAdmin() {
                 {p.is_co_captain && <span className="pill pill-ok">Co-Captain</span>}
                 {p.officiating_exempt && <span className="pill pill-open">Kampfgericht befreit</span>}
               </p>
-              <p className="text-xs text-tbw-ink/50">Code: {p.access_code}</p>
+              <p className="text-xs text-tbw-ink/50">Code: {codes[p.id] ?? '…'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => regenerate(p.id, p.name)}>

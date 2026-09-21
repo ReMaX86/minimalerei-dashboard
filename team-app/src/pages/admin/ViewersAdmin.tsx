@@ -6,6 +6,7 @@ import type { Viewer } from '../../types/database';
 
 export function ViewersAdmin() {
   const [viewers, setViewers] = useState<Viewer[] | null>(null);
+  const [codes, setCodes] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -13,16 +14,23 @@ export function ViewersAdmin() {
 
   const load = useCallback(async () => {
     setError(null);
-    const { data, error: loadError } = await supabase
-      .from('viewers')
-      .select('*')
-      .order('is_active', { ascending: false })
-      .order('name');
-    if (loadError) {
+    const [{ data, error: loadError }, { data: codeRows, error: codesError }] = await Promise.all([
+      supabase.from('viewers').select('*').order('is_active', { ascending: false }).order('name'),
+      supabase.rpc('list_viewer_access_codes')
+    ]);
+    if (loadError || codesError) {
       setError('Fehler beim Laden der Betrachter-Liste.');
       return;
     }
     setViewers((data as Viewer[]) ?? []);
+    setCodes(
+      Object.fromEntries(
+        ((codeRows as { viewer_id: string; access_code: string }[] | null) ?? []).map((r) => [
+          r.viewer_id,
+          r.access_code
+        ])
+      )
+    );
   }, []);
 
   useEffect(() => {
@@ -37,7 +45,8 @@ export function ViewersAdmin() {
     try {
       const { data, error: rpcError } = await supabase.rpc('create_viewer', { p_name: name.trim() });
       if (rpcError) throw rpcError;
-      setNewCode({ name: name.trim(), code: (data as Viewer).access_code });
+      const row = (data as { viewer: Viewer; access_code: string }[])[0];
+      setNewCode({ name: name.trim(), code: row.access_code });
       setName('');
       await load();
     } catch {
@@ -115,7 +124,7 @@ export function ViewersAdmin() {
           <li key={v.id} className={`card space-y-3 ${!v.is_active ? 'opacity-50' : ''}`}>
             <div>
               <p className="font-semibold text-tbw-navyDark">{v.name}</p>
-              <p className="text-xs text-tbw-ink/50">Code: {v.access_code}</p>
+              <p className="text-xs text-tbw-ink/50">Code: {codes[v.id] ?? '…'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => regenerate(v.id, v.name)}>
