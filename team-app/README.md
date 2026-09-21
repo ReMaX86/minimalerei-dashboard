@@ -846,6 +846,16 @@ synchronisiert, zeigt der Tab statt der leeren Fläche einen erklärenden Hinwei
 aktuell nicht verfügbar."), damit der vorausgewählte Tab nie einfach leer wirkt. Reiner UI-State
 (`useState`, kein Persistieren der Auswahl nötig) — kein neuer Datenbank-Zugriff.
 
+**Nachtrag: Team-Spalte der Tabelle unnötig breit.** `<table className="w-full min-w-[480px]">`
+zwang die Tabelle, den kompletten verfügbaren Platz auszufüllen — bei `table-layout: auto`
+(Browser-Standard) verteilte sich der überschüssige Platz dabei auch auf die Team-Spalte, statt
+nur so breit zu sein wie der längste Name. Auf einem schmalen Handy-Bildschirm blieb dadurch
+kaum noch scrollbarer Platz für die restlichen Spalten übrig. Fix: `w-full`/`min-w-[480px]`
+entfernt (die Tabelle bemisst sich jetzt an ihrem tatsächlichen Inhalt, `overflow-x-auto` am
+umgebenden Container scrollt weiterhin bei Bedarf) plus `whitespace-nowrap` auf der
+Team-Spalte (Kopf- und Datenzellen), damit ein langer Name nie umbricht, sondern die Spalte
+zuverlässig genau auf seine Breite wächst.
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
