@@ -1019,7 +1019,7 @@ export function GameStatsTracker() {
                         <div className="flex items-center gap-2">
                           {playersById[b.playerId] && <Avatar player={playersById[b.playerId]} size="xs" />}
                           {numPrefix(b.playerId)}
-                          {playersById[b.playerId]?.name ?? '?'}
+                          {playersById[b.playerId] ? shortPlayerName(playersById[b.playerId].name) : '?'}
                         </div>
                       </td>
                       <td className="px-1 py-1.5 text-right font-bold text-tbw-navyDark">{b.points}</td>
