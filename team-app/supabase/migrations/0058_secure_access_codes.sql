@@ -81,7 +81,12 @@ $$;
 -- Trainer-only: legt einen Spieler an und gibt Zeile + frisch generierten
 -- Code als zwei Spalten zurück (statt wie vorher als Teil der players-Zeile,
 -- die den Code ja jetzt nicht mehr enthält). Client: siehe PlayersAdmin.tsx.
-create or replace function public.create_player(p_name text)
+-- Rückgabetyp ändert sich gegenüber der bisherigen Funktion (players-Zeile
+-- -> Tabelle aus Zeile + Code) — "create or replace" erlaubt das nicht
+-- (Postgres-Fehler 42P13), deshalb erst explizit droppen.
+drop function if exists public.create_player(text);
+
+create function public.create_player(p_name text)
 returns table (player public.players, access_code text)
 language plpgsql
 security definer
@@ -110,7 +115,10 @@ end;
 $$;
 
 -- Trainer-only: legt einen Betrachter an, analog zu create_player().
-create or replace function public.create_viewer(p_name text)
+-- Gleicher Grund für den expliziten Drop wie bei create_player() oben.
+drop function if exists public.create_viewer(text);
+
+create function public.create_viewer(p_name text)
 returns table (viewer public.viewers, access_code text)
 language plpgsql
 security definer
