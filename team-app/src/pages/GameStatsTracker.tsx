@@ -405,7 +405,18 @@ export function GameStatsTracker() {
   // serverseitig per "Ratchet" (Migration 0042) — bewusst kein Fehler-UI
   // hier, ein Fehlschlag bei dieser Zusatzbenachrichtigung soll die
   // eigentliche Stats-Erfassung nie stören.
+  //
+  // Nachfrage vor dem eigentlichen Wechsel (auf Nutzeranfrage, nachdem ein
+  // versehentliches Durchklicken vor Spielbeginn schon einmal den Ratchet
+  // verbraucht hatte, siehe Migration 0053) — verhindert genau dieses
+  // Vertippen, da die Push sonst sofort mit dem (dann falschen)
+  // Zwischenstand rausginge.
   function selectQuarter(q: number) {
+    if (q === quarter) return;
+    const ok = window.confirm(
+      `Ist ${quarterLabel(quarter)} wirklich beendet und möchtest du zu ${quarterLabel(q)} wechseln?`
+    );
+    if (!ok) return;
     setQuarter(q);
     if (gameId && q >= 2 && q <= 4) {
       supabase.rpc('announce_quarter_score', { p_game_id: gameId, p_quarter: q - 1 }).then(undefined, () => {});
@@ -668,7 +679,7 @@ export function GameStatsTracker() {
                   className={`rounded-xl px-3 py-2 text-sm font-bold ${
                     quarter > 4 ? 'bg-tbw-navy text-white' : 'bg-tbw-bg text-tbw-ink/60'
                   }`}
-                  onClick={() => setQuarter((q) => (q > 4 ? q + 1 : 5))}
+                  onClick={() => selectQuarter(quarter > 4 ? quarter + 1 : 5)}
                 >
                   {quarter > 4 ? quarterLabel(quarter) : 'OT'}
                 </button>

@@ -2132,6 +2132,13 @@ hier die getroffenen Entscheidungen samt Begründung:
   `trikot_sets.current_holder_id`/`since` — wovon die große "Wer hat die Trikots?"-Kachel gespeist
   wird — wurde nie mehr aktualisiert. Fix: die fehlende Zeile wieder ergänzt, Rest der Funktion
   unverändert. Reine additive SQL-Korrektur (kein Signatur-Wechsel, kein Client-Code betroffen).
+- **Nachtrag: Bestätigung vor Viertelwechsel im Tracker.** Auf Nutzeranfrage, nachdem ein
+  versehentliches Durchklicken durch die Viertel vor Spielbeginn schon einmal den Ratchet aus
+  Migration `0042` verbraucht hatte (siehe oben) — jeder Klick auf einen anderen Viertel-Button
+  (inkl. OT) fragt jetzt erst per `window.confirm()` nach ("Ist Q1 wirklich beendet und möchtest du
+  zu Q2 wechseln?"), bevor `selectQuarter()` tatsächlich umschaltet und — bei Q2–Q4 — die
+  Live-Ticker-Push auslöst. Bei "Abbrechen" bleibt alles unverändert. Selbes `window.confirm()`-Muster
+  wie bereits bei "Spiel beenden" in derselben Datei, kein neuer UI-Baustein nötig.
 
 ## Projektstruktur
 
