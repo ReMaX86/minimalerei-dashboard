@@ -97,6 +97,9 @@ export function Spiele() {
   const [meetingEditorOpen, setMeetingEditorOpen] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [showPastMore, setShowPastMore] = useState(false);
+  // Auf Nutzeranfrage: Tabelle ist prominenter untergebracht (eigener Tab
+  // statt ganz unten auf der Seite) und standardmäßig vorausgewählt.
+  const [activeTab, setActiveTab] = useState<'spielplan' | 'tabelle'>('tabelle');
   const [publishing, setPublishing] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [meetingForm, setMeetingForm] = useState<MeetingPointFormValue>(EMPTY_MEETING_POINT);
@@ -292,12 +295,37 @@ export function Spiele() {
     </section>
   );
 
+  const tabsBar = (
+    <div className="flex gap-2">
+      <button
+        className={`flex-1 rounded-xl py-2 text-sm font-bold ${
+          activeTab === 'spielplan' ? 'bg-tbw-navy text-white' : 'bg-tbw-bg text-tbw-ink/60'
+        }`}
+        onClick={() => setActiveTab('spielplan')}
+      >
+        Spielplan
+      </button>
+      <button
+        className={`flex-1 rounded-xl py-2 text-sm font-bold ${
+          activeTab === 'tabelle' ? 'bg-tbw-navy text-white' : 'bg-tbw-bg text-tbw-ink/60'
+        }`}
+        onClick={() => setActiveTab('tabelle')}
+      >
+        Tabelle
+      </button>
+    </div>
+  );
+
+  const tabelleTab = leagueStandingsSection || (
+    <p className="card text-sm text-tbw-ink/50">Tabelle ist aktuell nicht verfügbar.</p>
+  );
+
   if (!state.nextGame) {
     return (
       <div className="space-y-4">
         <p className="card text-sm text-tbw-ink/50">Kein anstehendes Spiel geplant.</p>
-        {pastGamesSection}
-        {leagueStandingsSection}
+        {tabsBar}
+        {activeTab === 'spielplan' ? pastGamesSection : tabelleTab}
       </div>
     );
   }
@@ -663,38 +691,45 @@ export function Spiele() {
         )}
       </section>
 
-      {next3.length > 0 && (
-        <section className="card">
-          <p className="text-sm font-bold text-tbw-navyDark">Nächste Spiele</p>
-          <ul className="mt-2 space-y-2">
-            {next3.map((g) => (
-              <GameListItem key={g.id} game={g} />
-            ))}
-          </ul>
-        </section>
-      )}
+      {tabsBar}
 
-      {rest.length > 0 && (
-        <section className="card">
-          <button
-            className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
-            onClick={() => setShowMore((v) => !v)}
-          >
-            Weitere Spieltage anzeigen
-            <span>{showMore ? '▲' : '▼'}</span>
-          </button>
-          {showMore && (
-            <ul className="mt-3 space-y-2">
-              {rest.map((g) => (
-                <GameListItem key={g.id} game={g} />
-              ))}
-            </ul>
+      {activeTab === 'spielplan' ? (
+        <>
+          {next3.length > 0 && (
+            <section className="card">
+              <p className="text-sm font-bold text-tbw-navyDark">Nächste Spiele</p>
+              <ul className="mt-2 space-y-2">
+                {next3.map((g) => (
+                  <GameListItem key={g.id} game={g} />
+                ))}
+              </ul>
+            </section>
           )}
-        </section>
-      )}
 
-      {pastGamesSection}
-      {leagueStandingsSection}
+          {rest.length > 0 && (
+            <section className="card">
+              <button
+                className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+                onClick={() => setShowMore((v) => !v)}
+              >
+                Weitere Spieltage anzeigen
+                <span>{showMore ? '▲' : '▼'}</span>
+              </button>
+              {showMore && (
+                <ul className="mt-3 space-y-2">
+                  {rest.map((g) => (
+                    <GameListItem key={g.id} game={g} />
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {pastGamesSection}
+        </>
+      ) : (
+        tabelleTab
+      )}
     </div>
   );
 }
