@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff – Referenz: Karte „Letztes Ergebnis" (V1)</title>
+<!--
+  REFERENZ-UMSETZUNG der Karte „Letztes Ergebnis" (Variante 1).
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=win        Sieg, getrackt (Standard)
+    ?state=loss       Niederlage, getrackt
+    ?state=streak     Sieg, getrackt, mit laufender Serie (Label wechselt)
+    ?state=untracked  Endstand nachgetragen, nicht getrackt
+    ?state=noresult   Spiel vorbei, Endstand fehlt noch
+    ?state=notinsquad getrackt, aber du warst nicht im Kader
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F;--to-surface:#12151A;--to-surface-2:#1A1E25;--to-border:#232830;--to-line:#2A303A;
+  --to-text:#F2F4F7;--to-text-2:#A3ABB8;--to-text-3:#7C8594;
+  --to-accent:#C8FF2E;--to-on-accent:#0A0C0F;--to-accent-soft:rgba(200,255,46,.12);
+  --to-danger:#FF5A67;--to-danger-text:#FF7A85;--to-danger-soft:rgba(255,90,103,.14);
+}
+*{box-sizing:border-box}
+body{margin:0;padding:20px;background:var(--to-bg);color:var(--to-text);font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+[hidden]{display:none !important}
+.mono{font-family:'Geist Mono',monospace;font-variant-numeric:tabular-nums}
+
+.result{width:350px;border-radius:26px;background:var(--to-surface);border:1px solid var(--to-border);
+  padding:20px;display:flex;flex-direction:column;gap:16px}
+
+/* Kopfzeile */
+.head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.eyebrow{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--to-text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:8px;white-space:nowrap;flex:none;
+  font-family:'Geist Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.08em}
+.badge--win{background:var(--to-accent);color:var(--to-on-accent)}
+.badge--loss{background:var(--to-danger-soft);color:var(--to-danger-text)}
+.badge--open{background:var(--to-surface-2);color:var(--to-text-2)}
+
+/* Ergebnis */
+.score-row{display:flex;align-items:flex-end;justify-content:space-between;gap:14px}
+.who{display:flex;flex-direction:column;gap:4px;min-width:0}
+.who .opp{font-size:17px;font-weight:600;line-height:1.25}
+.who .date{font-family:'Geist Mono',monospace;font-size:13px;color:var(--to-text-3)}
+.score{display:flex;align-items:baseline;gap:2px;flex:none;font-family:'Geist Mono',monospace;font-size:34px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.score .sep{color:#5B626D;font-size:26px}
+.score .us.is-win{color:var(--to-accent)}
+.score .them.is-loss{color:var(--to-text-2)}
+.score--open{font-size:26px;color:var(--to-text-3)}
+
+/* Letzte 5 / Serie */
+.streak{display:flex;align-items:center;gap:12px;padding-top:14px;border-top:1px solid var(--to-border)}
+.streak__label{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--to-text-3);white-space:nowrap}
+.streak__label.is-win{color:var(--to-accent)}
+.streak__label.is-loss{color:var(--to-danger-text)}
+.streak__chips{flex:1;display:flex;gap:6px}
+.chip{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-family:'Geist Mono',monospace;font-size:12px;font-weight:600}
+.chip--w{background:var(--to-accent);color:var(--to-on-accent)}
+.chip--l{background:var(--to-surface-2);color:var(--to-danger-text)}
+.streak__record{font-size:13px;color:var(--to-text-2);white-space:nowrap}
+
+/* Eigene Werte */
+.stats{display:flex;gap:8px}
+.stat{flex:1;display:flex;flex-direction:column;gap:3px;padding:12px 14px;border-radius:14px;background:var(--to-surface-2)}
+.stat__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.stat__value{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:26px;line-height:1}
+.stat__value.is-accent{color:var(--to-accent)}
+
+/* Fußzeilen */
+.foot-link{display:flex;align-items:center;gap:10px;min-height:48px;padding-top:14px;border-top:1px solid var(--to-border);
+  color:var(--to-text);text-decoration:none}
+.foot-link svg.lead{width:19px;height:19px;flex:none;color:var(--to-accent)}
+.foot-link .txt{flex:1;font-size:15px;font-weight:600}
+.foot-link svg.chev{width:16px;height:16px;flex:none;color:#5B626D}
+.foot-note{display:flex;align-items:center;gap:10px;min-height:48px;padding-top:14px;border-top:1px solid var(--to-border);
+  font-size:14px;color:var(--to-text-2)}
+.foot-note .dot{width:8px;height:8px;border-radius:50%;background:var(--to-text-3);flex:none}
+.btn{height:50px;border:0;border-radius:14px;background:var(--to-accent);color:var(--to-on-accent);font-size:15px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%}
+</style>
+</head>
+<body>
+
+<section class="result" aria-label="Letztes Ergebnis">
+  <div class="head">
+    <span class="eyebrow" id="eyebrow">LETZTES SPIEL · HEIM</span>
+    <span class="badge badge--win" id="badge">SIEG</span>
+  </div>
+
+  <div class="score-row">
+    <span class="who">
+      <span class="opp" id="opp">vs. Hawks Mettmann</span>
+      <span class="date" id="date">SA 13.09.2026</span>
+    </span>
+    <span class="score" id="score"><span class="us is-win" id="us">78</span><span class="sep">:</span><span class="them" id="them">71</span></span>
+  </div>
+
+  <!-- Letzte 5 bzw. Serie -->
+  <div class="streak" id="streak">
+    <span class="streak__label" id="streak-label">LETZTE 5</span>
+    <span class="streak__chips" id="chips"></span>
+    <span class="streak__record" id="record">4 S · 1 N</span>
+  </div>
+
+  <!-- eigene Werte (nur getrackt UND im Kader) -->
+  <div class="stats" data-block="stats">
+    <span class="stat"><span class="stat__label">DEINE PUNKTE</span><span class="stat__value is-accent" id="pts">12</span></span>
+    <span class="stat"><span class="stat__label">REBOUNDS</span><span class="stat__value" id="reb">5</span></span>
+    <span class="stat"><span class="stat__label">ASSISTS</span><span class="stat__value" id="ast">3</span></span>
+  </div>
+
+  <!-- Box-Score (nur getrackt) -->
+  <a class="foot-link" href="#" data-block="box">
+    <svg class="lead" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M21 19H3"/></svg>
+    <span class="txt">Box-Score ansehen</span>
+    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+  </a>
+
+  <!-- nicht getrackt -->
+  <div class="foot-note" data-block="untracked" hidden><span class="dot"></span>Nicht getrackt – nur Endstand</div>
+
+  <!-- Endstand fehlt -->
+  <div data-block="noresult" hidden style="padding-top:14px;border-top:1px solid var(--to-border);display:flex;flex-direction:column;gap:10px">
+    <button type="button" class="btn">Endstand eintragen</button>
+    <span style="text-align:center;font-size:12px;color:var(--to-text-3)">Jede·r mit Zugang kann das Ergebnis nachtragen.</span>
+  </div>
+</section>
+
+<script>
+  const state = new URLSearchParams(location.search).get('state') || 'win';
+  const W = 'w', L = 'l';
+  const data = {
+    win:       { eyebrow: 'LETZTES SPIEL · HEIM',     opp: 'Hawks Mettmann', date: 'SA 13.09.2026', us: '78', them: '71', badge: 'win',  form: [W,L,W,W,W], rec: '4 S · 1 N', blocks: ['stats','box'] },
+    loss:      { eyebrow: 'LETZTES SPIEL · AUSWÄRTS', opp: 'BG Monheim',     date: 'SO 20.09.2026', us: '63', them: '82', badge: 'loss', form: [L,W,L,W,W], rec: '3 S · 2 N', blocks: ['stats','box'], pts: '8', reb: '4', ast: '2' },
+    streak:    { eyebrow: 'LETZTES SPIEL · HEIM',     opp: 'Hawks Mettmann', date: 'SA 13.09.2026', us: '78', them: '71', badge: 'win',  form: [W,W,W,L,W], rec: '4 S · 1 N', blocks: ['stats','box'], streakLabel: '3 SIEGE IN FOLGE', streakTone: 'is-win' },
+    untracked: { eyebrow: 'LETZTES SPIEL · AUSWÄRTS', opp: 'BG Monheim',     date: 'SO 20.09.2026', us: '63', them: '82', badge: 'loss', form: [L,W,L,W,W], rec: '3 S · 2 N', blocks: ['untracked'] },
+    noresult:  { eyebrow: 'LETZTES SPIEL · AUSWÄRTS', opp: 'BG Monheim',     date: 'SO 20.09.2026', us: null,               badge: 'open', form: [W,L,W,W,W], rec: '4 S · 1 N', blocks: ['noresult'] },
+    notinsquad:{ eyebrow: 'LETZTES SPIEL · AUSWÄRTS', opp: 'BG Monheim',     date: 'SO 20.09.2026', us: '63', them: '82', badge: 'loss', form: [L,W,L,W,W], rec: '3 S · 2 N', blocks: ['box'] }
+  }[state];
+
+  document.getElementById('eyebrow').textContent = data.eyebrow;
+  document.getElementById('opp').textContent = 'vs. ' + data.opp;
+  document.getElementById('date').textContent = data.date;
+
+  const badge = document.getElementById('badge');
+  badge.className = 'badge badge--' + data.badge;
+  badge.textContent = data.badge === 'win' ? 'SIEG' : data.badge === 'loss' ? 'NIEDERLAGE' : 'OFFEN';
+
+  const score = document.getElementById('score');
+  if (data.us === null) { score.className = 'score score--open'; score.innerHTML = '–&nbsp;:&nbsp;–'; }
+  else {
+    document.getElementById('us').textContent = data.us;
+    document.getElementById('them').textContent = data.them;
+    document.getElementById('us').className = 'us' + (data.badge === 'win' ? ' is-win' : '');
+    document.getElementById('them').className = 'them' + (data.badge === 'loss' ? ' is-loss' : '');
+  }
+
+  document.getElementById('chips').innerHTML = data.form
+    .map(r => `<span class="chip chip--${r}">${r === 'w' ? 'S' : 'N'}</span>`).join('');
+  document.getElementById('record').textContent = data.rec;
+  if (data.streakLabel) {
+    const l = document.getElementById('streak-label');
+    l.textContent = data.streakLabel;
+    l.classList.add(data.streakTone);
+    document.getElementById('record').hidden = true; // bei laufender Serie ersetzt das Label die Bilanz
+  }
+  if (data.pts) { document.getElementById('pts').textContent = data.pts; document.getElementById('reb').textContent = data.reb; document.getElementById('ast').textContent = data.ast; }
+
+  document.querySelectorAll('[data-block]').forEach(el => { el.hidden = !data.blocks.includes(el.dataset.block); });
+</script>
+</body>
+</html>

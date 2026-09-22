@@ -12,13 +12,25 @@ export function fmtDateShort(iso: string): string {
 // docs/design/tipoff-design/elements/02-naechstes-spiel/): zweistelliges
 // Wochentagskürzel in Versalien + fmtDateShort(), ohne Jahr.
 export function fmtDateBadge(iso: string): string {
+  return `${weekdayBadge(iso)} ${fmtDateShort(iso)}`;
+}
+
+// "SA 13.09.2026" — Datumszeile auf der Karte "Letztes Ergebnis" (siehe
+// docs/design/tipoff-design/elements/03-letztes-ergebnis/): wie
+// fmtDateBadge(), aber mit Jahr statt trennendem Punkt am Ende.
+export function fmtDateBadgeWithYear(iso: string): string {
   const d = new Date(iso + 'T00:00:00');
-  const weekday = d
+  const datePart = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return `${weekdayBadge(iso)} ${datePart}`;
+}
+
+function weekdayBadge(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  return d
     .toLocaleDateString('de-DE', { weekday: 'short' })
     .replace(/[^a-zA-ZÀ-ÿ]/g, '')
     .slice(0, 2)
     .toUpperCase();
-  return `${weekday} ${fmtDateShort(iso)}`;
 }
 
 export function fmtTime(time: string): string {

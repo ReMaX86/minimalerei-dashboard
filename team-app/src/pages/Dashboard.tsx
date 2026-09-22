@@ -12,16 +12,17 @@ import { PushNotificationCard } from '../components/PushNotificationCard';
 import { IconChevronRight, IconClipboard, IconJersey } from '../components/NavIcons';
 import { StartHeader } from '../components/StartHeader';
 import { NextGameCard } from '../components/NextGameCard';
+import { LastResultCard } from '../components/LastResultCard';
 import { usePushStatus } from '../hooks/usePushStatus';
 import { fmtDate, fmtDateShort, fmtTime, hasKickedOff } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
 import { computeReminders, type ReminderItem } from '../lib/reminders';
 import { latestTransferFrom, pendingWasherFor } from '../lib/trikots';
+import { computeBoxScore } from '../lib/gameStats';
 import {
   OFFICIATING_TASK_LABELS,
   STAT_POINT_VALUES,
   benoetigterSatz,
-  gameResult,
   officiatingGameLabel,
   type Announcement,
   type CarpoolClaim,
@@ -29,6 +30,7 @@ import {
   type DeclineReason,
   type Game,
   type GameSquadRow,
+  type GameStatEvent,
   type OfficiatingGame,
   type OfficiatingTask,
   type Player,
@@ -43,8 +45,6 @@ import {
   type TrikotTransferLogRow,
   type TrikotWashLogRow
 } from '../types/database';
-
-const RESULT_LABELS = { sieg: 'Sieg', niederlage: 'Niederlage', unentschieden: 'Unentschieden' } as const;
 
 // Spielberichtsbogen-Grenze — dieselbe Zahl wie MAX_SQUAD_SIZE in
 // Spiele.tsx; wird bei der Kader/Trainer-Modus-Umstellung (nächster
@@ -69,7 +69,10 @@ interface DashboardData {
   carpoolClaims: CarpoolClaim[];
   absencesOverview: PlayerAbsence[];
   lastResult: Game | null;
-  myTotalPoints: number | null;
+  lastResultInSquad: boolean | null;
+  lastResultTracked: boolean;
+  lastResultMyBoxScore: { points: number; rebounds: number; assists: number } | null;
+  recentResults: Game[];
   squadCount: number | null;
   declinedNames: string[];
   reminders: ReminderItem[];
@@ -89,6 +92,7 @@ export function Dashboard() {
   const [trainingVersion, setTrainingVersion] = useState(0);
   const [trikotVersion, setTrikotVersion] = useState(0);
   const [squadResponseVersion, setSquadResponseVersion] = useState(0);
+  const [resultVersion, setResultVersion] = useState(0);
   const [showUpcomingAbsences, setShowUpcomingAbsences] = useState(false);
   // Direkte Trikot-Übergabe (siehe Migration 0048): eigener State statt
   // pro-Set, da realistisch immer nur ein Set gleichzeitig übergeben wird —
@@ -454,29 +458,67 @@ export function Dashboard() {
         }
       }
 
+      // Karte "Letztes Ergebnis": IMMER das zuletzt angepfiffene Spiel, auch
+      // ohne Endstand (siehe elements/03-letztes-ergebnis/PROMPT.md) — anders
+      // als vorher (das nur das letzte FINALISIERTE Spiel fand, siehe unten
+      // bei recentResults) — deshalb ein paar Kandidaten laden (falls das
+      // jüngste Spiel per Datum von heute noch gar nicht angepfiffen ist) und
+      // client-seitig den ersten mit erreichtem Anpfiff nehmen.
       let lastResult: Game | null = null;
-      let myTotalPoints: number | null = null;
+      let lastResultInSquad: DashboardData['lastResultInSquad'] = null;
+      let lastResultTracked = false;
+      let lastResultMyBoxScore: DashboardData['lastResultMyBoxScore'] = null;
+      let recentResults: Game[] = [];
       if (flags.stats) {
-        const { data: lastGameRow } = await supabase
+        const { data: candidateRows } = await supabase
+          .from('games')
+          .select('*')
+          .lte('game_date', today)
+          .order('game_date', { ascending: false })
+          .order('game_time', { ascending: false })
+          .limit(3);
+        lastResult =
+          ((candidateRows as Game[] | null) ?? []).find((g) => hasKickedOff(g.game_date, g.game_time)) ?? null;
+
+        // Für "Letzte 5"/Serie: die letzten fünf Spiele mit EINGETRAGENEM
+        // Endstand — unabhängig vom obigen lastResult (das auch ohne
+        // Endstand gesetzt sein kann, siehe "noresult"-Zustand; ein Spiel
+        // ohne Endstand zählt für die Serie laut Vorgabe nicht mit).
+        const { data: recentRows } = await supabase
           .from('games')
           .select('*')
           .not('stats_finalized_at', 'is', null)
           .order('game_date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        lastResult = lastGameRow as Game | null;
+          .limit(5);
+        recentResults = (recentRows as Game[]) ?? [];
 
-        if (role === 'player' && player) {
-          const { data: statRows } = await supabase
+        if (lastResult) {
+          // Nur die drei Felder, die computeBoxScore() tatsächlich liest
+          // (siehe gameStats.ts) — quarter/id/etc. sind für die Aggregation
+          // irrelevant, der Cast spiegelt genau das.
+          const { data: eventRows } = await supabase
             .from('game_stat_events')
-            .select('stat_type')
-            .eq('team', 'us')
-            .eq('player_id', player.id)
-            .in('stat_type', ['fg2_made', 'fg3_made', 'ft_made']);
-          myTotalPoints = ((statRows as { stat_type: StatType }[] | null) ?? []).reduce(
-            (sum, r) => sum + (STAT_POINT_VALUES[r.stat_type] ?? 0),
-            0
-          );
+            .select('team, player_id, stat_type')
+            .eq('game_id', lastResult.id);
+          const events = (eventRows ?? []) as unknown as GameStatEvent[];
+          lastResultTracked = events.length > 0;
+
+          if (role === 'player' && player) {
+            const { data: squadRow } = await supabase
+              .from('game_squad')
+              .select('is_selected')
+              .eq('game_id', lastResult.id)
+              .eq('player_id', player.id)
+              .maybeSingle();
+            lastResultInSquad = squadRow?.is_selected ?? false;
+
+            if (lastResultTracked) {
+              const myRow = computeBoxScore(events).find((b) => b.playerId === player.id);
+              lastResultMyBoxScore = myRow
+                ? { points: myRow.points, rebounds: myRow.rebounds, assists: myRow.assists }
+                : null;
+            }
+          }
         }
       }
 
@@ -522,7 +564,10 @@ export function Dashboard() {
         carpoolClaims,
         absencesOverview,
         lastResult,
-        myTotalPoints,
+        lastResultInSquad,
+        lastResultTracked,
+        lastResultMyBoxScore,
+        recentResults,
         squadCount,
         reminders,
         declinedNames,
@@ -548,7 +593,8 @@ export function Dashboard() {
     absenceVersion,
     trainingVersion,
     trikotVersion,
-    squadResponseVersion
+    squadResponseVersion,
+    resultVersion
   ]);
 
   // Live-Anzeigetafel fürs laufende Spiel: der große Initial-Load oben läuft
@@ -722,41 +768,18 @@ export function Dashboard() {
         </section>
       )}
 
-      {/* Letztes Ergebnis — kein Mockup-Pendant, gleiche Kartensprache
-          (DESIGN.md §7). */}
+      {/* Letztes Ergebnis — Vorlage: docs/design/tipoff-design/elements/
+          03-letztes-ergebnis/ (pixelgenau, siehe PROMPT.md dort). */}
       {flags.stats && data.lastResult && (
-        <section className="card !p-5">
-          <p className="to-label">Letztes Ergebnis</p>
-          <div className="mt-2 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-to-text">vs. {data.lastResult.opponent}</p>
-              <p className="text-xs text-to-text3">{fmtDate(data.lastResult.game_date)}</p>
-            </div>
-            <div className="text-right">
-              <p className="tabular-score text-2xl text-to-text">
-                {data.lastResult.final_score_us}:{data.lastResult.final_score_opponent}
-              </p>
-              {gameResult(data.lastResult) && (
-                <span className={`pill ${gameResult(data.lastResult) === 'sieg' ? 'pill-ok' : 'pill-open'}`}>
-                  {RESULT_LABELS[gameResult(data.lastResult)!]}
-                </span>
-              )}
-            </div>
-          </div>
-          {role === 'player' && data.myTotalPoints !== null && (
-            <p className="mt-2 border-t border-to-divider pt-2 text-xs text-to-text2">
-              Deine Punkte diese Saison: <span className="font-semibold text-to-text">{data.myTotalPoints}</span>
-            </p>
-          )}
-          {(role === 'player' || role === 'trainer' || role === 'viewer') && (
-            <Link
-              to={`/stats/${data.lastResult.id}`}
-              className="mt-2 block border-t border-to-divider pt-2 text-xs font-semibold text-to-accent"
-            >
-              Box-Score ansehen →
-            </Link>
-          )}
-        </section>
+        <LastResultCard
+          game={data.lastResult}
+          role={role as 'trainer' | 'player' | 'viewer'}
+          inSquad={data.lastResultInSquad}
+          wasTracked={data.lastResultTracked}
+          myBoxScore={data.lastResultMyBoxScore}
+          recentResults={data.recentResults}
+          onScoreReported={() => setResultVersion((v) => v + 1)}
+        />
       )}
 
       {/* Status-Kacheln — DESIGN.md: Kader-Stand + eigener nächster

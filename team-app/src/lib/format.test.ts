@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { daysUntil, fmtDateBadge, fmtDateTimeShort, hasKickedOff, mapsUrl, shortPlayerName } from './format';
+import { daysUntil, fmtDateBadge, fmtDateBadgeWithYear, fmtDateTimeShort, hasKickedOff, mapsUrl, shortPlayerName } from './format';
 
 describe('shortPlayerName', () => {
   it('shortens a two-part name to first name + last initial', () => {
@@ -35,6 +35,12 @@ describe('mapsUrl', () => {
 describe('fmtDateBadge', () => {
   it('formats as uppercase two-letter weekday + day.month.', () => {
     expect(fmtDateBadge('2026-09-25')).toBe('FR 25.09.');
+  });
+});
+
+describe('fmtDateBadgeWithYear', () => {
+  it('formats as uppercase two-letter weekday + day.month.year', () => {
+    expect(fmtDateBadgeWithYear('2026-09-25')).toBe('FR 25.09.2026');
   });
 });
 
