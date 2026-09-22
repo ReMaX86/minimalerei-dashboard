@@ -485,8 +485,17 @@ export function Dashboard() {
           .order('game_date', { ascending: false })
           .order('game_time', { ascending: false })
           .limit(3);
+        // Ein bereits finalisiertes Spiel zählt IMMER als "gespielt", auch
+        // wenn die geplante Anpfiffzeit (nur ein Richtwert) noch nicht
+        // erreicht ist — sonst verschwindet ein Ergebnis, das früher als
+        // geplant getrackt und beendet wurde, hinter einem älteren Spiel
+        // (derselbe Fehler wie vorher bei der Live-Anzeige in
+        // NextGameCard.tsx: die geplante Uhrzeit ist kein verlässliches
+        // "das Spiel läuft/ist vorbei"-Signal).
         lastResult =
-          ((candidateRows as Game[] | null) ?? []).find((g) => hasKickedOff(g.game_date, g.game_time)) ?? null;
+          ((candidateRows as Game[] | null) ?? []).find(
+            (g) => g.stats_finalized_at || hasKickedOff(g.game_date, g.game_time)
+          ) ?? null;
 
         // Für "Letzte 5"/Serie: die letzten fünf Spiele mit EINGETRAGENEM
         // Endstand — unabhängig vom obigen lastResult (das auch ohne
