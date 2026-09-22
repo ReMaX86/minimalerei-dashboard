@@ -11,6 +11,7 @@ import { AbsenceSection } from '../components/AbsenceSection';
 import { PushNotificationCard } from '../components/PushNotificationCard';
 import { IconChevronRight, IconClipboard, IconJersey } from '../components/NavIcons';
 import { Countdown } from '../components/Countdown';
+import { StartHeader } from '../components/StartHeader';
 import { usePushStatus } from '../hooks/usePushStatus';
 import { fmtDate, fmtDateShort, fmtTime, hasKickedOff, mapsUrl } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
@@ -589,7 +590,6 @@ export function Dashboard() {
   if (error) return <div className="card text-sm text-to-dangerText">{error}</div>;
   if (!data) return <LoadingSpinner />;
 
-  const firstName = (player?.name ?? '').split(' ')[0];
   const ownSetId = player
     ? data.trikotSets.find((s) => s.current_holder_id === player.id)?.id ?? null
     : null;
@@ -615,8 +615,7 @@ export function Dashboard() {
 
   return (
     <div className="space-y-4">
-      {player && <p className="to-label !text-to-text3">Willkommen zurück</p>}
-      {player && <h1 className="headline text-[32px] leading-none text-to-text">Hi {firstName}.</h1>}
+      <StartHeader nextGameDate={data.nextGame?.game_date ?? null} pushStatus={pushStatus} onPushChange={refreshPushStatus} />
 
       {/* Nächstes Spiel — DESIGN.md Dashboard.dc.html: Karte mit Court-Linien-
           Deko, Team-Zeile, Countdown, Kader-Status (nur Anzeige, siehe §7). */}
@@ -642,7 +641,7 @@ export function Dashboard() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <p className="headline text-[40px] leading-[0.95] text-to-text">{fmtDate(data.nextGame.game_date)}</p>
+              <p className="to-display-md text-to-text">{fmtDate(data.nextGame.game_date)}</p>
               <p className="to-data text-sm text-to-text2">
                 {fmtTime(data.nextGame.game_time)} Uhr
                 {meetingPoints(data.nextGame)[0]?.time && ` · Treffpunkt ${fmtTime(meetingPoints(data.nextGame)[0].time!)}`}

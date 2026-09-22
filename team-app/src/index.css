@@ -56,15 +56,8 @@
   .card-dark {
     @apply card;
   }
-  /* Screen-Headlines/Hero-Datum — entspricht .to-display aus
-     tipoff-tokens.css, als Klassenname aus der Vorgänger-Version
-     beibehalten, damit noch nicht migrierte Screens (PlayerProfiles,
-     ResetPassword, MyProfileModal) automatisch mitgezogen werden. */
-  .headline {
-    @apply to-display;
-  }
   /* Punktstände/Zähler — entspricht .to-data, Name aus Vorgänger-Version
-     beibehalten (siehe .headline oben). */
+     beibehalten. */
   .tabular-score {
     @apply to-data font-bold;
   }

@@ -79,8 +79,8 @@ export function MyProfileModal({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <p className="headline text-xl text-tbw-navyDark">Mein Profil</p>
-          <button className="text-sm font-semibold text-tbw-ink/50" onClick={onClose}>
+          <p className="to-display-lg text-to-text">Mein Profil</p>
+          <button className="text-sm font-semibold text-to-text2" onClick={onClose}>
             Schließen
           </button>
         </div>
@@ -100,7 +100,7 @@ export function MyProfileModal({ onClose }: { onClose: () => void }) {
 
         <div className="mt-4 space-y-2">
           <label className="block text-xs">
-            <span className="font-semibold text-tbw-ink/50">Größe (cm)</span>
+            <span className="font-semibold text-to-text2">Größe (cm)</span>
             <input
               type="number"
               className="input mt-1"

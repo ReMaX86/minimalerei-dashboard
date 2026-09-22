@@ -40,7 +40,7 @@ export function ResetPassword() {
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-tbw-navyDark to-tbw-navy text-white">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-10">
-        <h2 className="headline text-3xl text-white">Neues Passwort</h2>
+        <h2 className="to-display-lg text-white">Neues Passwort</h2>
         {done ? (
           <>
             <p className="mt-4 text-sm leading-relaxed text-white/70">

@@ -45,7 +45,7 @@ export function PlayerProfiles() {
         </button>
         <div className="card text-center">
           <Avatar player={selected} size="lg" />
-          <p className="mt-3 headline text-2xl text-tbw-navyDark">{selected.name}</p>
+          <p className="mt-3 to-display-lg text-to-text">{selected.name}</p>
           <p className="mt-1 text-sm text-tbw-ink/50">
             {selected.position ? POSITION_LABELS[selected.position] : 'Position unbekannt'}
           </p>

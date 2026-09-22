@@ -15,11 +15,11 @@ import { Admin } from './pages/Admin';
 import { PlayerProfiles } from './pages/PlayerProfiles';
 import { GameStatsTracker } from './pages/GameStatsTracker';
 
-function Shell({ title, children }: { title: string; children: ReactNode }) {
+function Shell({ title, hideHeader, children }: { title: string; hideHeader?: boolean; children: ReactNode }) {
   return (
     <div className="min-h-screen pb-[calc(5rem+env(safe-area-inset-bottom))]">
-      <Header title={title} />
-      <main className="mx-auto max-w-lg px-4 py-4">{children}</main>
+      {!hideHeader && <Header title={title} />}
+      <main className="mx-auto max-w-lg px-5 py-5">{children}</main>
       <BottomNav />
     </div>
   );
@@ -80,7 +80,7 @@ export default function App() {
       <Route
         path="/"
         element={
-          <Shell title="Start">
+          <Shell title="Start" hideHeader>
             <Dashboard />
           </Shell>
         }

@@ -87,7 +87,7 @@ function Intro({ onDone }: { onDone: () => void }) {
     <div className="text-center">
       <p className="to-label text-to-accent">Willkommen</p>
       <slide.Icon className="mx-auto mt-6 h-14 w-14 text-to-accent" />
-      <h2 className="headline mt-6 text-3xl text-to-text">{slide.title}</h2>
+      <h2 className="to-display-xl mt-6 text-to-text">{slide.title}</h2>
       <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-to-text2">{slide.text}</p>
 
       <div className="mt-8 flex justify-center gap-2">
@@ -139,7 +139,7 @@ function Welcome({ onTrainer, onPlayer }: { onTrainer: () => void; onPlayer: () 
 
       <div className="mt-8 flex flex-col gap-4">
         <p className="to-label text-to-accent">Willkommen im Team</p>
-        <h1 className="headline text-[38px] leading-none text-to-text">Alles klar vor dem Sprungball.</h1>
+        <h1 className="to-display-xl text-to-text">Alles klar vor dem Sprungball.</h1>
         <p className="max-w-xs text-base leading-relaxed text-to-text2">
           Kader, Trikots, Kampfgericht und Spielplan deines Teams — an einem Ort und immer aktuell.
         </p>
@@ -194,7 +194,7 @@ function TrainerLogin({ onBack, onForgotPassword }: { onBack: () => void; onForg
   return (
     <div>
       <BackButton onClick={onBack} />
-      <h2 className="headline mt-6 text-3xl text-to-text">Trainer-Login</h2>
+      <h2 className="to-display-lg mt-6 text-to-text">Trainer-Login</h2>
       <form onSubmit={submit} className="mt-6 space-y-3">
         <input
           type="email"
@@ -252,7 +252,7 @@ function ForgotPassword({ onBack }: { onBack: () => void }) {
   return (
     <div>
       <BackButton onClick={onBack} />
-      <h2 className="headline mt-6 text-3xl text-to-text">Passwort vergessen</h2>
+      <h2 className="to-display-lg mt-6 text-to-text">Passwort vergessen</h2>
       {sent ? (
         <p className="mt-6 text-sm leading-relaxed text-to-text2">
           Falls ein Trainer-Account mit dieser E-Mail existiert, wurde ein Link zum Zurücksetzen des Passworts
@@ -308,7 +308,7 @@ function PlayerCode({ onBack }: { onBack: () => void }) {
       <BackButton onClick={onBack} />
       <div className="mt-6 flex flex-col gap-4">
         <p className="to-label text-to-accent">Zugangscode</p>
-        <h1 className="headline text-[34px] leading-none text-to-text">Dein persönlicher Code.</h1>
+        <h1 className="to-display-xl text-to-text">Dein persönlicher Code.</h1>
         <p className="text-base leading-relaxed text-to-text2">
           Den Code hast du von deinem Trainer bekommen, z. B. „FIN82" — ein Passwort brauchst du nicht.
         </p>

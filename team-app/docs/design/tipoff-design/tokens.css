@@ -49,17 +49,31 @@
   --to-space-7: 28px;
 
   --to-tap: 44px;        /* Mindest-Touchfläche */
+
+  /* Display-Headline-Skala (Update 2026-09-22) — feste Stufen statt
+     Screen-eigener Werte, siehe DESIGN.md §3. */
+  --to-display-xl: 32px;  /* Begrüßung ("Hi Marc!"), Headline im Willkommens-Screen */
+  --to-display-lg: 28px;  /* Screen-Titel ("Kader", "Kader bearbeiten") */
+  --to-display-md: 34px;  /* Datum im "Nächstes Spiel"-Kasten (z. B. "SA 26.09.") */
+  --to-display-num: 40px; /* Große Zähler (z. B. "10/12" im Kader) */
 }
 
 /* Typo-Rollen */
-.to-display {        /* Screen-Headlines, Datum im Hero */
+.to-display-xl,
+.to-display-lg,
+.to-display-md,
+.to-display-num {
   font-family: var(--to-font-display);
   font-stretch: 125%;
   font-weight: 800;
   font-style: italic;
   letter-spacing: -0.035em;
-  line-height: 1;
+  line-height: 1.05;
 }
+.to-display-xl { font-size: var(--to-display-xl); }
+.to-display-lg { font-size: var(--to-display-lg); }
+.to-display-md { font-size: var(--to-display-md); }
+.to-display-num { font-size: var(--to-display-num); }
 .to-number {         /* Trikotnummern */
   font-family: var(--to-font-number);
   font-stretch: 62%;

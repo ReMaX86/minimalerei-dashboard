@@ -44,6 +44,20 @@ Drei Rollen, alle von Google Fonts (Link steht in `tokens.css`):
 | Text | Geist | 400 / 500 / 600 | Namen, Beschreibungen, Buttons |
 | Daten & Labels | Geist Mono | 11–15 px, Labels in Versalien mit `letter-spacing: 0.12em` | „NÄCHSTES SPIEL · SPIELTAG 3", „14:00 Uhr", Countdown |
 
+**Display-Headline-Skala** (Update 2026-09-22): Statt screen-eigener Größen gilt jetzt eine feste
+Skala für alle Display-Headlines — als Tokens in `tokens.css` (`--to-display-xl/-lg/-md/-num`)
+und passenden Klassen (`.to-display-xl/-lg/-md/-num`), jede mit `font-stretch: 125%`, 800,
+*italic*, `letter-spacing: -0.035em`, `line-height: 1.05`:
+
+| Token/Klasse | Größe | Einsatz |
+|---|---|---|
+| `--to-display-xl` | 32px | Begrüßung ("Hi Marc!"), Headline im Willkommens-Screen |
+| `--to-display-lg` | 28px | Screen-Titel ("Kader", "Kader bearbeiten") |
+| `--to-display-md` | 34px | Datum im "Nächstes Spiel"-Kasten (z. B. "SA 26.09.") |
+| `--to-display-num` | 40px | Große Zähler (z. B. "10/12" im Kader) |
+
+Kein Screen setzt mehr eine eigene Headline-Größe — immer eine dieser vier Stufen.
+
 Größen: Screen-Titel 30–36 px · Hero-Datum 46 px · Karten-Titel 18 px/600 · Text 15–16 px · Sekundär 12–13 px · Labels 11 px.
 
 ## 4. Logo & Icon

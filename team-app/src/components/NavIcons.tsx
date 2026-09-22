@@ -132,6 +132,24 @@ export function IconAlertTriangle(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconChevronDown(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M6 9.5 12 15.5 18 9.5" />
+    </svg>
+  );
+}
+
+export function IconLogout(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M15.5 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7.5a2 2 0 0 0 2-2v-2" />
+      <path d="M9.5 12h11" />
+      <path d="M17.5 8.5 21 12l-3.5 3.5" />
+    </svg>
+  );
+}
+
 export function IconGear(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
