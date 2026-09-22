@@ -2422,6 +2422,28 @@ hier die getroffenen Entscheidungen samt Begründung:
   nächsten Deploy im SQL-Editor laufen** — der Client verlässt sich sofort auf die neue Rückgabeform
   von `create_player`/`create_viewer` (Tabellenzeile `{ player, access_code }` statt Code als Feld
   der `players`/`viewers`-Zeile).
+- **Nachtrag: alle `api/send-*.ts`-Functions zu einer einzigen `api/notify.ts` zusammengeführt —
+  Produktion lief dadurch mehrere Tage auf einem veralteten Stand.** Vercel Hobby erlaubt maximal
+  12 Serverless Functions pro Deployment (eine Datei unter `api/` = eine Function). Mit
+  `api/send-game-started.ts` (Push #171) kamen wir auf 13 Dateien — die beiden folgenden
+  Produktions-Deployments (Push #171 UND der Security-Fix Push #172 oben) scheiterten dadurch
+  live mit `exceeded_serverless_functions_per_deployment`. Vercel meldet einen fehlgeschlagenen
+  Build nicht als PR-Check zurück nach GitHub, nur als Deployment-Status im Vercel-Dashboard —
+  das fiel deshalb nicht auf, und die App lief bis zur Entdeckung (beim ersten Einsatz der neu
+  verbundenen Vercel-/Supabase-Connectoren) weiter auf dem Stand von Push #170, **ohne den
+  Security-Fix aus Migration `0058`**. Fix: alle zwölf bisherigen `api/send-*.ts`-Dateien
+  (Announcement, Zwischenstand, Dreier, Spielende, Spielstart, Training abgesagt, Kader
+  veröffentlicht/Absage/Nachnominierung, sowie die drei Cron-Erinnerungen für Training/
+  Kampfgericht/Kader) in eine einzige `api/notify.ts` zusammengeführt, dispatched über einen
+  `?kind=...`-Query-Parameter. `vercel.json` rewritet jede alte URL (z. B.
+  `/api/send-quarter-score`) transparent auf `/api/notify?kind=quarter-score` — die bereits im
+  SQL-Editor angelegten Datenbank-Trigger (siehe Abschnitte oben) mussten dafür NICHT geändert
+  werden, sie rufen unverändert dieselben alten URLs auf. `api/sync-league-standings.ts` bleibt
+  als einzige weitere Function bestehen (andere Art von Endpunkt, kein Push). Damit sind wir bei
+  2 von 12 Functions — reichlich Puffer für künftige Benachrichtigungsarten, ohne dass uns das
+  hier noch einmal passiert. **Lehre für uns:** nach jedem Merge den tatsächlichen
+  Produktions-Deployment-Status in Vercel prüfen (nicht nur den GitHub-Merge als "live" werten) —
+  jetzt möglich, weil dieser Claude-Code-Sitzung inzwischen ein Vercel-Connector zur Seite steht.
 
 ## Projektstruktur
 

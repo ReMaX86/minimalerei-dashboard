@@ -2,5 +2,19 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/api/send-push", "destination": "/api/notify?kind=announcement" },
+    { "source": "/api/send-quarter-score", "destination": "/api/notify?kind=quarter-score" },
+    { "source": "/api/send-three-pointer", "destination": "/api/notify?kind=three-pointer" },
+    { "source": "/api/send-game-finished", "destination": "/api/notify?kind=game-finished" },
+    { "source": "/api/send-game-started", "destination": "/api/notify?kind=game-started" },
+    { "source": "/api/send-training-cancelled", "destination": "/api/notify?kind=training-cancelled" },
+    { "source": "/api/send-squad-published", "destination": "/api/notify?kind=squad-published" },
+    { "source": "/api/send-squad-decline", "destination": "/api/notify?kind=squad-decline" },
+    { "source": "/api/send-squad-nomination", "destination": "/api/notify?kind=squad-nomination" },
+    { "source": "/api/send-training-reminders", "destination": "/api/notify?kind=training-reminders" },
+    { "source": "/api/send-officiating-reminders", "destination": "/api/notify?kind=officiating-reminders" },
+    { "source": "/api/send-squad-reminders", "destination": "/api/notify?kind=squad-reminders" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
