@@ -44,14 +44,14 @@ export function PushNotificationCard({ status, onChange }: PushNotificationCardP
 
   return (
     <section className="card">
-      <p className="flex items-center gap-2 text-sm font-bold text-tbw-navyDark">
-        <IconBell className="h-4 w-4 text-tbw-gold" />
+      <p className="flex items-center gap-2 text-sm font-semibold text-to-text">
+        <IconBell className="h-4 w-4 text-to-accent" />
         Benachrichtigungen
       </p>
 
       {status === 'subscribed' && (
         <>
-          <p className="mt-1 text-xs text-tbw-ink/50">
+          <p className="mt-1 text-xs text-to-text2">
             Aktiviert — du bekommst z. B. bei neuen Meldungen eine Benachrichtigung.
           </p>
           <button className="btn-secondary mt-3 w-full text-sm" disabled={busy} onClick={disable}>
@@ -62,7 +62,7 @@ export function PushNotificationCard({ status, onChange }: PushNotificationCardP
 
       {status === 'unsubscribed' && (
         <>
-          <p className="mt-1 text-xs text-tbw-ink/50">
+          <p className="mt-1 text-xs text-to-text2">
             Verpasse keine Meldung vom Trainer mehr — direkt auf dein Gerät.
           </p>
           <button className="btn-primary mt-3 w-full text-sm" disabled={busy} onClick={enable}>
@@ -72,13 +72,13 @@ export function PushNotificationCard({ status, onChange }: PushNotificationCardP
       )}
 
       {status === 'denied' && (
-        <p className="mt-1 text-xs text-tbw-ink/50">
+        <p className="mt-1 text-xs text-to-text2">
           Benachrichtigungen sind für diese App in den Geräteeinstellungen blockiert. Um sie zu
           aktivieren, müssen sie dort erst wieder erlaubt werden.
         </p>
       )}
 
-      {error && <p className="mt-2 text-xs font-semibold text-tbw-red">{error}</p>}
+      {error && <p className="mt-2 text-xs font-semibold text-to-dangerText">{error}</p>}
     </section>
   );
 }

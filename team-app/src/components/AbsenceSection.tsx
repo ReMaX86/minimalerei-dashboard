@@ -83,26 +83,26 @@ export function AbsenceSection({ onChange }: { onChange: () => void }) {
 
   return (
     <section className="card">
-      <p className="flex items-center gap-2 text-sm font-bold text-tbw-navyDark">
-        <IconSuitcase className="h-4 w-4 text-tbw-gold" />
+      <p className="flex items-center gap-2 text-sm font-semibold text-to-text">
+        <IconSuitcase className="h-4 w-4 text-to-accent" />
         Dein Urlaub / Abwesenheit
       </p>
-      <p className="mt-1 text-xs text-tbw-ink/50">
+      <p className="mt-1 text-xs text-to-text2">
         Training in diesem Zeitraum wird automatisch abgesagt, beim Kader sieht der Trainer einen Hinweis.
       </p>
 
       {absences.length > 0 && (
         <ul className="mt-3 space-y-2">
           {absences.map((a) => (
-            <li key={a.id} className="flex items-center justify-between rounded-xl bg-tbw-bg p-3">
+            <li key={a.id} className="flex items-center justify-between rounded-to-md bg-to-bg p-3">
               <div>
-                <p className="text-sm font-semibold text-tbw-navyDark">
+                <p className="text-sm font-semibold text-to-text">
                   {fmtDateShort(a.start_date)} – {fmtDateShort(a.end_date)}
                 </p>
-                {a.note && <p className="text-xs text-tbw-ink/50">{a.note}</p>}
+                {a.note && <p className="text-xs text-to-text2">{a.note}</p>}
               </div>
               <button
-                className="btn-secondary shrink-0 !px-2 !py-1 text-xs !text-tbw-red"
+                className="btn-secondary shrink-0 !h-9 !px-2.5 text-xs !text-to-dangerText"
                 disabled={busy}
                 onClick={() => remove(a.id)}
               >
@@ -113,7 +113,7 @@ export function AbsenceSection({ onChange }: { onChange: () => void }) {
         </ul>
       )}
 
-      <div className="mt-3 border-t border-black/5 pt-3">
+      <div className="mt-3 border-t border-to-divider pt-3">
         {showForm ? (
           <form onSubmit={submit} className="space-y-2">
             <div className="space-y-2">

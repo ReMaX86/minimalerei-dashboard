@@ -9,7 +9,8 @@ import { UpcomingTrainings } from '../components/UpcomingTrainings';
 import { WeeklyTrainingTimes } from '../components/WeeklyTrainingTimes';
 import { AbsenceSection } from '../components/AbsenceSection';
 import { PushNotificationCard } from '../components/PushNotificationCard';
-import { IconCheck, IconChevronRight, IconClose } from '../components/NavIcons';
+import { IconChevronRight, IconClipboard, IconJersey } from '../components/NavIcons';
+import { Countdown } from '../components/Countdown';
 import { usePushStatus } from '../hooks/usePushStatus';
 import { fmtDate, fmtDateShort, fmtTime, hasKickedOff, mapsUrl } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
@@ -44,6 +45,19 @@ import {
 
 const RESULT_LABELS = { sieg: 'Sieg', niederlage: 'Niederlage', unentschieden: 'Unentschieden' } as const;
 
+// Spielberichtsbogen-Grenze — dieselbe Zahl wie MAX_SQUAD_SIZE in
+// Spiele.tsx; wird bei der Kader/Trainer-Modus-Umstellung (nächster
+// Schritt) in eine gemeinsame Stelle gezogen statt an zwei Stellen gepflegt.
+const MAX_SQUAD_SIZE = 12;
+
+// Grobe, aus dem echten Namen abgeleitete Kurzform fürs Team-Icon im Hero
+// (DESIGN.md: "TBW"/"HMT"-Kacheln) — keine erfundene Abkürzung, nur die
+// ersten drei Buchstaben ohne Leerzeichen/Sonderzeichen.
+function teamAbbrev(name: string): string {
+  const letters = name.replace(/[^a-zA-ZÀ-ÿ]/g, '').toUpperCase();
+  return letters.slice(0, 3) || '?';
+}
+
 interface DashboardData {
   nextGame: Game | null;
   upcomingGames: Game[];
@@ -61,6 +75,7 @@ interface DashboardData {
   absencesOverview: PlayerAbsence[];
   lastResult: Game | null;
   myTotalPoints: number | null;
+  squadCount: number | null;
   declinedNames: string[];
   reminders: ReminderItem[];
   activeStatsHolder: string | null;
@@ -76,9 +91,6 @@ export function Dashboard() {
   const [absenceVersion, setAbsenceVersion] = useState(0);
   const [trainingVersion, setTrainingVersion] = useState(0);
   const [trikotVersion, setTrikotVersion] = useState(0);
-  const [squadVersion, setSquadVersion] = useState(0);
-  const [responding, setResponding] = useState(false);
-  const [respondError, setRespondError] = useState<string | null>(null);
   const [showUpcomingAbsences, setShowUpcomingAbsences] = useState(false);
   // Direkte Trikot-Übergabe (siehe Migration 0048): eigener State statt
   // pro-Set, da realistisch immer nur ein Set gleichzeitig übergeben wird —
@@ -179,6 +191,18 @@ export function Dashboard() {
         ]);
         carpoolOffers = (offersRes.data as CarpoolOffer[]) ?? [];
         carpoolClaims = (claimsRes.data as CarpoolClaim[]) ?? [];
+      }
+
+      // Kader-Status-Kachel ("Nominiert X/12") — dieselbe game_squad-Tabelle,
+      // die die Kader-Übersicht auf der Spiele-Seite schon breiter (nicht
+      // nur die eigene Zeile) liest; hier nur gezählt statt einzeln gelistet.
+      let squadCount: number | null = null;
+      if (nextGame?.squad_published) {
+        const { data: squadRows } = await supabase
+          .from('game_squad')
+          .select('is_selected')
+          .eq('game_id', nextGame.id);
+        squadCount = ((squadRows as { is_selected: boolean }[] | null) ?? []).filter((r) => r.is_selected).length;
       }
 
       if (role === 'player' && player && nextGame?.squad_published) {
@@ -465,6 +489,7 @@ export function Dashboard() {
         absencesOverview,
         lastResult,
         myTotalPoints,
+        squadCount,
         reminders,
         declinedNames,
         activeStatsHolder,
@@ -486,8 +511,7 @@ export function Dashboard() {
     flags.stats,
     absenceVersion,
     trainingVersion,
-    trikotVersion,
-    squadVersion
+    trikotVersion
   ]);
 
   // Live-Anzeigetafel fürs laufende Spiel: der große Initial-Load oben läuft
@@ -562,7 +586,7 @@ export function Dashboard() {
     };
   }, [nextGameIsLive, refreshLiveScore]);
 
-  if (error) return <div className="card text-sm text-tbw-red">{error}</div>;
+  if (error) return <div className="card text-sm text-to-dangerText">{error}</div>;
   if (!data) return <LoadingSpinner />;
 
   const firstName = (player?.name ?? '').split(' ')[0];
@@ -589,65 +613,78 @@ export function Dashboard() {
     }
   }
 
-  // Dieselbe RPC wie die Kader-Zu-/Absage auf der Spiele-Seite
-  // (respond_to_squad, siehe Spiele.tsx) — der Kader-Reiter war für die
-  // eigentliche Ja/Nein-Antwort offenbar zu versteckt, deshalb dieselbe
-  // Aktion zusätzlich direkt auf der "Nächstes Spiel"-Karte der Startseite.
-  async function respondToSquad(confirmed: boolean) {
-    if (!data?.nextGame) return;
-    setResponding(true);
-    setRespondError(null);
-    try {
-      const { error: rpcError } = await supabase.rpc('respond_to_squad', {
-        p_game_id: data.nextGame.id,
-        p_confirmed: confirmed
-      });
-      if (rpcError) throw rpcError;
-      setSquadVersion((v) => v + 1);
-    } catch {
-      setRespondError('Rückmeldung konnte nicht gespeichert werden.');
-    } finally {
-      setResponding(false);
-    }
-  }
-
   return (
     <div className="space-y-4">
-      {/* Arena-Hero: volle Breite, bricht bewusst aus dem Shell-Container aus
-          (Richtungsvertrag FIRST VIEWPORT) — Live-Ticker/Nächstes-Spiel lebt
-          auf der dunklen Fläche, alles Organisatorische darunter auf Papier. */}
-      <section className="-mx-4 -mt-4 bg-tbw-navyDark px-4 pb-5 pt-5 text-white">
-        {player && <p className="text-sm font-semibold text-white/60">Hi {firstName}!</p>}
+      {player && <p className="to-label !text-to-text3">Willkommen zurück</p>}
+      {player && <h1 className="headline text-[32px] leading-none text-to-text">Hi {firstName}.</h1>}
+
+      {/* Nächstes Spiel — DESIGN.md Dashboard.dc.html: Karte mit Court-Linien-
+          Deko, Team-Zeile, Countdown, Kader-Status (nur Anzeige, siehe §7). */}
+      <section className="card relative overflow-hidden">
+        <svg
+          viewBox="0 0 300 300"
+          width="300"
+          height="300"
+          className="pointer-events-none absolute -right-32 -top-24 -z-0"
+          aria-hidden="true"
+        >
+          <circle cx="150" cy="150" r="140" fill="none" stroke="#F2F4F7" strokeWidth="1" opacity="0.08" />
+          <circle cx="150" cy="150" r="52" fill="none" stroke="#C8FF2E" strokeWidth="1.5" opacity="0.5" />
+        </svg>
+
         {data.nextGame ? (
-          <div className="mt-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-widest text-white/40">
-                  {data.nextGame.is_home ? 'Heimspiel' : 'Auswärtsspiel'}
-                </p>
-                <p className="headline text-2xl leading-none text-white">vs. {data.nextGame.opponent}</p>
+          <div className="relative flex flex-col gap-5">
+            <div className="flex items-center gap-2.5">
+              <span className={data.nextGame.is_home ? 'badge-home' : 'badge-away'}>
+                {data.nextGame.is_home ? 'Heim' : 'Auswärts'}
+              </span>
+              <span className="to-label !text-to-text2">Nächstes Spiel</span>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <p className="headline text-[40px] leading-[0.95] text-to-text">{fmtDate(data.nextGame.game_date)}</p>
+              <p className="to-data text-sm text-to-text2">
+                {fmtTime(data.nextGame.game_time)} Uhr
+                {meetingPoints(data.nextGame)[0]?.time && ` · Treffpunkt ${fmtTime(meetingPoints(data.nextGame)[0].time!)}`}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-[1fr_28px_1fr] items-center gap-2 border-y border-to-divider py-4">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <TeamTile abbrev="TBW" own />
+                <span className="min-w-0 truncate text-sm font-semibold text-to-text">TB Wülfrath</span>
               </div>
-              <div className="shrink-0 text-right">
-                <p className="text-sm font-bold text-tbw-gold">{fmtDate(data.nextGame.game_date)}</p>
-                <p className="tabular-score text-lg text-white">{fmtTime(data.nextGame.game_time)}</p>
+              <span className="to-data text-center text-xs text-to-text3">vs</span>
+              <div className="flex min-w-0 items-center justify-end gap-2.5 text-right">
+                <span className="min-w-0 truncate text-sm font-semibold text-to-text">{data.nextGame.opponent}</span>
+                <TeamTile abbrev={teamAbbrev(data.nextGame.opponent)} />
               </div>
             </div>
 
-            <a
-              href={mapsUrl(data.nextGame.location)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 inline-block text-sm text-white/70 underline decoration-white/25 underline-offset-2"
-            >
-              {data.nextGame.location}
-            </a>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-to-text2" aria-hidden="true">
+                  <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" />
+                  <circle cx="12" cy="9.5" r="2.5" />
+                </svg>
+                <span className="min-w-0 truncate text-sm font-medium text-to-text">{data.nextGame.location}</span>
+              </div>
+              <a
+                href={mapsUrl(data.nextGame.location)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary !h-11 shrink-0 !px-4 text-sm"
+              >
+                Route
+              </a>
+            </div>
 
             {meetingPoints(data.nextGame).length > 0 && (
-              <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-white/40">Treffpunkt</p>
+              <div className="rounded-to-md border border-to-divider bg-to-bg px-3.5 py-2.5">
+                <p className="to-label">Treffpunkt</p>
                 {meetingPoints(data.nextGame).map((m) => (
-                  <p key={m.label} className="text-xs text-white/70">
-                    {m.time && <span className="font-semibold text-white/90">{fmtTime(m.time)} Uhr</span>}
+                  <p key={m.label} className="mt-0.5 text-sm text-to-text2">
+                    {m.time && <span className="font-semibold text-to-text">{fmtTime(m.time)} Uhr</span>}
                     {m.time && ' · '}
                     {m.label}
                     {m.place ? `, ${m.place}` : ''}
@@ -657,22 +694,18 @@ export function Dashboard() {
             )}
 
             {flags.carpool && data.carpoolOffers.length > 0 && (
-              <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+              <div className="rounded-to-md border border-to-divider bg-to-bg px-3.5 py-2.5">
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-white/40">
-                    Mitfahrgelegenheit
-                  </p>
-                  <Link to="/spiele" className="text-[10px] font-bold text-tbw-gold">
+                  <p className="to-label">Mitfahrgelegenheit</p>
+                  <Link to="/spiele" className="text-xs font-semibold text-to-accent">
                     Verwalten →
                   </Link>
                 </div>
                 {data.carpoolOffers.map((o) => {
                   const free = o.seats - data.carpoolClaims.filter((c) => c.offer_id === o.id).length;
                   return (
-                    <p key={o.id} className="text-xs text-white/70">
-                      <span className="font-semibold text-white/90">
-                        {data.players[o.driver_player_id]?.name ?? '?'}
-                      </span>{' '}
+                    <p key={o.id} className="mt-0.5 text-sm text-to-text2">
+                      <span className="font-semibold text-to-text">{data.players[o.driver_player_id]?.name ?? '?'}</span>{' '}
                       · {free > 0 ? `${free} von ${o.seats} Plätzen frei` : 'voll'}
                     </p>
                   );
@@ -680,36 +713,35 @@ export function Dashboard() {
               </div>
             )}
 
-            <p className="mt-2 text-xs text-white/50">
-              Trikot: {benoetigterSatz(data.nextGame) === 'weiss' ? 'Weiß' : 'Schwarz'}
-            </p>
+            {!nextGameIsLive && <Countdown gameDate={data.nextGame.game_date} gameTime={data.nextGame.game_time} />}
+
             {nextGameIsLive && (data.activeStatsHolder || data.nextGame.final_score_us !== null) && (
-              <div className="mt-4 border-t border-white/10 pt-4">
+              <div className="rounded-to-md bg-to-bg px-4 py-3.5">
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-tbw-gold">
-                    {data.activeStatsHolder && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-tbw-gold" />}
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-to-accent">
+                    {data.activeStatsHolder && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-to-accent" />}
                     {data.activeStatsHolder ? 'Live' : 'Zwischenstand'}
                   </span>
                   <button
                     disabled={refreshingLive}
                     onClick={() => refreshLiveScore()}
-                    className="text-[10px] font-bold uppercase tracking-wide text-white/50 disabled:opacity-40"
+                    className="text-[11px] font-semibold uppercase tracking-wide text-to-text3 disabled:opacity-40"
                   >
                     {refreshingLive ? 'Aktualisiert…' : 'Aktualisieren'}
                   </button>
                 </div>
-                <div className="mt-1 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wide text-white/50">
+                <div className="mt-1 flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-to-text3">
                   <span>TB Wülfrath</span>
-                  <span className="text-white/30">–</span>
+                  <span className="text-to-text3">–</span>
                   <span className="truncate">{data.nextGame.opponent}</span>
                 </div>
-                <p className="tabular-score text-center text-6xl text-white">
+                <p className="tabular-score text-center text-6xl text-to-text">
                   {data.nextGame.final_score_us ?? 0}:{data.nextGame.final_score_opponent ?? 0}
                 </p>
                 {data.lastScoreEvent && (
-                  <p className="mt-0.5 text-center text-xs text-white/50">
+                  <p className="mt-0.5 text-center text-xs text-to-text3">
                     Zuletzt:{' '}
-                    <span className="font-semibold text-white/80">
+                    <span className="font-semibold text-to-text2">
                       {data.lastScoreEvent.team === 'opponent'
                         ? data.nextGame.opponent
                         : (data.players[data.lastScoreEvent.playerId ?? '']?.name ?? '?')}
@@ -718,12 +750,12 @@ export function Dashboard() {
                   </p>
                 )}
                 {data.activeStatsHolder && (
-                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-white/10 pt-2">
-                    <p className="text-xs text-white/60">
-                      <span className="font-semibold text-white">{data.activeStatsHolder}</span> trackt gerade
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-to-divider pt-2">
+                    <p className="text-xs text-to-text2">
+                      <span className="font-semibold text-to-text">{data.activeStatsHolder}</span> trackt gerade
                     </p>
                     {(role === 'player' || role === 'trainer' || role === 'viewer') && (
-                      <Link to={`/stats/${data.nextGame.id}`} className="shrink-0 text-xs font-bold text-tbw-gold">
+                      <Link to={`/stats/${data.nextGame.id}`} className="shrink-0 text-xs font-semibold text-to-accent">
                         Tracking übernehmen
                       </Link>
                     )}
@@ -734,117 +766,113 @@ export function Dashboard() {
             {nextGameIsLive &&
               (role === 'player' || role === 'trainer' || role === 'viewer') &&
               !data.activeStatsHolder && (
-              <Link to={`/stats/${data.nextGame.id}`} className="btn-accent mt-3 block w-full text-center !py-2 text-sm">
+              <Link to={`/stats/${data.nextGame.id}`} className="btn-primary w-full text-sm">
                 Spiel-Stats tracking übernehmen
               </Link>
             )}
-            {role === 'player' && (
-              <div className="mt-3 border-t border-white/10 pt-3">
-                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                  {!data.nextGame.squad_published ? (
-                    <span className="text-sm text-white/50">Kader noch nicht veröffentlicht</span>
-                  ) : data.playerInSquad ? (
-                    <span className="text-sm font-bold text-status-ok">
-                      Du bist dabei!{data.myConfirmation === 'confirmed' && ' (zugesagt)'}
-                    </span>
-                  ) : (
-                    <span className="text-sm font-medium text-white/50">Nicht im Kader</span>
-                  )}
-                  {data.nextGame.squad_published && (
-                    <Link to="/spiele?kader=1" className="shrink-0 text-xs font-bold text-tbw-gold">
-                      Kader ansehen →
-                    </Link>
-                  )}
-                </div>
-                {data.playerInSquad && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {data.myConfirmation === 'confirmed' ? (
-                      <>
-                        <span className="pill pill-ok">
-                          <IconCheck className="h-3 w-3" />
-                          Zugesagt
-                        </span>
-                        <button
-                          type="button"
-                          disabled={responding}
-                          onClick={() => respondToSquad(false)}
-                          className="text-xs font-semibold text-white/40 underline disabled:opacity-40"
-                        >
-                          Doch nicht?
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-sm font-semibold text-tbw-gold">Kannst du?</span>
-                        <button
-                          type="button"
-                          disabled={responding}
-                          onClick={() => respondToSquad(true)}
-                          className="pill pill-ok disabled:opacity-40"
-                        >
-                          <IconCheck className="h-3 w-3" />
-                          Kann
-                        </button>
-                        <button
-                          type="button"
-                          disabled={responding}
-                          onClick={() => respondToSquad(false)}
-                          className="pill pill-open !bg-white/10 !text-white/70 disabled:opacity-40"
-                        >
-                          <IconClose className="h-3 w-3" />
-                          Kann nicht
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-                {respondError && <ErrorNote message={respondError} />}
-              </div>
-            )}
+
+            <div className="flex items-center justify-between gap-3">
+              {!data.nextGame.squad_published ? (
+                <span className="pill pill-warn">Kader noch nicht veröffentlicht</span>
+              ) : role === 'player' ? (
+                <span className={`pill ${data.playerInSquad ? 'pill-ok' : 'pill-open'}`}>
+                  {data.playerInSquad ? 'Im Kader' : 'Nicht im Kader'}
+                </span>
+              ) : (
+                data.squadCount !== null && (
+                  <span className="pill pill-ok">
+                    {data.squadCount}/{MAX_SQUAD_SIZE} im Kader
+                  </span>
+                )
+              )}
+              {data.nextGame.squad_published && (
+                <Link to="/spiele?kader=1" className="shrink-0 text-xs font-semibold text-to-accent">
+                  Kader ansehen →
+                </Link>
+              )}
+            </div>
+
+            <p className="text-xs text-to-text3">
+              Trikot für dieses Spiel: {benoetigterSatz(data.nextGame) === 'weiss' ? 'Weiß' : 'Schwarz'}
+            </p>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-white/50">Kein Spiel geplant.</p>
-        )}
-
-        {flags.stats && data.lastResult && (
-          <div className="mt-4 border-t border-white/10 pt-4">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-white/40">Letztes Ergebnis</p>
-            <div className="mt-1 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-white">vs. {data.lastResult.opponent}</p>
-                <p className="text-xs text-white/50">{fmtDate(data.lastResult.game_date)}</p>
-              </div>
-              <div className="text-right">
-                <p className="tabular-score text-xl text-white">
-                  {data.lastResult.final_score_us}:{data.lastResult.final_score_opponent}
-                </p>
-                {gameResult(data.lastResult) && (
-                  <span
-                    className={`pill ${
-                      gameResult(data.lastResult) === 'sieg' ? 'pill-ok' : '!bg-white/10 !text-white/70'
-                    }`}
-                  >
-                    {RESULT_LABELS[gameResult(data.lastResult)!]}
-                  </span>
-                )}
-              </div>
-            </div>
-            {role === 'player' && data.myTotalPoints !== null && (
-              <p className="mt-2 border-t border-white/10 pt-2 text-xs text-white/50">
-                Deine Punkte diese Saison: <span className="font-bold text-white">{data.myTotalPoints}</span>
-              </p>
-            )}
-            {(role === 'player' || role === 'trainer' || role === 'viewer') && (
-              <Link
-                to={`/stats/${data.lastResult.id}`}
-                className="mt-2 block border-t border-white/10 pt-2 text-xs font-bold text-tbw-gold"
-              >
-                Box-Score ansehen →
-              </Link>
-            )}
-          </div>
+          <p className="relative text-sm text-to-text2">Kein Spiel geplant.</p>
         )}
       </section>
+
+      {/* Letztes Ergebnis — kein Mockup-Pendant, gleiche Kartensprache
+          (DESIGN.md §7). */}
+      {flags.stats && data.lastResult && (
+        <section className="card !p-5">
+          <p className="to-label">Letztes Ergebnis</p>
+          <div className="mt-2 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-to-text">vs. {data.lastResult.opponent}</p>
+              <p className="text-xs text-to-text3">{fmtDate(data.lastResult.game_date)}</p>
+            </div>
+            <div className="text-right">
+              <p className="tabular-score text-2xl text-to-text">
+                {data.lastResult.final_score_us}:{data.lastResult.final_score_opponent}
+              </p>
+              {gameResult(data.lastResult) && (
+                <span className={`pill ${gameResult(data.lastResult) === 'sieg' ? 'pill-ok' : 'pill-open'}`}>
+                  {RESULT_LABELS[gameResult(data.lastResult)!]}
+                </span>
+              )}
+            </div>
+          </div>
+          {role === 'player' && data.myTotalPoints !== null && (
+            <p className="mt-2 border-t border-to-divider pt-2 text-xs text-to-text2">
+              Deine Punkte diese Saison: <span className="font-semibold text-to-text">{data.myTotalPoints}</span>
+            </p>
+          )}
+          {(role === 'player' || role === 'trainer' || role === 'viewer') && (
+            <Link
+              to={`/stats/${data.lastResult.id}`}
+              className="mt-2 block border-t border-to-divider pt-2 text-xs font-semibold text-to-accent"
+            >
+              Box-Score ansehen →
+            </Link>
+          )}
+        </section>
+      )}
+
+      {/* Status-Kacheln — DESIGN.md: Kader-Stand + eigener nächster
+          Kampfgericht-Einsatz (statt einer Trikotnummer, die es in dieser
+          App gar nicht gibt — siehe DESIGN.md §7). */}
+      {(data.squadCount !== null || (role === 'player' && data.playerNextTask)) && (
+        <div className="grid grid-cols-2 gap-3">
+          {data.squadCount !== null && (
+            <div className="card flex flex-col gap-3.5 !p-4">
+              <div className="flex items-center justify-between">
+                <span className="to-label">Kader</span>
+                <span className="h-2 w-2 rounded-full bg-to-accent" />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-lg font-semibold text-to-text">{data.squadCount} nominiert</span>
+                <span className="text-[13px] text-to-text2">von {MAX_SQUAD_SIZE} Plätzen</span>
+              </div>
+            </div>
+          )}
+          {role === 'player' && (
+            <div className="card flex flex-col gap-3.5 !p-4">
+              <div className="flex items-center justify-between">
+                <span className="to-label">Kampfgericht</span>
+                <IconClipboard className="h-4 w-4 text-to-accent" />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-lg font-semibold text-to-text">
+                  {data.playerNextTask ? 'Eingeteilt' : 'Frei'}
+                </span>
+                <span className="truncate text-[13px] text-to-text2">
+                  {data.playerNextTask ? fmtDate(data.playerNextTask.officiating_games.game_date) : 'Kein Termin'}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {flags.push_notifications && (pushStatus === 'unsubscribed' || pushStatus === 'denied') && (
         <PushNotificationCard status={pushStatus} onChange={refreshPushStatus} />
@@ -860,41 +888,39 @@ export function Dashboard() {
             data.reminders.map((r) =>
               r.to.startsWith('#') ? (
                 <a key={r.key} href={r.to} className="sheet-row-link">
-                  <span className="led-dot bg-tbw-gold" />
-                  <span className="flex-1 text-sm font-semibold text-tbw-navyDark">{r.text}</span>
-                  <IconChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-tbw-ink/30" />
+                  <span className="led-dot bg-to-accent" />
+                  <span className="flex-1 text-sm font-medium text-to-text">{r.text}</span>
+                  <IconChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-to-text3" />
                 </a>
               ) : (
                 <Link key={r.key} to={r.to} className="sheet-row-link">
-                  <span className="led-dot bg-tbw-gold" />
-                  <span className="flex-1 text-sm font-semibold text-tbw-navyDark">{r.text}</span>
-                  <IconChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-tbw-ink/30" />
+                  <span className="led-dot bg-to-accent" />
+                  <span className="flex-1 text-sm font-medium text-to-text">{r.text}</span>
+                  <IconChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-to-text3" />
                 </Link>
               )
             )}
 
           {isAdmin && data.nextGame?.squad_decline_pending && data.declinedNames.length > 0 && (
             <Link to="/spiele?kader=1" className="sheet-row-link">
-              <span className="led-dot bg-status-warn" />
-              <span className="flex-1 text-sm text-tbw-navyDark">
+              <span className="led-dot bg-to-danger" />
+              <span className="flex-1 text-sm text-to-text">
                 <span className="font-semibold">Kader-Absage:</span>{' '}
                 {declinedNamesText(data.declinedNames)} leider am Spiel vs. {data.nextGame.opponent} nicht
                 teilnehmen.
               </span>
-              <IconChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-tbw-ink/30" />
+              <IconChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-to-text3" />
             </Link>
           )}
 
           {flags.announcements &&
             data.announcements.map((a) => (
               <div key={a.id} className="sheet-row">
-                <span className={`led-dot ${a.pinned ? 'bg-tbw-gold' : 'bg-status-open'}`} />
+                <span className={`led-dot ${a.pinned ? 'bg-to-accent' : 'bg-to-text3'}`} />
                 <div>
-                  {a.pinned && (
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-gold">Angeheftet</p>
-                  )}
-                  <p className="text-sm text-tbw-navyDark">{a.message}</p>
-                  <p className="mt-1 text-xs text-tbw-ink/40">
+                  {a.pinned && <p className="text-[10px] font-semibold uppercase tracking-wide text-to-accent">Angeheftet</p>}
+                  <p className="text-sm text-to-text">{a.message}</p>
+                  <p className="mt-1 text-xs text-to-text3">
                     {a.author_name} · {fmtDate(a.created_at.slice(0, 10))}
                   </p>
                 </div>
@@ -903,42 +929,97 @@ export function Dashboard() {
         </section>
       )}
 
-      <section className="sheet">
-        <div className="sheet-header">Dein Programm</div>
-
-        {role === 'player' && (
-          <div className="sheet-row">
-            <span className="led-dot bg-tbw-navy" />
-            <div className="flex-1">
-              <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Kampfgericht</p>
-              {data.playerNextTask ? (
-                <>
-                  <p className="mt-0.5 text-sm font-semibold text-tbw-navyDark">
-                    {OFFICIATING_TASK_LABELS[data.playerNextTask.task_type]}
-                  </p>
-                  <p className="text-sm text-tbw-ink/60">
-                    {fmtDate(data.playerNextTask.officiating_games.game_date)}
-                    {data.playerNextTask.officiating_games.game_time
-                      ? ` · ${fmtTime(data.playerNextTask.officiating_games.game_time)} Uhr`
-                      : ''}{' '}
-                    · {officiatingGameLabel(data.playerNextTask.officiating_games)}
-                  </p>
-                </>
-              ) : (
-                <p className="mt-0.5 text-sm text-tbw-ink/50">Aktuell kein Termin für dich eingeteilt.</p>
-              )}
+      {/* Kampfgericht — DESIGN.md Dashboard.dc.html: eine Karte mit den
+          Aufgaben des nächsten Kampfgericht-Termins (auch für andere Teams
+          im Verein, siehe §7) plus dem eigenen nächsten Einsatz darunter. */}
+      {showOfficiatingOverview && (
+        <section className="card flex flex-col gap-1 !p-5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <IconClipboard className="h-[22px] w-[22px] text-to-text" />
+              <h2 className="text-lg font-semibold text-to-text">Kampfgericht</h2>
             </div>
+            {data.trainerNextOfficiatingGame && (
+              <span className="pill pill-open">
+                {data.trainerNextOfficiatingGame.tasks.filter((t) => !t.assigned_player_id).length} offen
+              </span>
+            )}
           </div>
-        )}
-
-        <div id="training" className="sheet-row scroll-mt-20">
-          <span className="led-dot bg-tbw-navy" />
-          <div className="flex-1">
-            <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Nächste Trainingseinheit</p>
-            <div className="mt-1.5">
-              <UpcomingTrainings refreshKey={absenceVersion} onChange={() => setTrainingVersion((v) => v + 1)} />
+          {data.trainerNextOfficiatingGame ? (
+            <>
+              <p className="mb-1 text-[13px] text-to-text3">
+                {fmtDate(data.trainerNextOfficiatingGame.game_date)}
+                {data.trainerNextOfficiatingGame.game_time
+                  ? ` · ${fmtTime(data.trainerNextOfficiatingGame.game_time)} Uhr`
+                  : ''}{' '}
+                · {officiatingGameLabel(data.trainerNextOfficiatingGame)}
+              </p>
+              <div className="divide-y divide-to-divider">
+                {data.trainerNextOfficiatingGame.tasks.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between gap-3 py-3">
+                    <span className="text-sm font-medium text-to-text">{OFFICIATING_TASK_LABELS[t.task_type]}</span>
+                    <span className={t.assigned_player_id ? 'pill pill-ok' : 'pill pill-open'}>
+                      {t.assigned_player_id ? data.players[t.assigned_player_id]?.name ?? '?' : 'offen'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-to-text2">Kein Kampfgericht-Termin geplant.</p>
+          )}
+          {role === 'player' && data.playerNextTask && (
+            <div className="mt-2 flex items-center gap-3.5 rounded-to-md bg-to-bg p-3.5">
+              <span className="to-data shrink-0 rounded-to-sm border border-to-accent px-2 py-1.5 text-xs font-semibold text-to-accent">
+                {fmtDateShort(data.playerNextTask.officiating_games.game_date)}
+              </span>
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="to-label">Dein nächster Einsatz</span>
+                <span className="truncate text-sm font-semibold text-to-text">
+                  {OFFICIATING_TASK_LABELS[data.playerNextTask.task_type]} ·{' '}
+                  {officiatingGameLabel(data.playerNextTask.officiating_games)}
+                </span>
+              </div>
             </div>
+          )}
+        </section>
+      )}
+
+      {/* Trikots — DESIGN.md §7: echte Satz-/Wasch-Logik statt des
+          Nummern-Rasters aus dem Mockup. */}
+      <section className="card flex flex-col gap-4 !p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <IconJersey className="h-[22px] w-[22px] text-to-text" />
+            <h2 className="text-lg font-semibold text-to-text">Trikots</h2>
           </div>
+          {data.nextGame && (
+            <span className="to-data text-sm text-to-text2">
+              Für nächstes Spiel: <span className="text-to-accent">{benoetigterSatz(data.nextGame) === 'weiss' ? 'Weiß' : 'Schwarz'}</span>
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-2 divide-x divide-to-divider overflow-hidden rounded-to-md border border-to-divider">
+          {data.trikotSets.map((set) => {
+            const transferredFrom = latestTransferFrom(set.id, data.trikotWashLog, data.trikotTransferLog);
+            return (
+              <div key={set.id} className={`p-3.5 ${set.id === ownSetId ? 'bg-to-accentSoft' : ''}`}>
+                <p className="to-label">
+                  {set.label.split(' · ').map((part, i) => (
+                    <span key={i} className="block">
+                      {part}
+                    </span>
+                  ))}
+                </p>
+                <p className="mt-1.5 text-sm font-semibold text-to-text">
+                  {set.current_holder_id ? data.players[set.current_holder_id]?.name ?? '—' : 'Niemand'}
+                </p>
+                {transferredFrom && (
+                  <p className="mt-0.5 text-[11px] text-to-text3">Übergeben von {data.players[transferredFrom]?.name ?? '?'}</p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {role === 'player' &&
@@ -954,146 +1035,141 @@ export function Dashboard() {
               const neededGame = data.upcomingGames.find((g) => benoetigterSatz(g) === set.id) ?? null;
               const isPicking = transferringSetId === set.id;
               return (
-                <div key={set.id} className="sheet-row">
-                  <span className="led-dot bg-tbw-gold" />
-                  <div className="flex-1">
-                    <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Deine Trikots</p>
-                    <p className="mt-0.5 text-sm font-semibold text-tbw-navyDark">
-                      Du hast aktuell den {set.id === 'weiss' ? 'weißen' : 'schwarzen'} Trikotsatz.
-                    </p>
-                    <p className="mt-0.5 text-xs text-tbw-ink/50">
-                      {neededGame
-                        ? `Bitte zum nächsten Einsatz am ${fmtDate(neededGame.game_date)} gegen ${neededGame.opponent} mitbringen.`
-                        : 'Bitte zum nächsten Einsatz mit diesem Set mitbringen.'}
-                    </p>
+                <div key={set.id} className="rounded-to-md bg-to-bg p-3.5">
+                  <p className="text-sm font-semibold text-to-text">
+                    Du hast aktuell den {set.id === 'weiss' ? 'weißen' : 'schwarzen'} Trikotsatz.
+                  </p>
+                  <p className="mt-0.5 text-xs text-to-text2">
+                    {neededGame
+                      ? `Bitte zum nächsten Einsatz am ${fmtDate(neededGame.game_date)} gegen ${neededGame.opponent} mitbringen.`
+                      : 'Bitte zum nächsten Einsatz mit diesem Set mitbringen.'}
+                  </p>
 
-                    {!isPicking ? (
-                      <button
-                        className="mt-2 text-xs font-bold text-tbw-navy"
-                        onClick={() => {
-                          setTransferringSetId(set.id);
-                          setTransferTargetId('');
-                          setTransferError(null);
-                        }}
-                      >
-                        Set übergeben?
-                      </button>
-                    ) : (
-                      <div className="mt-3 space-y-2 rounded-lg border border-tbw-ink/10 bg-tbw-bg p-3">
-                        <p className="text-sm text-tbw-ink/70">An wen?</p>
-                        <select
-                          className="input"
-                          value={transferTargetId}
-                          onChange={(e) => setTransferTargetId(e.target.value)}
+                  {!isPicking ? (
+                    <button
+                      className="mt-2 text-xs font-semibold text-to-accent"
+                      onClick={() => {
+                        setTransferringSetId(set.id);
+                        setTransferTargetId('');
+                        setTransferError(null);
+                      }}
+                    >
+                      Set übergeben?
+                    </button>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-sm text-to-text2">An wen?</p>
+                      <select className="input" value={transferTargetId} onChange={(e) => setTransferTargetId(e.target.value)}>
+                        <option value="">Spieler wählen…</option>
+                        {Object.values(data.players)
+                          .filter((p) => p.id !== player.id)
+                          .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                      </select>
+                      {transferError && <ErrorNote message={transferError} />}
+                      <div className="flex gap-2">
+                        <button
+                          className="btn-primary !h-11 flex-1 text-sm"
+                          disabled={!transferTargetId || transferring}
+                          onClick={() => transferSet(set.id, transferTargetId)}
                         >
-                          <option value="">Spieler wählen…</option>
-                          {Object.values(data.players)
-                            .filter((p) => p.id !== player.id)
-                            .sort((a, b) => a.name.localeCompare(b.name, 'de'))
-                            .map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                        </select>
-                        {transferError && <ErrorNote message={transferError} />}
-                        <div className="flex gap-2">
-                          <button
-                            className="btn-primary flex-1 !py-2 text-sm"
-                            disabled={!transferTargetId || transferring}
-                            onClick={() => transferSet(set.id, transferTargetId)}
-                          >
-                            {transferring ? 'Speichere…' : 'Bestätigen'}
-                          </button>
-                          <button
-                            className="btn-secondary flex-1 !py-2 text-sm"
-                            disabled={transferring}
-                            onClick={() => {
-                              setTransferringSetId(null);
-                              setTransferTargetId('');
-                              setTransferError(null);
-                            }}
-                          >
-                            Abbrechen
-                          </button>
-                        </div>
+                          {transferring ? 'Speichere…' : 'Bestätigen'}
+                        </button>
+                        <button
+                          className="btn-secondary flex-1 text-sm"
+                          disabled={transferring}
+                          onClick={() => {
+                            setTransferringSetId(null);
+                            setTransferTargetId('');
+                            setTransferError(null);
+                          }}
+                        >
+                          Abbrechen
+                        </button>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
+      </section>
+
+      {/* Spielplan-Vorschau — DESIGN.md Dashboard.dc.html. */}
+      {data.upcomingGames.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-lg font-semibold text-to-text">Spielplan</h2>
+            <Link to="/spiele" className="text-sm font-medium text-to-accent">
+              Alle Spiele
+            </Link>
+          </div>
+          {data.upcomingGames.slice(0, 3).map((g) => (
+            <div key={g.id} className="card flex items-center gap-3.5 !p-3.5">
+              <div className="to-data flex w-[58px] shrink-0 flex-col gap-0.5">
+                <span className="text-[11px] tracking-wide text-to-text3">{fmtDateShort(g.game_date).slice(0, 2).toUpperCase()}</span>
+                <span className="text-sm font-semibold text-to-text">{fmtDateShort(g.game_date)}</span>
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate text-sm font-semibold text-to-text">{g.opponent}</span>
+                <span className="text-xs text-to-text2">{fmtTime(g.game_time)} Uhr</span>
+              </div>
+              <span className={g.is_home ? 'badge-home' : 'badge-away'}>{g.is_home ? 'Heim' : 'Ausw.'}</span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      <section className="sheet">
+        <div id="training" className="sheet-row scroll-mt-20">
+          <span className="led-dot bg-to-text3" />
+          <div className="flex-1">
+            <p className="to-label">Nächste Trainingseinheit</p>
+            <div className="mt-1.5">
+              <UpcomingTrainings refreshKey={absenceVersion} onChange={() => setTrainingVersion((v) => v + 1)} />
+            </div>
+          </div>
+        </div>
       </section>
 
       {flags.absences && role === 'player' && (
         <AbsenceSection onChange={() => setAbsenceVersion((v) => v + 1)} />
       )}
 
-      <p className="pt-1 text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Teaminformationen</p>
+      <p className="to-label pt-1">Teaminformationen</p>
 
       <section className="sheet">
-        {showOfficiatingOverview && (
-          <div className="sheet-row">
-            <span className="led-dot bg-tbw-navy" />
-            <div className="flex-1">
-              <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">
-                Nächster Kampfgericht-Termin
-              </p>
-              {data.trainerNextOfficiatingGame ? (
-                <div className="mt-1 space-y-2">
-                  <p className="text-sm font-semibold text-tbw-navyDark">
-                    {fmtDate(data.trainerNextOfficiatingGame.game_date)}
-                    {data.trainerNextOfficiatingGame.game_time
-                      ? ` · ${fmtTime(data.trainerNextOfficiatingGame.game_time)} Uhr`
-                      : ''}{' '}
-                    · {officiatingGameLabel(data.trainerNextOfficiatingGame)}
-                  </p>
-                  <ul className="space-y-1 text-sm">
-                    {data.trainerNextOfficiatingGame.tasks.map((t) => (
-                      <li key={t.id} className="flex items-center justify-between">
-                        <span className="text-tbw-ink/70">{OFFICIATING_TASK_LABELS[t.task_type]}</span>
-                        <span className={t.assigned_player_id ? 'pill pill-ok' : 'pill pill-open'}>
-                          {t.assigned_player_id ? data.players[t.assigned_player_id]?.name ?? '?' : 'offen'}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="mt-0.5 text-sm text-tbw-ink/50">Kein Kampfgericht-Termin geplant.</p>
-              )}
-            </div>
-          </div>
-        )}
-
         {showAbsencesOverview && data.absencesOverview.length > 0 && (() => {
           const today = new Date().toISOString().slice(0, 10);
           const currentAbsences = data.absencesOverview.filter((a) => a.start_date <= today);
           const upcomingAbsences = data.absencesOverview.filter((a) => a.start_date > today);
           return (
             <div className="sheet-row">
-              <span className="led-dot bg-tbw-navy" />
+              <span className="led-dot bg-to-text3" />
               <div className="flex-1">
-                <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Aktuell abwesend</p>
+                <p className="to-label">Aktuell abwesend</p>
                 {currentAbsences.length > 0 ? (
                   <ul className="mt-1 space-y-1">
                     {currentAbsences.map((a) => (
                       <li key={a.id} className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-tbw-navyDark">{data.players[a.player_id]?.name ?? '?'}</span>
-                        <span className="text-tbw-ink/50">
+                        <span className="font-medium text-to-text">{data.players[a.player_id]?.name ?? '?'}</span>
+                        <span className="text-to-text3">
                           {fmtDateShort(a.start_date)} – {fmtDateShort(a.end_date)}
                         </span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="mt-0.5 text-sm text-tbw-ink/50">Aktuell ist niemand abwesend.</p>
+                  <p className="mt-0.5 text-sm text-to-text2">Aktuell ist niemand abwesend.</p>
                 )}
 
                 {upcomingAbsences.length > 0 && (
-                  <div className="mt-3 border-t border-tbw-ink/10 pt-2">
+                  <div className="mt-3 border-t border-to-divider pt-2">
                     <button
-                      className="text-xs font-semibold text-tbw-ink/50"
+                      className="text-xs font-semibold text-to-text2"
                       onClick={() => setShowUpcomingAbsences((v) => !v)}
                     >
                       {showUpcomingAbsences
@@ -1104,10 +1180,8 @@ export function Dashboard() {
                       <ul className="mt-2 space-y-1">
                         {upcomingAbsences.map((a) => (
                           <li key={a.id} className="flex items-center justify-between text-sm">
-                            <span className="font-medium text-tbw-navyDark">
-                              {data.players[a.player_id]?.name ?? '?'}
-                            </span>
-                            <span className="text-tbw-ink/50">
+                            <span className="font-medium text-to-text">{data.players[a.player_id]?.name ?? '?'}</span>
+                            <span className="text-to-text3">
                               {fmtDateShort(a.start_date)} – {fmtDateShort(a.end_date)}
                             </span>
                           </li>
@@ -1122,40 +1196,9 @@ export function Dashboard() {
         })()}
 
         <div className="sheet-row">
-          <span className="led-dot bg-tbw-navy" />
+          <span className="led-dot bg-to-text3" />
           <div className="flex-1">
-            <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Wer hat die Trikots?</p>
-            <div className="mt-2 grid grid-cols-2 divide-x divide-tbw-ink/10 overflow-hidden rounded-lg border border-tbw-ink/10">
-              {data.trikotSets.map((set) => {
-                const transferredFrom = latestTransferFrom(set.id, data.trikotWashLog, data.trikotTransferLog);
-                return (
-                  <div key={set.id} className={`p-3 ${set.id === ownSetId ? 'bg-tbw-gold/10' : ''}`}>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
-                      {set.label.split(' · ').map((part, i) => (
-                        <span key={i} className="block">
-                          {part}
-                        </span>
-                      ))}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-tbw-navyDark">
-                      {set.current_holder_id ? data.players[set.current_holder_id]?.name ?? '—' : 'Niemand'}
-                    </p>
-                    {transferredFrom && (
-                      <p className="mt-0.5 text-[10px] text-tbw-ink/40">
-                        Übergeben von {data.players[transferredFrom]?.name ?? '?'}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div className="sheet-row">
-          <span className="led-dot bg-tbw-navy" />
-          <div className="flex-1">
-            <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Trainingszeiten</p>
+            <p className="to-label">Trainingszeiten</p>
             <div className="mt-1.5">
               <WeeklyTrainingTimes />
             </div>
@@ -1167,6 +1210,18 @@ export function Dashboard() {
         <PushNotificationCard status={pushStatus} onChange={refreshPushStatus} />
       )}
     </div>
+  );
+}
+
+function TeamTile({ abbrev, own }: { abbrev: string; own?: boolean }) {
+  return (
+    <span
+      className={`to-data flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full text-[15px] font-semibold ${
+        own ? 'bg-to-accent text-to-onAccent' : 'border-[1.5px] border-to-text text-to-text'
+      }`}
+    >
+      {abbrev}
+    </span>
   );
 }
 

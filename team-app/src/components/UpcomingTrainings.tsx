@@ -106,7 +106,7 @@ export function UpcomingTrainings({
   if (error) return <ErrorNote message={error} />;
   if (!state) return <LoadingSpinner />;
   if (state.occurrences.length === 0) {
-    return <p className="text-sm text-tbw-ink/50">Keine Trainingszeiten hinterlegt.</p>;
+    return <p className="text-sm text-to-text2">Keine Trainingszeiten hinterlegt.</p>;
   }
 
   async function vote(occ: TrainingOccurrence, isAttending: boolean) {
@@ -146,18 +146,18 @@ export function UpcomingTrainings({
   }
 
   return (
-    <div className="divide-y divide-tbw-ink/10">
+    <div className="divide-y divide-to-divider">
       {state.occurrences.map((occ) => {
         const key = occ.training.id + occ.date;
 
         if (occ.cancelled) {
           return (
             <div key={key} className="flex gap-3 py-3 first:pt-0">
-              <span className="led-dot bg-tbw-red" />
+              <span className="led-dot bg-to-danger" />
               <div>
-                <p className="text-sm font-bold text-tbw-red">{fmtDate(occ.date)}</p>
-                <p className="mt-0.5 text-sm font-semibold text-tbw-red">Training fällt aus</p>
-                {occ.cancelledBy?.note && <p className="mt-0.5 text-xs text-tbw-red/70">{occ.cancelledBy.note}</p>}
+                <p className="text-sm font-semibold text-to-dangerText">{fmtDate(occ.date)}</p>
+                <p className="mt-0.5 text-sm font-semibold text-to-dangerText">Training fällt aus</p>
+                {occ.cancelledBy?.note && <p className="mt-0.5 text-xs text-to-text2">{occ.cancelledBy.note}</p>}
               </div>
             </div>
           );
@@ -182,23 +182,23 @@ export function UpcomingTrainings({
         return (
           <div key={key} className="py-3 first:pt-0">
             <button className="w-full text-left" onClick={() => toggleExpanded(key)}>
-              <p className="text-sm font-bold text-tbw-navyDark">{fmtDate(occ.date)}</p>
-              <p className="text-sm text-tbw-ink/70">
+              <p className="text-sm font-semibold text-to-text">{fmtDate(occ.date)}</p>
+              <p className="text-sm text-to-text2">
                 {fmtTime(occ.training.start_time)}–{fmtTime(occ.training.end_time)} · {occ.training.location}
               </p>
               {occ.note && (
-                <p className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-tbw-gold">
+                <p className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-to-accent">
                   <IconSuitcase className="h-3 w-3" />
                   {occ.note}
                 </p>
               )}
-              <p className="mt-1 flex items-center gap-2 text-xs text-tbw-ink/50">
+              <p className="mt-1 flex items-center gap-2 text-xs text-to-text3">
                 <span className="inline-flex items-center gap-0.5">
-                  <IconCheck className="h-3 w-3 text-status-ok" />
+                  <IconCheck className="h-3 w-3 text-to-accent" />
                   {zusagen.length}
                 </span>
                 <span className="inline-flex items-center gap-0.5">
-                  <IconClose className="h-3 w-3 text-tbw-red" />
+                  <IconClose className="h-3 w-3 text-to-danger" />
                   {absagen.length}
                 </span>
                 {urlaub.length > 0 && (
@@ -212,7 +212,7 @@ export function UpcomingTrainings({
             </button>
 
             {role === 'player' && myAbsence && (
-              <p className="mt-2 flex items-center gap-1.5 text-sm text-tbw-ink/50">
+              <p className="mt-2 flex items-center gap-1.5 text-sm text-to-text2">
                 <IconSuitcase className="h-3.5 w-3.5 shrink-0" />
                 Du bist in diesem Zeitraum als abwesend eingetragen — Training gilt als abgesagt.
               </p>
@@ -226,13 +226,13 @@ export function UpcomingTrainings({
                   className="flex flex-col items-center gap-0.5 disabled:opacity-50"
                 >
                   <span
-                    className={`flex h-11 w-11 items-center justify-center rounded-lg transition active:scale-95 ${
-                      myVote === true ? 'bg-status-ok text-white' : 'bg-status-ok/10 text-status-ok'
+                    className={`flex h-11 w-11 items-center justify-center rounded-to-md transition active:scale-95 ${
+                      myVote === true ? 'bg-to-accent text-to-onAccent' : 'bg-to-accentSoft text-to-accent'
                     }`}
                   >
                     <IconCheck className="h-5 w-5" />
                   </span>
-                  <span className="text-[10px] font-semibold text-tbw-ink/50">Bin dabei</span>
+                  <span className="text-[10px] font-semibold text-to-text3">Bin dabei</span>
                 </button>
                 <button
                   onClick={() => vote(occ, false)}
@@ -240,19 +240,19 @@ export function UpcomingTrainings({
                   className="flex flex-col items-center gap-0.5 disabled:opacity-50"
                 >
                   <span
-                    className={`flex h-11 w-11 items-center justify-center rounded-lg transition active:scale-95 ${
-                      myVote === false ? 'bg-tbw-red text-white' : 'bg-tbw-red/10 text-tbw-red'
+                    className={`flex h-11 w-11 items-center justify-center rounded-to-md transition active:scale-95 ${
+                      myVote === false ? 'bg-to-danger text-white' : 'bg-to-dangerSoft text-to-dangerText'
                     }`}
                   >
                     <IconClose className="h-5 w-5" />
                   </span>
-                  <span className="text-[10px] font-semibold text-tbw-ink/50">Kann nicht</span>
+                  <span className="text-[10px] font-semibold text-to-text3">Kann nicht</span>
                 </button>
               </div>
             )}
 
             {isExpanded && (
-              <div className="mt-3 space-y-2 border-t border-black/5 pt-3 text-sm">
+              <div className="mt-3 space-y-2 border-t border-to-divider pt-3 text-sm">
                 <AttendeeGroup label="Zusagen" pillClass="pill-ok" players={zusagen} />
                 <AttendeeGroup label="Absagen" pillClass="pill-open" players={absagen} />
                 {urlaub.length > 0 && <AttendeeGroup label="Urlaub" pillClass="pill-warn" players={urlaub} />}
@@ -279,11 +279,11 @@ function AttendeeGroup({
 }) {
   return (
     <div>
-      <p className={`text-xs font-bold uppercase tracking-wide ${muted ? 'text-tbw-ink/40' : 'text-tbw-navy/70'}`}>
+      <p className={`text-xs font-semibold uppercase tracking-wide ${muted ? 'text-to-text3' : 'text-to-text2'}`}>
         {label} ({players.length})
       </p>
       {players.length === 0 ? (
-        <p className="text-xs text-tbw-ink/40">—</p>
+        <p className="text-xs text-to-text3">—</p>
       ) : (
         <div className="mt-1 flex flex-wrap gap-1.5">
           {players.map((p) => (

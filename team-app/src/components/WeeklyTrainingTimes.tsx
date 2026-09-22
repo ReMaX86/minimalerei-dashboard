@@ -35,14 +35,14 @@ export function WeeklyTrainingTimes() {
 
   if (error) return <ErrorNote message={error} />;
   if (!trainings) return <LoadingSpinner />;
-  if (trainings.length === 0) return <p className="text-sm text-tbw-ink/50">Keine Trainingszeiten hinterlegt.</p>;
+  if (trainings.length === 0) return <p className="text-sm text-to-text2">Keine Trainingszeiten hinterlegt.</p>;
 
   return (
     <ul className="space-y-1.5">
       {trainings.map((t) => (
         <li key={t.id} className="flex items-center justify-between text-sm">
-          <span className="font-medium text-tbw-navyDark">{t.weekday}</span>
-          <span className="text-tbw-ink/60">
+          <span className="font-medium text-to-text">{t.weekday}</span>
+          <span className="text-to-text2">
             {fmtTime(t.start_time)}–{fmtTime(t.end_time)} · {t.location}
           </span>
         </li>
