@@ -1204,10 +1204,6 @@ export function Dashboard() {
           </div>
         </div>
       </section>
-
-      {flags.push_notifications && pushStatus === 'subscribed' && (
-        <PushNotificationCard status={pushStatus} onChange={refreshPushStatus} />
-      )}
     </div>
   );
 }

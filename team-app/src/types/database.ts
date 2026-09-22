@@ -161,6 +161,10 @@ export interface Player {
   photo_url: string | null;
   skills: string[];
   created_at: string;
+  // Optionale, vom Verein vergebene Rückennummer (0-99, Migration 0059) —
+  // nullable, noch keine Pflege-Oberfläche (siehe docs/design/tipoff-design/
+  // elements/01-start-header/PROMPT.md).
+  jersey_number: number | null;
 }
 
 export interface Trainer {
