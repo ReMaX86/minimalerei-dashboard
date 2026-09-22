@@ -16,9 +16,15 @@ import { Admin } from './pages/Admin';
 import { PlayerProfiles } from './pages/PlayerProfiles';
 import { GameStatsTracker } from './pages/GameStatsTracker';
 
+// Abstand unten — DESIGN.md/elements/08-menueleiste/PROMPT.md: die Leiste
+// selbst ist 60px hoch (padding:7px + 44px-Ziele + Rand), + 34px Luft, damit
+// nichts unter der schwebenden Kapsel verschwindet; env(safe-area-inset-
+// bottom) zusätzlich zur Vorlagen-Formel, da die Leiste ihren eigenen
+// bottom-Abstand ja ebenfalls per Safe-Area verschiebt (sonst würde der
+// Inhalt auf Geräten mit Home-Indicator zu knapp enden).
 function Shell({ title, hideHeader, children }: { title: string; hideHeader?: boolean; children: ReactNode }) {
   return (
-    <div className="min-h-screen pb-[calc(5rem+env(safe-area-inset-bottom))]">
+    <div className="min-h-screen pb-[calc(60px+34px+env(safe-area-inset-bottom))]">
       {!hideHeader && <Header title={title} />}
       <main className="mx-auto max-w-lg px-5 py-5">{children}</main>
       <BottomNav />
