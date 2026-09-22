@@ -1,8 +1,9 @@
-import { useEffect, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { useFeatureFlags } from './context/FeatureFlagsContext';
 import { LoadingSpinner } from './components/LoadingSpinner';
+import { Splash } from './components/Splash';
 import { BottomNav } from './components/BottomNav';
 import { Header } from './components/Header';
 import { Onboarding } from './pages/Onboarding';
@@ -25,10 +26,34 @@ function Shell({ title, hideHeader, children }: { title: string; hideHeader?: bo
   );
 }
 
+const SPLASH_SESSION_KEY = 'tipoff:splash-shown';
+
 export default function App() {
   const { role, isAdmin, passwordRecovery } = useAuth();
   const { flags, loading: flagsLoading } = useFeatureFlags();
   const location = useLocation();
+
+  // Splash beim Kaltstart — genau einmal pro Sitzung (nicht bei jedem
+  // Seitenwechsel, nicht beim Zurückkehren aus dem Hintergrund): der
+  // Startwert wird einmalig aus sessionStorage gelesen, danach bleibt der
+  // Flag für den Rest der Sitzung gesetzt.
+  const [showSplash, setShowSplash] = useState(() => {
+    try {
+      return sessionStorage.getItem(SPLASH_SESSION_KEY) !== '1';
+    } catch {
+      return true;
+    }
+  });
+  const dataReady = role !== 'loading' && !flagsLoading;
+  const dismissSplash = useCallback(() => {
+    try {
+      sessionStorage.setItem(SPLASH_SESSION_KEY, '1');
+    } catch {
+      // Privater Modus o. Ä. — dann läuft die Splash im Zweifel öfter als
+      // einmal, statt die App zu blockieren.
+    }
+    setShowSplash(false);
+  }, []);
 
   // On mobile, logging in from the Onboarding form can leave the page
   // scrolled down (the on-screen keyboard shifted the viewport while the
@@ -47,99 +72,111 @@ export default function App() {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
-  if (location.pathname === '/reset-password' || passwordRecovery) {
-    return <ResetPassword />;
-  }
+  // Ergebnis der Routing-Entscheidungen, getrennt von der Splash-Overlay
+  // darüber (siehe finales Return unten) — die Splash blendet unabhängig
+  // davon, was hier gerade gerendert würde, über allem anderen ein.
+  function renderBody(): ReactNode {
+    if (location.pathname === '/reset-password' || passwordRecovery) {
+      return <ResetPassword />;
+    }
 
-  if (role === 'loading') {
+    if (role === 'loading') {
+      return (
+        <div className="flex min-h-screen items-center justify-center">
+          <LoadingSpinner />
+        </div>
+      );
+    }
+
+    if (role === 'guest') {
+      return <Onboarding />;
+    }
+
+    // Route decisions below depend on which optional features are enabled
+    // (e.g. /team only exists if player_profiles is on) — wait for the flags
+    // to load first, otherwise a direct link/refresh on such a route would
+    // redirect away before we actually know whether it should be visible.
+    if (flagsLoading) {
+      return (
+        <div className="flex min-h-screen items-center justify-center">
+          <LoadingSpinner />
+        </div>
+      );
+    }
+
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  if (role === 'guest') {
-    return <Onboarding />;
-  }
-
-  // Route decisions below depend on which optional features are enabled
-  // (e.g. /team only exists if player_profiles is on) — wait for the flags
-  // to load first, otherwise a direct link/refresh on such a route would
-  // redirect away before we actually know whether it should be visible.
-  if (flagsLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <LoadingSpinner />
-      </div>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <Shell title="Start" hideHeader>
+              <Dashboard />
+            </Shell>
+          }
+        />
+        <Route
+          path="/trikots"
+          element={
+            role === 'viewer' ? (
+              <Navigate to="/" replace />
+            ) : (
+              <Shell title="Trikots">
+                <Trikots />
+              </Shell>
+            )
+          }
+        />
+        <Route
+          path="/kampfgericht"
+          element={
+            <Shell title="Kampfgericht">
+              <Kampfgericht />
+            </Shell>
+          }
+        />
+        <Route
+          path="/spiele"
+          element={
+            <Shell title="Spiele & Kader">
+              <Spiele />
+            </Shell>
+          }
+        />
+        <Route path="/kader" element={<Navigate to="/spiele" replace />} />
+        <Route
+          path="/team"
+          element={
+            flags.player_profiles ? (
+              <Shell title="Team">
+                <PlayerProfiles />
+              </Shell>
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route path="/stats/:gameId" element={<GameStatsTracker />} />
+        <Route
+          path="/admin"
+          element={
+            isAdmin ? (
+              <Shell title="Admin">
+                <Admin />
+              </Shell>
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     );
   }
 
   return (
-    <Routes>
-      <Route
-        path="/"
-        element={
-          <Shell title="Start" hideHeader>
-            <Dashboard />
-          </Shell>
-        }
-      />
-      <Route
-        path="/trikots"
-        element={
-          role === 'viewer' ? (
-            <Navigate to="/" replace />
-          ) : (
-            <Shell title="Trikots">
-              <Trikots />
-            </Shell>
-          )
-        }
-      />
-      <Route
-        path="/kampfgericht"
-        element={
-          <Shell title="Kampfgericht">
-            <Kampfgericht />
-          </Shell>
-        }
-      />
-      <Route
-        path="/spiele"
-        element={
-          <Shell title="Spiele & Kader">
-            <Spiele />
-          </Shell>
-        }
-      />
-      <Route path="/kader" element={<Navigate to="/spiele" replace />} />
-      <Route
-        path="/team"
-        element={
-          flags.player_profiles ? (
-            <Shell title="Team">
-              <PlayerProfiles />
-            </Shell>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route path="/stats/:gameId" element={<GameStatsTracker />} />
-      <Route
-        path="/admin"
-        element={
-          isAdmin ? (
-            <Shell title="Admin">
-              <Admin />
-            </Shell>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      {renderBody()}
+      {showSplash && <Splash ready={dataReady} onDone={dismissSplash} />}
+    </>
   );
 }

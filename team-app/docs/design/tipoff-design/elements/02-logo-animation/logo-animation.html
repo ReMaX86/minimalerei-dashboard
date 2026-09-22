@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff – Logo-Animation, 3 Varianten</title>
+<!--
+  Drei Animations-Varianten für das TipOff-Zeichen (Ring + Punkt).
+  Reines SVG + CSS, keine Bibliothek, keine Videodatei.
+  URL-Parameter:  ?only=1|2|3   zeigt nur eine Variante groß (Splash-Vorschau)
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Geist:wght@300..700&display=swap">
+<style>
+:root{--to-bg:#0A0C0F;--to-surface:#12151A;--to-line:#2A303A;--to-text:#F2F4F7;--to-text-2:#A3ABB8;--to-text-3:#7C8594;--to-accent:#C8FF2E}
+*{box-sizing:border-box}
+body{margin:0;background:var(--to-bg);color:var(--to-text);font-family:'Geist',system-ui,sans-serif}
+.wrap{padding:28px;display:flex;flex-direction:column;gap:22px}
+h1{margin:0;font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;font-size:26px;letter-spacing:-0.03em}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.card{background:var(--to-surface);border:1px solid #232830;border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:14px;align-items:center}
+.stage{width:100%;aspect-ratio:1/1;display:grid;place-items:center;background:var(--to-bg);border-radius:18px;overflow:hidden}
+.meta{width:100%;display:flex;flex-direction:column;gap:4px}
+.meta b{font-size:15px;font-weight:600}
+.meta span{font-size:13px;color:var(--to-text-2)}
+.replay{height:40px;padding:0 16px;border:1px solid var(--to-line);border-radius:12px;background:transparent;color:var(--to-text);font:inherit;font-size:14px;cursor:pointer}
+svg{width:70%;height:70%;overflow:visible}
+.ring{fill:none;stroke:var(--to-accent);stroke-width:11;stroke-linecap:round}
+.dot{fill:var(--to-accent)}
+
+/* ---------- 1) Sprungball: der Ball steigt aus dem Mittelkreis ---------- */
+.a1 .ring{transform-origin:50px 56px;animation:a1-ring 1100ms cubic-bezier(.2,.7,.3,1) both}
+.a1 .dot{transform-origin:50px 19px;animation:a1-dot 1100ms cubic-bezier(.16,.9,.3,1) both}
+.a1 .trail{stroke:var(--to-accent);stroke-width:3;stroke-linecap:round;stroke-dasharray:2 9;opacity:0;animation:a1-trail 1100ms ease-out both}
+@keyframes a1-ring{
+  0%{transform:scale(.72) rotate(-16deg);opacity:0}
+  45%{transform:scale(1.04) rotate(2deg);opacity:1}
+  70%{transform:scale(.99) rotate(0deg)}
+  100%{transform:scale(1) rotate(0deg);opacity:1}
+}
+@keyframes a1-dot{
+  0%{transform:translateY(37px) scale(.35);opacity:0}
+  25%{opacity:1}
+  60%{transform:translateY(-7px) scale(1.06)}
+  80%{transform:translateY(2px) scale(.98)}
+  100%{transform:translateY(0) scale(1);opacity:1}
+}
+@keyframes a1-trail{0%,20%{opacity:0}45%{opacity:.85}100%{opacity:0}}
+
+/* ---------- 2) Dribbling: der Ball prallt auf den Ring ---------- */
+.a2 .ring{transform-origin:50px 56px;animation:a2-ring 1200ms ease-out both}
+.a2 .dot{transform-origin:50px 19px;animation:a2-dot 1200ms both}
+@keyframes a2-ring{
+  0%{transform:scale(1);opacity:.25}
+  24%{transform:scale(1);opacity:1}
+  30%{transform:scale(1.1,.86)}
+  40%{transform:scale(.97,1.03)}
+  58%{transform:scale(1.05,.93)}
+  70%{transform:scale(1)}
+  100%{transform:scale(1);opacity:1}
+}
+@keyframes a2-dot{
+  0%{transform:translateY(-46px) scale(.9,1.12);opacity:0}
+  10%{opacity:1}
+  26%{transform:translateY(14px) scale(1.16,.84)}   /* Aufprall auf dem Ring */
+  44%{transform:translateY(-26px) scale(.94,1.08)}
+  60%{transform:translateY(10px) scale(1.1,.9)}
+  76%{transform:translateY(-8px) scale(.98,1.03)}
+  100%{transform:translateY(0) scale(1);opacity:1}
+}
+
+/* ---------- 3) Shot Clock: der Ring läuft ab, dann fällt der Ball ---------- */
+.a3 .ring{stroke-dasharray:137;stroke-dashoffset:137;transform-origin:50px 56px;transform:rotate(-90deg);animation:a3-ring 1150ms cubic-bezier(.4,0,.2,1) both}
+.a3 .dot{transform-origin:50px 19px;animation:a3-dot 1150ms cubic-bezier(.2,.8,.2,1) both}
+@keyframes a3-ring{
+  0%{stroke-dashoffset:137;transform:rotate(-90deg);stroke:var(--to-accent)}
+  68%{stroke-dashoffset:0;transform:rotate(-90deg);stroke:var(--to-accent)}
+  78%{stroke:#FFFFFF}
+  100%{stroke-dashoffset:0;transform:rotate(0deg);stroke:var(--to-accent)}
+}
+@keyframes a3-dot{
+  0%,55%{transform:translateY(-30px) scale(.2);opacity:0}
+  72%{transform:translateY(0) scale(1.25);opacity:1}
+  86%{transform:translateY(0) scale(.94)}
+  100%{transform:translateY(0) scale(1);opacity:1}
+}
+
+/* Splash-Vorschau (?only=) */
+body.only .wrap{padding:0}
+body.only .grid{grid-template-columns:1fr;height:100vh}
+body.only .card{border:0;background:var(--to-bg);border-radius:0;justify-content:center;height:100vh}
+body.only .stage{background:var(--to-bg)}
+body.only .meta,body.only .replay,body.only h1,body.only .intro{display:none}
+body.only svg{width:150px;height:150px}
+.wordmark{font-family:'Archivo',sans-serif;font-stretch:100%;font-weight:700;font-size:34px;letter-spacing:-0.045em;opacity:0;animation:word 1400ms ease-out both}
+@keyframes word{0%,55%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:translateY(0)}}
+body:not(.only) .wordmark{display:none}
+
+@media (prefers-reduced-motion: reduce){
+  .a1 .ring,.a1 .dot,.a2 .ring,.a2 .dot,.a3 .ring,.a3 .dot,.wordmark{animation:none !important;opacity:1;transform:none;stroke-dashoffset:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Logo-Animation – 3 Varianten</h1>
+  <p class="intro" style="margin:-10px 0 0;color:var(--to-text-2);font-size:14px">Jede Variante läuft einmal, ca. 1,1 Sekunden. Zum Wiederholen auf „Nochmal“ tippen.</p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="stage"><svg class="a1" viewBox="0 0 100 100" aria-label="Animation Sprungball" role="img">
+        <line class="trail" x1="50" y1="48" x2="50" y2="30"/>
+        <path class="ring" d="M64.91 34.7 A26 26 0 1 1 35.09 34.7"/>
+        <circle class="dot" cx="50" cy="19" r="9.5"/>
+      </svg></div>
+      <div class="meta"><b>1 · Sprungball</b><span>Der Ball steigt aus dem Mittelkreis nach oben, der Ring richtet sich dabei auf.</span></div>
+      <button type="button" class="replay">Nochmal</button>
+    </div>
+
+    <div class="card">
+      <div class="stage"><svg class="a2" viewBox="0 0 100 100" aria-label="Animation Dribbling" role="img">
+        <path class="ring" d="M64.91 34.7 A26 26 0 1 1 35.09 34.7"/>
+        <circle class="dot" cx="50" cy="19" r="9.5"/>
+      </svg></div>
+      <div class="meta"><b>2 · Dribbling</b><span>Der Ball fällt von oben, prallt zweimal auf dem Ring auf und kommt zur Ruhe.</span></div>
+      <button type="button" class="replay">Nochmal</button>
+    </div>
+
+    <div class="card">
+      <div class="stage"><svg class="a3" viewBox="0 0 100 100" aria-label="Animation Shot Clock" role="img">
+        <path class="ring" d="M64.91 34.7 A26 26 0 1 1 35.09 34.7"/>
+        <circle class="dot" cx="50" cy="19" r="9.5"/>
+      </svg></div>
+      <div class="meta"><b>3 · Shot Clock</b><span>Der Ring zeichnet sich wie eine ablaufende 24-Sekunden-Uhr, dann springt der Ball heraus.</span></div>
+      <button type="button" class="replay">Nochmal</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.replay').forEach(b => b.addEventListener('click', () => {
+    const svg = b.closest('.card').querySelector('svg');
+    const clone = svg.cloneNode(true);
+    svg.replaceWith(clone);
+  }));
+  const only = new URLSearchParams(location.search).get('only');
+  if (only) {
+    document.body.classList.add('only');
+    document.querySelectorAll('.card').forEach((c, i) => { if (String(i + 1) !== only) c.remove(); });
+    const card = document.querySelector('.card');
+    const w = document.createElement('div');
+    w.className = 'wordmark'; w.textContent = 'tipoff';
+    card.appendChild(w);
+  }
+</script>
+</body>
+</html>

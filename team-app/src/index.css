@@ -155,4 +155,149 @@
   .code-box-active {
     @apply border-to-accent;
   }
+
+  /* Tipoff-Zeichen (Ring + Punkt) — Kaltstart-Splash und Ladeanzeige.
+     Vorlage: docs/design/tipoff-design/elements/02-logo-animation/
+     (Variante 3 "Shot Clock"), eingebaut in Splash.tsx / LoadingSpinner.tsx.
+     Reines SVG + CSS, Farben ausschließlich aus unseren Tokens. */
+  .to-mark-ring {
+    fill: none;
+    stroke: var(--to-accent);
+    stroke-width: 11;
+    stroke-linecap: round;
+  }
+  .to-mark-dot {
+    fill: var(--to-accent);
+  }
+  /* Ladeanzeige — nur der Ring, sanft pulsierend, ohne die volle
+     Splash-Animation (siehe LoadingSpinner.tsx). */
+  .to-mark-ring-pulse {
+    animation: to-mark-pulse 1400ms ease-in-out infinite;
+  }
+  @keyframes to-mark-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  /* Splash-Einstieg: der Ring zeichnet sich wie eine ablaufende Wurfuhr,
+     dann springt der Punkt heraus (Vorlage-Variante 3, ~1,15s). Die
+     Weiß-Vorlagefarbe bei 78% wurde auf --to-text (unser hellstes
+     Text-Token) statt eines neuen Hex-Werts gemappt. */
+  .to-splash-ring {
+    stroke-dasharray: 137;
+    stroke-dashoffset: 137;
+    transform-origin: 50px 56px;
+    transform: rotate(-90deg);
+    animation: to-splash-ring-enter 1150ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+  @keyframes to-splash-ring-enter {
+    0% {
+      stroke-dashoffset: 137;
+      transform: rotate(-90deg);
+      stroke: var(--to-accent);
+    }
+    68% {
+      stroke-dashoffset: 0;
+      transform: rotate(-90deg);
+      stroke: var(--to-accent);
+    }
+    78% {
+      stroke: var(--to-text);
+    }
+    100% {
+      stroke-dashoffset: 0;
+      transform: rotate(0deg);
+      stroke: var(--to-accent);
+    }
+  }
+  .to-splash-dot {
+    transform-origin: 50px 19px;
+    animation: to-splash-dot-enter 1150ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  @keyframes to-splash-dot-enter {
+    0%,
+    55% {
+      transform: translateY(-30px) scale(0.2);
+      opacity: 0;
+    }
+    72% {
+      transform: translateY(0) scale(1.25);
+      opacity: 1;
+    }
+    86% {
+      transform: translateY(0) scale(0.94);
+    }
+    100% {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+  }
+  /* Dauert das Laden länger als die Animation: Ring/Punkt nach dem Einstieg
+     sanft weiterpulsieren statt die Animation neu zu starten. */
+  .to-splash-pulsing .to-splash-ring {
+    animation:
+      to-splash-ring-enter 1150ms cubic-bezier(0.4, 0, 0.2, 1) both,
+      to-mark-pulse 1400ms ease-in-out 1150ms infinite;
+  }
+  .to-splash-pulsing .to-splash-dot {
+    animation:
+      to-splash-dot-enter 1150ms cubic-bezier(0.2, 0.8, 0.2, 1) both,
+      to-mark-pulse 1400ms ease-in-out 1150ms infinite;
+  }
+
+  .to-splash-overlay {
+    @apply fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-to-bg;
+    transition: opacity 200ms ease-out;
+  }
+  .to-splash-overlay-fading {
+    opacity: 0;
+  }
+  .to-splash-mark {
+    width: 150px;
+    height: 150px;
+    overflow: visible;
+  }
+  .to-splash-wordmark {
+    font-family: var(--to-font-display);
+    font-stretch: 100%;
+    font-weight: 700;
+    font-size: 34px;
+    letter-spacing: -0.045em;
+    color: var(--to-text);
+    opacity: 0;
+    animation: to-splash-word-in 1150ms ease-out both;
+  }
+  @keyframes to-splash-word-in {
+    0%,
+    55% {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .to-splash-wordmark-static {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .to-splash-ring,
+    .to-splash-dot,
+    .to-splash-wordmark,
+    .to-mark-ring-pulse {
+      animation: none !important;
+      opacity: 1;
+      transform: none;
+      stroke-dashoffset: 0;
+    }
+  }
 }
