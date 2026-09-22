@@ -122,11 +122,21 @@ export function NextGameCard({
   const [responding, setResponding] = useState(false);
   const [respondError, setRespondError] = useState<string | null>(null);
 
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  // Lokales Datum, NICHT toISOString().slice(0,10) (das ist UTC — würde in
+  // den ersten ein bis zwei Stunden nach Mitternacht fälschlich noch den
+  // Vortag liefern und den Spieltag verfehlen).
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const isMatchday = game.game_date === todayIso;
-  const kickedOff = hasKickedOff(game.game_date, game.game_time);
-  const live = showTracking && isMatchday && kickedOff;
-  const matchdayPreKickoff = showTracking && isMatchday && !kickedOff;
+  const kickedOff = hasKickedOff(game.game_date, game.game_time, now);
+  // Ob wirklich schon getrackt wird, ist ein stärkeres "das Spiel läuft"-
+  // Signal als die geplante Anpfiffzeit — die Uhrzeit ist oft nur eine grobe
+  // Angabe, und wer schon tracked, hat faktisch schon angepfiffen (siehe
+  // "wieso sehe ich kein Live-Ticker, obwohl getrackt wird" — vorher zeigte
+  // die Karte bis zur geplanten Uhrzeit weiter "trackt gerade" +
+  // "Tracking übernehmen" statt der Anzeigetafel).
+  const live = showTracking && isMatchday && (kickedOff || !!activeStatsHolder);
+  const matchdayPreKickoff = showTracking && isMatchday && !live;
 
   const isPending = !game.squad_published;
   const isNotInSquad = role === 'player' && game.squad_published && !playerInSquad && myConfirmation !== 'declined';

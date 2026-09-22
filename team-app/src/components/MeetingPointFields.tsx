@@ -34,7 +34,7 @@ export function MeetingPointFields({
             onChange={(v) => onChange({ ...value, meeting_time_carpool: v })}
           />
           <label className="block text-xs">
-            <span className="font-semibold text-tbw-ink/50">Fahrgemeinschaft — Ort</span>
+            <span className="font-semibold text-to-text3">Fahrgemeinschaft — Ort</span>
             <input
               type="text"
               placeholder="z. B. Parkplatz Schulzentrum"

@@ -134,9 +134,9 @@ export function CarpoolSection({
 
   const content = (
     <>
-      <p className="text-sm font-bold text-tbw-navyDark">🚗 Mitfahrgelegenheit</p>
+      <p className="text-sm font-bold text-to-text">🚗 Mitfahrgelegenheit</p>
 
-      {state.offers.length === 0 && <p className="mt-2 text-sm text-tbw-ink/50">Noch keine Fahrer eingetragen.</p>}
+      {state.offers.length === 0 && <p className="mt-2 text-sm text-to-text3">Noch keine Fahrer eingetragen.</p>}
 
       <ul className="mt-2 space-y-2">
         {state.offers.map((o) => {
@@ -145,25 +145,25 @@ export function CarpoolSection({
           const isMyOffer = o.driver_player_id === player?.id;
           const isMyClaim = myClaim?.offer_id === o.id;
           return (
-            <li key={o.id} className="rounded-xl bg-tbw-bg p-3">
+            <li key={o.id} className="rounded-xl bg-to-bg p-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-sm font-semibold text-tbw-navyDark">
+                  <p className="text-sm font-semibold text-to-text">
                     {playersById[o.driver_player_id]?.name ?? '?'} fährt
                   </p>
-                  <p className="text-xs text-tbw-ink/50">
+                  <p className="text-xs text-to-text3">
                     {free > 0 ? `${free} von ${o.seats} Plätzen frei` : 'Voll'}
                     {o.note ? ` · ${o.note}` : ''}
                   </p>
                   {takenBy.length > 0 && (
-                    <p className="mt-1 text-xs text-tbw-ink/50">
+                    <p className="mt-1 text-xs text-to-text3">
                       Mit dabei: {takenBy.map((c) => playersById[c.player_id]?.name ?? '?').join(', ')}
                     </p>
                   )}
                 </div>
                 {isMyOffer ? (
                   <button
-                    className="btn-secondary shrink-0 !px-2 !py-1 text-xs !text-tbw-red"
+                    className="btn-secondary shrink-0 !px-2 !py-1 text-xs !text-to-dangerText"
                     disabled={busyKey === o.id}
                     onClick={() => cancelOffer(o.id)}
                   >
@@ -171,7 +171,7 @@ export function CarpoolSection({
                   </button>
                 ) : isMyClaim ? (
                   <button
-                    className="btn-secondary shrink-0 !px-2 !py-1 text-xs !text-tbw-red"
+                    className="btn-secondary shrink-0 !px-2 !py-1 text-xs !text-to-dangerText"
                     disabled={busyKey === o.id}
                     onClick={() => cancelClaim(o.id)}
                   >
@@ -193,11 +193,11 @@ export function CarpoolSection({
       </ul>
 
       {player && !myOffer && (
-        <div className="mt-3 border-t border-black/5 pt-3">
+        <div className="mt-3 border-t border-to-divider pt-3">
           {showOfferForm ? (
             <form onSubmit={createOffer} className="space-y-2">
               <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-tbw-ink/50">Freie Plätze</label>
+                <label className="text-xs font-semibold text-to-text3">Freie Plätze</label>
                 <input
                   type="number"
                   min={1}
@@ -234,7 +234,7 @@ export function CarpoolSection({
   );
 
   return embedded ? (
-    <div className="mt-3 border-t border-black/5 pt-3">{content}</div>
+    <div className="mt-3 border-t border-to-divider pt-3">{content}</div>
   ) : (
     <section className="card">{content}</section>
   );

@@ -71,7 +71,7 @@ type LockState =
 // jedem Spieler-Tile stehen zu haben, wenn die Zuordnung übersprungen wurde.
 function NumberBadge({ number }: { number: number }) {
   return (
-    <span className="absolute -left-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-tbw-gold px-1 text-[10px] font-extrabold text-tbw-navyDark shadow ring-2 ring-white">
+    <span className="absolute -left-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-to-accent px-1 text-[10px] font-extrabold text-to-text shadow ring-2 ring-white">
       {number}
     </span>
   );
@@ -95,14 +95,14 @@ function PlayerTile({
       disabled={disabled}
       onClick={onClick}
       className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-3 text-center disabled:opacity-30 ${
-        selected ? 'border-status-ok bg-status-ok/5' : 'border-transparent bg-tbw-bg active:scale-[0.97]'
+        selected ? 'border-to-accent bg-to-accentSoft' : 'border-transparent bg-to-bg active:scale-[0.97]'
       }`}
     >
       <div className="relative">
         <Avatar player={player} size="lg" />
         {number !== undefined && <NumberBadge number={number} />}
       </div>
-      <span className="text-sm font-semibold leading-tight text-tbw-navyDark">{shortPlayerName(player.name)}</span>
+      <span className="text-sm font-semibold leading-tight text-to-text">{shortPlayerName(player.name)}</span>
     </button>
   );
 }
@@ -115,10 +115,10 @@ function OpponentTile({ onClick, disabled }: { onClick: () => void; disabled?: b
     <button
       disabled={disabled}
       onClick={onClick}
-      className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-tbw-ink/25 bg-transparent p-3 text-center disabled:opacity-30"
+      className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-to-line bg-transparent p-3 text-center disabled:opacity-30"
     >
-      <span className="flex h-24 w-24 items-center justify-center rounded-full bg-tbw-ink/10 text-3xl">🆚</span>
-      <span className="text-sm font-semibold leading-tight text-tbw-ink/60">Gegner</span>
+      <span className="flex h-24 w-24 items-center justify-center rounded-full bg-to-surface2 text-3xl">🆚</span>
+      <span className="text-sm font-semibold leading-tight text-to-text2">Gegner</span>
     </button>
   );
 }
@@ -606,32 +606,32 @@ export function GameStatsTracker() {
   useScrollResetOnChange(screenKey);
 
   return (
-    <div className="min-h-screen bg-tbw-bg pb-8">
-      <div className="sticky top-0 z-10 bg-tbw-navyDark px-4 py-3 text-white">
+    <div className="min-h-screen bg-to-bg pb-8">
+      <div className="sticky top-0 z-10 bg-to-surface px-4 py-3 text-to-text">
         <div className="flex items-center justify-between">
-          <button className="text-sm font-semibold text-white/70" onClick={goBack}>
+          <button className="text-sm font-semibold text-to-text2" onClick={goBack}>
             ← Zurück
           </button>
           <p className="text-sm font-bold">{game ? `vs. ${game.opponent}` : 'Spiel-Stats'}</p>
           <span className="w-12" />
         </div>
         {game && (
-          <p className="mt-0.5 text-center text-xs text-white/50">
+          <p className="mt-0.5 text-center text-xs text-to-text3">
             {fmtDate(game.game_date)} · {fmtTime(game.game_time)} Uhr
           </p>
         )}
         {game && (
-          <div className="mt-2 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wide text-white/50">
-            <span className="text-tbw-gold">TB Wülfrath</span>
-            <span className="text-white/30">–</span>
+          <div className="mt-2 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wide text-to-text3">
+            <span className="text-to-accent">TB Wülfrath</span>
+            <span className="text-to-text3">–</span>
             <span className="truncate">{game.opponent}</span>
           </div>
         )}
         <p className="text-center text-3xl font-extrabold">
-          <span className="text-tbw-gold">{teamScore.us}</span> : {teamScore.opponent}
+          <span className="text-to-accent">{teamScore.us}</span> : {teamScore.opponent}
         </p>
         {quarterScores.length > 0 && (
-          <p className="mt-1 text-center text-xs text-white/50">
+          <p className="mt-1 text-center text-xs text-to-text3">
             {quarterScores.map((q) => `${quarterLabel(q.quarter)} ${q.us}:${q.opponent}`).join(' · ')}
           </p>
         )}
@@ -648,8 +648,8 @@ export function GameStatsTracker() {
 
         {lockState.kind === 'blocked' && (
           <div className="card space-y-3 text-center">
-            <p className="text-sm text-tbw-ink/70">
-              Wird gerade von <span className="font-bold text-tbw-navyDark">{lockState.session.holder_name}</span>{' '}
+            <p className="text-sm text-to-text2">
+              Wird gerade von <span className="font-bold text-to-text">{lockState.session.holder_name}</span>{' '}
               getrackt (seit{' '}
               {new Date(lockState.session.started_at).toLocaleTimeString('de-DE', {
                 hour: '2-digit',
@@ -668,7 +668,7 @@ export function GameStatsTracker() {
 
         {lockState.kind === 'takenOver' && (
           <div className="card space-y-3 text-center">
-            <p className="text-sm text-tbw-ink/70">
+            <p className="text-sm text-to-text2">
               Jemand anderes hat die Eingabe übernommen. Deine Aktionen werden ab jetzt nicht mehr gespeichert.
             </p>
             <button className="btn-secondary w-full" onClick={goBack}>
@@ -679,7 +679,7 @@ export function GameStatsTracker() {
 
         {lockState.kind === 'readonly' && (
           <div className="card mb-3">
-            <p className="text-sm font-bold text-tbw-navyDark">Stats abgeschlossen</p>
+            <p className="text-sm font-bold text-to-text">Stats abgeschlossen</p>
             {events.length === 0 ? (
               // Endstand wurde nachträglich eingetragen (siehe GamesAdmin.tsx
               // "Endstand nachtragen"), nie live getrackt — es gibt also keine
@@ -688,12 +688,12 @@ export function GameStatsTracker() {
               // eine Live-Tracking-Sitzung starten (Aufstellung, Trikotnummern
               // ...), die dann wieder mit "Spiel beenden" abgeschlossen werden
               // müsste — inklusive einer zweiten "Spiel beendet"-Push.
-              <p className="mt-1 text-xs text-tbw-ink/50">
+              <p className="mt-1 text-xs text-to-text3">
                 Für dieses Spiel wurden keine Einzelspieler-Stats erfasst — der Endstand wurde manuell nachgetragen.
               </p>
             ) : (
               <>
-                <p className="mt-1 text-xs text-tbw-ink/50">Nur noch zur Ansicht.</p>
+                <p className="mt-1 text-xs text-to-text3">Nur noch zur Ansicht.</p>
                 {isAdmin && (
                   <button className="btn-secondary mt-3 w-full" disabled={busy} onClick={reopen}>
                     Wieder öffnen
@@ -707,13 +707,13 @@ export function GameStatsTracker() {
         {lockState.kind === 'held' && (
           <>
             <div className="card space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Viertel</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Viertel</p>
               <div className="flex flex-wrap gap-2">
                 {[1, 2, 3, 4].map((q) => (
                   <button
                     key={q}
                     className={`flex-1 rounded-xl py-2 text-sm font-bold ${
-                      quarter === q ? 'bg-tbw-navy text-white' : 'bg-tbw-bg text-tbw-ink/60'
+                      quarter === q ? 'bg-to-accent text-to-onAccent' : 'bg-to-bg text-to-text2'
                     }`}
                     onClick={() => selectQuarter(q)}
                   >
@@ -722,7 +722,7 @@ export function GameStatsTracker() {
                 ))}
                 <button
                   className={`rounded-xl px-3 py-2 text-sm font-bold ${
-                    quarter > 4 ? 'bg-tbw-navy text-white' : 'bg-tbw-bg text-tbw-ink/60'
+                    quarter > 4 ? 'bg-to-accent text-to-onAccent' : 'bg-to-bg text-to-text2'
                   }`}
                   onClick={() => selectQuarter(quarter > 4 ? quarter + 1 : 5)}
                 >
@@ -733,14 +733,14 @@ export function GameStatsTracker() {
 
             {trackablePlayers.length === 0 && (
               <div className="card mt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Spieler</p>
-                <p className="mt-2 text-sm text-tbw-ink/40">Kein Kader für dieses Spiel hinterlegt.</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Spieler</p>
+                <p className="mt-2 text-sm text-to-text3">Kein Kader für dieses Spiel hinterlegt.</p>
               </div>
             )}
 
             {trackablePlayers.length > 0 && !showNumbersCard && (
               <button
-                className="mt-2 block text-xs font-bold text-tbw-navy"
+                className="mt-2 block text-xs font-bold text-to-accent"
                 onClick={openNumbersEditor}
               >
                 🔢 Trikotnummern bearbeiten
@@ -749,14 +749,14 @@ export function GameStatsTracker() {
 
             {trackablePlayers.length > 0 && showNumbersCard && (
               <div className="card mt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Trikotnummern</p>
-                <p className="mt-1 text-xs text-tbw-ink/50">
+                <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Trikotnummern</p>
+                <p className="mt-1 text-xs text-to-text3">
                   Welcher Spieler hat welche Nummer? Kann auch leer bleiben und später ergänzt werden.
                 </p>
-                <ul className="mt-3 divide-y divide-black/5">
+                <ul className="mt-3 divide-y divide-to-divider">
                   {trackablePlayers.map((p) => (
                     <li key={p.id} className="flex items-center justify-between gap-3 py-2">
-                      <span className="flex items-center gap-2 text-sm font-medium text-tbw-navyDark">
+                      <span className="flex items-center gap-2 text-sm font-medium text-to-text">
                         <Avatar player={p} size="xs" />
                         {p.name}
                       </span>
@@ -790,10 +790,10 @@ export function GameStatsTracker() {
 
             {trackablePlayers.length > 0 && !showNumbersCard && useCourtSplit && onCourtIds.length < COURT_SIZE && (
               <div className="card mt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
+                <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">
                   Startaufstellung ({onCourtIds.length}/{COURT_SIZE})
                 </p>
-                <p className="mt-1 text-xs text-tbw-ink/50">Wer steht auf dem Feld?</p>
+                <p className="mt-1 text-xs text-to-text3">Wer steht auf dem Feld?</p>
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   {trackablePlayers.map((p) => (
                     <PlayerTile
@@ -816,10 +816,10 @@ export function GameStatsTracker() {
               substituting && (
                 <div className="card mt-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">
                       {outgoingId ? 'Wer kommt rein?' : 'Wer geht raus?'}
                     </p>
-                    <button className="text-xs font-bold text-tbw-red" onClick={cancelSubstitution}>
+                    <button className="text-xs font-bold text-to-dangerText" onClick={cancelSubstitution}>
                       Abbrechen
                     </button>
                   </div>
@@ -843,10 +843,10 @@ export function GameStatsTracker() {
               pendingAction && (
                 <div className="card mt-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">
                       Wer? — {STAT_TYPE_LABELS[pendingAction]}
                     </p>
-                    <button className="text-xs font-bold text-tbw-red" onClick={() => setPendingAction(null)}>
+                    <button className="text-xs font-bold text-to-dangerText" onClick={() => setPendingAction(null)}>
                       Abbrechen
                     </button>
                   </div>
@@ -874,12 +874,12 @@ export function GameStatsTracker() {
               !pendingAction && (
                 <>
                   {lastEvent && (
-                    <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-tbw-ink/45">
+                    <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-to-text3">
                       <span>Zuletzt:</span>
                       {lastEvent.team === 'us' && lastEvent.player_id && playersById[lastEvent.player_id] && (
                         <Avatar player={playersById[lastEvent.player_id]} size="xs" />
                       )}
-                      <span className="font-semibold text-tbw-ink/70">
+                      <span className="font-semibold text-to-text2">
                         {lastEvent.team === 'opponent'
                           ? 'Gegner'
                           : `${numPrefix(lastEvent.player_id ?? '')}${playersById[lastEvent.player_id ?? '']?.name ?? '?'}`}
@@ -889,7 +889,7 @@ export function GameStatsTracker() {
                   )}
 
                   <div className="card mt-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Aktion</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Aktion</p>
                     <div className="mt-2 flex flex-col items-center gap-2">
                       {SCORING_BUTTONS.map(({ made, miss, label }) => (
                         <div key={made} className="flex gap-4">
@@ -914,8 +914,8 @@ export function GameStatsTracker() {
                   {useCourtSplit && (
                     <div className="card mt-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Auf dem Feld</p>
-                        <button className="text-xs font-bold text-tbw-navy" onClick={startSubstitution}>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Auf dem Feld</p>
+                        <button className="text-xs font-bold text-to-accent" onClick={startSubstitution}>
                           🔄 Wechseln
                         </button>
                       </div>
@@ -923,7 +923,7 @@ export function GameStatsTracker() {
                         {onCourtPlayers.map((p) => (
                           <div key={p.id} className="flex flex-col items-center gap-1">
                             <Avatar player={p} size="xs" />
-                            <span className="text-center text-[9px] font-semibold leading-tight text-tbw-navyDark">
+                            <span className="text-center text-[9px] font-semibold leading-tight text-to-text">
                               {numPrefix(p.id)}
                               {shortPlayerName(p.name)}
                             </span>
@@ -932,10 +932,10 @@ export function GameStatsTracker() {
                       </div>
                       {benchPlayers.length > 0 && (
                         <>
-                          <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-tbw-ink/30">Bank</p>
+                          <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-to-text3">Bank</p>
                           <div className="mt-1 flex flex-wrap gap-1.5">
                             {benchPlayers.map((p) => (
-                              <span key={p.id} className="rounded-full bg-tbw-bg px-2.5 py-1 text-xs text-tbw-ink/40">
+                              <span key={p.id} className="rounded-full bg-to-bg px-2.5 py-1 text-xs text-to-text3">
                                 {numPrefix(p.id)}
                                 {shortPlayerName(p.name)}
                               </span>
@@ -950,9 +950,9 @@ export function GameStatsTracker() {
 
             <div className="card mt-3">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Zuletzt</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Zuletzt</p>
                 <button
-                  className="text-xs font-bold text-tbw-red disabled:opacity-30"
+                  className="text-xs font-bold text-to-dangerText disabled:opacity-30"
                   disabled={insertedStack.current.length === 0 || busy}
                   onClick={undo}
                 >
@@ -960,13 +960,13 @@ export function GameStatsTracker() {
                 </button>
               </div>
               {recentEvents.length === 0 ? (
-                <p className="mt-1 text-xs text-tbw-ink/40">Noch keine Aktionen.</p>
+                <p className="mt-1 text-xs text-to-text3">Noch keine Aktionen.</p>
               ) : (
                 <ul className="mt-1 space-y-1">
                   {recentEvents.map((e) => {
                     const evPlayer = e.player_id ? playersById[e.player_id] : undefined;
                     return (
-                      <li key={e.id} className="flex items-center gap-2 text-xs text-tbw-ink/60">
+                      <li key={e.id} className="flex items-center gap-2 text-xs text-to-text2">
                         {evPlayer && <Avatar player={evPlayer} size="xs" />}
                         <span>
                           {quarterLabel(e.quarter)} ·{' '}
@@ -988,12 +988,12 @@ export function GameStatsTracker() {
 
         {boxScore.length > 0 && (
           <div className="card mt-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">Box-Score</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Box-Score</p>
             <div className="mt-2 overflow-x-auto">
               <table className="w-full min-w-[680px] text-left text-xs">
                 <thead>
-                  <tr className="text-tbw-ink/40">
-                    <th className="sticky left-0 z-10 border-r border-black/5 bg-white py-1 pr-2 font-semibold">
+                  <tr className="text-to-text3">
+                    <th className="sticky left-0 z-10 border-r border-to-divider bg-to-surface py-1 pr-2 font-semibold">
                       Spieler
                     </th>
                     <th className="px-1 py-1 text-right font-semibold">Pkt</th>
@@ -1014,39 +1014,39 @@ export function GameStatsTracker() {
                 </thead>
                 <tbody>
                   {boxScore.map((b) => (
-                    <tr key={b.playerId} className="border-t border-black/5">
-                      <td className="sticky left-0 z-10 border-r border-black/5 bg-white py-1.5 pr-2 font-semibold text-tbw-navyDark">
+                    <tr key={b.playerId} className="border-t border-to-divider">
+                      <td className="sticky left-0 z-10 border-r border-to-divider bg-to-surface py-1.5 pr-2 font-semibold text-to-text">
                         <div className="flex items-center gap-2">
                           {playersById[b.playerId] && <Avatar player={playersById[b.playerId]} size="xs" />}
                           {numPrefix(b.playerId)}
                           {playersById[b.playerId] ? shortPlayerName(playersById[b.playerId].name) : '?'}
                         </div>
                       </td>
-                      <td className="px-1 py-1.5 text-right font-bold text-tbw-navyDark">{b.points}</td>
-                      <td className="px-1 py-1.5 text-right text-tbw-ink/60">
+                      <td className="px-1 py-1.5 text-right font-bold text-to-text">{b.points}</td>
+                      <td className="px-1 py-1.5 text-right text-to-text2">
                         {b.fg2m}/{b.fg2a}
                       </td>
-                      <td className="px-1 py-1.5 text-right text-tbw-ink/40">{fgPct(b.fg2m, b.fg2a)}</td>
-                      <td className="px-1 py-1.5 text-right text-tbw-ink/60">
+                      <td className="px-1 py-1.5 text-right text-to-text3">{fgPct(b.fg2m, b.fg2a)}</td>
+                      <td className="px-1 py-1.5 text-right text-to-text2">
                         {b.fg3m}/{b.fg3a}
                       </td>
-                      <td className="px-1 py-1.5 text-right text-tbw-ink/40">{fgPct(b.fg3m, b.fg3a)}</td>
-                      <td className="px-1 py-1.5 text-right text-tbw-ink/60">
+                      <td className="px-1 py-1.5 text-right text-to-text3">{fgPct(b.fg3m, b.fg3a)}</td>
+                      <td className="px-1 py-1.5 text-right text-to-text2">
                         {b.ftm}/{b.fta}
                       </td>
-                      <td className="px-1 py-1.5 text-right text-tbw-ink/40">{fgPct(b.ftm, b.fta)}</td>
-                      <td className="px-1 py-1.5 text-right text-tbw-ink/60">{b.rebounds}</td>
-                      <td className="px-1 py-1.5 text-right text-tbw-ink/60">{b.assists}</td>
-                      <td className="px-1 py-1.5 text-right text-tbw-ink/60">{b.steals}</td>
-                      <td className="px-1 py-1.5 text-right text-tbw-ink/60">{b.blocks}</td>
-                      <td className="px-1 py-1.5 text-right text-tbw-ink/60">{b.turnovers}</td>
-                      <td className="px-1 py-1.5 text-right text-tbw-ink/60">{b.fouls}</td>
+                      <td className="px-1 py-1.5 text-right text-to-text3">{fgPct(b.ftm, b.fta)}</td>
+                      <td className="px-1 py-1.5 text-right text-to-text2">{b.rebounds}</td>
+                      <td className="px-1 py-1.5 text-right text-to-text2">{b.assists}</td>
+                      <td className="px-1 py-1.5 text-right text-to-text2">{b.steals}</td>
+                      <td className="px-1 py-1.5 text-right text-to-text2">{b.blocks}</td>
+                      <td className="px-1 py-1.5 text-right text-to-text2">{b.turnovers}</td>
+                      <td className="px-1 py-1.5 text-right text-to-text2">{b.fouls}</td>
                       {(() => {
                         const pm = plusMinusByPlayer[b.playerId] ?? 0;
                         return (
                           <td
                             className={`py-1.5 pl-1 text-right font-semibold ${
-                              pm > 0 ? 'text-status-ok' : pm < 0 ? 'text-tbw-red' : 'text-tbw-ink/40'
+                              pm > 0 ? 'text-to-accent' : pm < 0 ? 'text-to-dangerText' : 'text-to-text3'
                             }`}
                           >
                             {fmtPlusMinus(pm)}
@@ -1065,36 +1065,36 @@ export function GameStatsTracker() {
                     // Summe würde also mehrfach zählen.
                     const teamNet = teamScore.us - teamScore.opponent;
                     return (
-                      <tr className="border-t-2 border-tbw-navy/10 bg-tbw-bg font-bold text-tbw-navyDark">
-                        <td className="sticky left-0 z-10 border-r border-black/5 bg-tbw-bg py-1.5 pr-2">Team</td>
+                      <tr className="border-t-2 border-to-border bg-to-bg font-bold text-to-text">
+                        <td className="sticky left-0 z-10 border-r border-to-divider bg-to-bg py-1.5 pr-2">Team</td>
                         <td className="px-1 py-1.5 text-right">{teamTotals.points}</td>
-                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">
+                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">
                           {teamTotals.fg2m}/{teamTotals.fg2a}
                         </td>
-                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/40">
+                        <td className="px-1 py-1.5 text-right font-normal text-to-text3">
                           {fgPct(teamTotals.fg2m, teamTotals.fg2a)}
                         </td>
-                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">
+                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">
                           {teamTotals.fg3m}/{teamTotals.fg3a}
                         </td>
-                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/40">
+                        <td className="px-1 py-1.5 text-right font-normal text-to-text3">
                           {fgPct(teamTotals.fg3m, teamTotals.fg3a)}
                         </td>
-                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">
+                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">
                           {teamTotals.ftm}/{teamTotals.fta}
                         </td>
-                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/40">
+                        <td className="px-1 py-1.5 text-right font-normal text-to-text3">
                           {fgPct(teamTotals.ftm, teamTotals.fta)}
                         </td>
-                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">{teamTotals.rebounds}</td>
-                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">{teamTotals.assists}</td>
-                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">{teamTotals.steals}</td>
-                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">{teamTotals.blocks}</td>
-                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">{teamTotals.turnovers}</td>
-                        <td className="px-1 py-1.5 text-right font-normal text-tbw-ink/60">{teamTotals.fouls}</td>
+                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.rebounds}</td>
+                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.assists}</td>
+                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.steals}</td>
+                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.blocks}</td>
+                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.turnovers}</td>
+                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.fouls}</td>
                         <td
                           className={`py-1.5 pl-1 text-right ${
-                            teamNet > 0 ? 'text-status-ok' : teamNet < 0 ? 'text-tbw-red' : 'text-tbw-ink/40'
+                            teamNet > 0 ? 'text-to-accent' : teamNet < 0 ? 'text-to-dangerText' : 'text-to-text3'
                           }`}
                         >
                           {fmtPlusMinus(teamNet)}

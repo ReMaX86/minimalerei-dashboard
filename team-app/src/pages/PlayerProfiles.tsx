@@ -40,26 +40,26 @@ export function PlayerProfiles() {
   if (selected) {
     return (
       <div className="space-y-4">
-        <button onClick={() => setSelectedId(null)} className="text-sm font-semibold text-tbw-ink/60">
+        <button onClick={() => setSelectedId(null)} className="text-sm font-semibold text-to-text2">
           ← Zurück
         </button>
         <div className="card text-center">
           <Avatar player={selected} size="lg" />
           <p className="mt-3 to-display-lg text-to-text">{selected.name}</p>
-          <p className="mt-1 text-sm text-tbw-ink/50">
+          <p className="mt-1 text-sm text-to-text3">
             {selected.position ? POSITION_LABELS[selected.position] : 'Position unbekannt'}
           </p>
 
           <div className="mt-4 grid grid-cols-2 gap-3 text-left">
-            <div className="rounded-xl bg-tbw-bg p-3">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-ink/40">Größe</p>
-              <p className="mt-1 text-sm font-semibold text-tbw-navyDark">
+            <div className="rounded-xl bg-to-bg p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-to-text3">Größe</p>
+              <p className="mt-1 text-sm font-semibold text-to-text">
                 {selected.height_cm ? `${selected.height_cm} cm` : '—'}
               </p>
             </div>
-            <div className="rounded-xl bg-tbw-bg p-3">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-ink/40">Alter</p>
-              <p className="mt-1 text-sm font-semibold text-tbw-navyDark">
+            <div className="rounded-xl bg-to-bg p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-to-text3">Alter</p>
+              <p className="mt-1 text-sm font-semibold text-to-text">
                 {selected.birth_date ? `${ageFromBirthDate(selected.birth_date)} Jahre` : '—'}
               </p>
             </div>
@@ -67,7 +67,7 @@ export function PlayerProfiles() {
 
           {selected.skills.length > 0 && (
             <div className="mt-4 text-left">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-ink/40">Stärken</p>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-to-text3">Stärken</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {selected.skills.map((s) => (
                   <span key={s} className="pill pill-ok">
@@ -91,10 +91,10 @@ export function PlayerProfiles() {
           className="card flex flex-col items-center gap-2 !p-3 text-center"
         >
           <Avatar player={p} size="sm" />
-          <span className="text-xs font-semibold text-tbw-navyDark">{p.name}</span>
+          <span className="text-xs font-semibold text-to-text">{p.name}</span>
         </button>
       ))}
-      {players.length === 0 && <p className="col-span-3 text-sm text-tbw-ink/50">Noch keine Spieler eingetragen.</p>}
+      {players.length === 0 && <p className="col-span-3 text-sm text-to-text3">Noch keine Spieler eingetragen.</p>}
     </div>
   );
 }

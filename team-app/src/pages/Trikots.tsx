@@ -193,12 +193,12 @@ export function Trikots() {
   return (
     <div className="space-y-4">
       {state.pastGame && pastNeededSet && pastSuggestion && (
-        <section className="card !bg-tbw-red/10 !ring-tbw-red/30 border-l-4 border-tbw-red">
-          <p className="text-xs font-semibold uppercase tracking-wide text-tbw-red">Bitte nachtragen</p>
-          <p className="mt-1 text-sm font-bold text-tbw-navyDark">
+        <section className="card !bg-to-dangerSoft !ring-tbw-red/30 border-l-4 border-to-danger">
+          <p className="text-xs font-semibold uppercase tracking-wide text-to-dangerText">Bitte nachtragen</p>
+          <p className="mt-1 text-sm font-bold text-to-text">
             Hat {pastSuggestion.name} beim Spiel vs. {state.pastGame.opponent} die Trikots mitgenommen?
           </p>
-          <p className="mt-0.5 text-xs text-tbw-ink/50">{fmtDate(state.pastGame.game_date)}</p>
+          <p className="mt-0.5 text-xs text-to-text3">{fmtDate(state.pastGame.game_date)}</p>
 
           {canConfirmPast && !pastPickingAlternate && (
             <div className="mt-3 flex gap-2">
@@ -211,14 +211,14 @@ export function Trikots() {
                   })
                 }
                 disabled={pastConfirming}
-                className="btn-primary flex-1 !bg-status-ok"
+                className="btn-primary flex-1 !bg-to-accentSoft"
               >
                 Ja
               </button>
               <button
                 onClick={() => setPastPickingAlternate(true)}
                 disabled={pastConfirming}
-                className="btn-secondary flex-1 !text-tbw-red !ring-tbw-red/30"
+                className="btn-secondary flex-1 !text-to-dangerText !ring-tbw-red/30"
               >
                 Nein
               </button>
@@ -226,8 +226,8 @@ export function Trikots() {
           )}
 
           {canConfirmPast && pastPickingAlternate && (
-            <div className="mt-3 space-y-2 rounded-xl bg-white/70 p-3">
-              <p className="text-sm text-tbw-ink/70">Wer hat das Set stattdessen mitgenommen?</p>
+            <div className="mt-3 space-y-2 rounded-xl bg-to-bg p-3">
+              <p className="text-sm text-to-text2">Wer hat das Set stattdessen mitgenommen?</p>
               <select className="input" value={pastAlternateId} onChange={(e) => setPastAlternateId(e.target.value)}>
                 <option value="">Spieler wählen…</option>
                 {sortedPlayers
@@ -267,7 +267,7 @@ export function Trikots() {
           )}
 
           {!canConfirmPast && (
-            <p className="mt-2 text-xs text-tbw-ink/60">
+            <p className="mt-2 text-xs text-to-text2">
               Nur {pastSuggestion.name}, Captains oder der Trainer können das bestätigen.
             </p>
           )}
@@ -275,37 +275,37 @@ export function Trikots() {
       )}
 
       {state.nextGame && neededSet && (
-        <section className="card border-l-4 border-tbw-gold">
-          <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
+        <section className="card border-l-4 border-to-accent">
+          <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">
             Für {fmtDate(state.nextGame.game_date)} gegen {state.nextGame.opponent} benötigt
           </p>
-          <p className="mt-1 text-lg font-bold text-tbw-navyDark">
+          <p className="mt-1 text-lg font-bold text-to-text">
             {neededSet === 'weiss' ? 'Weißes' : 'Schwarzes'} Trikot-Set
           </p>
           {!state.nextGame.squad_published ? (
-            <p className="mt-2 text-sm text-tbw-ink/50">Kader für dieses Spiel noch nicht veröffentlicht.</p>
+            <p className="mt-2 text-sm text-to-text3">Kader für dieses Spiel noch nicht veröffentlicht.</p>
           ) : confirmedForGame ? (
             <div className="mt-3">
-              <p className="text-xs font-bold uppercase tracking-wide text-tbw-navy/70">🧺 Trikotwäscher</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-to-text3">🧺 Trikotwäscher</p>
               <div className="mt-1 flex items-center gap-2">
                 <span className="pill pill-ok">✓ Bestätigt</span>
-                <p className="text-sm font-semibold text-tbw-navyDark">
+                <p className="text-sm font-semibold text-to-text">
                   {playersById[confirmedForGame.player_id]?.name ?? '?'}
                 </p>
               </div>
             </div>
           ) : suggestion ? (
             <div className="mt-3">
-              <p className="text-xs font-bold uppercase tracking-wide text-tbw-navy/70">
+              <p className="text-xs font-bold uppercase tracking-wide text-to-text3">
                 🧺 Nächster Trikotwäscher
               </p>
-              <p className="mt-0.5 text-lg font-bold text-tbw-navyDark">{suggestion.name}</p>
-              <p className="text-xs text-tbw-ink/50">
+              <p className="mt-0.5 text-lg font-bold text-to-text">{suggestion.name}</p>
+              <p className="text-xs text-to-text3">
                 nimmt das Set nach diesem Spiel zum Waschen mit nach Hause
               </p>
 
               {!gameStarted && (
-                <p className="mt-2 text-xs text-tbw-ink/40">
+                <p className="mt-2 text-xs text-to-text3">
                   Bestätigen kann {suggestion.name} ab Spielbeginn ({fmtTime(state.nextGame.game_time)} Uhr).
                 </p>
               )}
@@ -321,14 +321,14 @@ export function Trikots() {
                       })
                     }
                     disabled={confirming}
-                    className="btn-primary flex-1 !bg-status-ok"
+                    className="btn-primary flex-1 !bg-to-accentSoft"
                   >
                     ✓ Übernimmt
                   </button>
                   <button
                     onClick={() => setPickingAlternate(true)}
                     disabled={confirming}
-                    className="btn-secondary flex-1 !text-tbw-red !ring-tbw-red/30"
+                    className="btn-secondary flex-1 !text-to-dangerText !ring-tbw-red/30"
                   >
                     ✗ Kann nicht
                   </button>
@@ -336,8 +336,8 @@ export function Trikots() {
               )}
 
               {gameStarted && canConfirm && pickingAlternate && (
-                <div className="mt-3 space-y-2 rounded-xl bg-tbw-bg p-3">
-                  <p className="text-sm text-tbw-ink/70">Wer nimmt das Set stattdessen mit nach Hause?</p>
+                <div className="mt-3 space-y-2 rounded-xl bg-to-bg p-3">
+                  <p className="text-sm text-to-text2">Wer nimmt das Set stattdessen mit nach Hause?</p>
                   <select
                     className="input"
                     value={alternateId}
@@ -381,7 +381,7 @@ export function Trikots() {
               )}
             </div>
           ) : (
-            <p className="mt-2 text-sm text-tbw-ink/50">Niemand aus dem Kader verfügbar.</p>
+            <p className="mt-2 text-sm text-to-text3">Niemand aus dem Kader verfügbar.</p>
           )}
         </section>
       )}
@@ -394,25 +394,25 @@ export function Trikots() {
             (isAdmin || player?.id === set.current_holder_id || player?.is_captain || player?.is_co_captain);
           return (
             <div key={set.id} className="card">
-              <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
+              <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">
                 {set.label.split(' · ').map((part, i) => (
                   <span key={i} className="block">
                     {part}
                   </span>
                 ))}
               </p>
-              <p className="mt-1 font-bold text-tbw-navyDark">
+              <p className="mt-1 font-bold text-to-text">
                 {set.current_holder_id ? playersById[set.current_holder_id]?.name ?? '—' : 'Niemand'}
               </p>
-              {set.since && <p className="text-xs text-tbw-ink/50">seit {fmtDateShort(set.since)}</p>}
+              {set.since && <p className="text-xs text-to-text3">seit {fmtDateShort(set.since)}</p>}
               {transferredFrom && (
-                <p className="mt-0.5 text-[10px] text-tbw-ink/40">
+                <p className="mt-0.5 text-[10px] text-to-text3">
                   Übergeben von {playersById[transferredFrom]?.name ?? '?'}
                 </p>
               )}
               {canTransfer && transferringSetId !== set.id && (
                 <button
-                  className="mt-2 text-xs font-bold text-tbw-navy"
+                  className="mt-2 text-xs font-bold text-to-accent"
                   onClick={() => {
                     setTransferringSetId(set.id);
                     setTransferTargetId('');
@@ -432,7 +432,7 @@ export function Trikots() {
           if (!set) return null;
           return (
             <section className="card">
-              <p className="text-sm font-bold text-tbw-navyDark">
+              <p className="text-sm font-bold text-to-text">
                 {set.label.split(' · ')[0]} übergeben — an wen?
               </p>
               <div className="mt-3 space-y-2">
@@ -471,15 +471,15 @@ export function Trikots() {
         })()}
 
       <section className="card">
-        <p className="mb-2 text-sm font-bold text-tbw-navyDark">Spieler</p>
-        <ul className="divide-y divide-black/5">
+        <p className="mb-2 text-sm font-bold text-to-text">Spieler</p>
+        <ul className="divide-y divide-to-divider">
           {sortedPlayers.map((p) => (
             <li key={p.id} className="flex items-center justify-between py-2 text-sm">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-tbw-navyDark">{p.name}</span>
+                <span className="font-medium text-to-text">{p.name}</span>
                 {suggestion?.id === p.id && <span className="pill pill-warn">nächster dran</span>}
               </div>
-              <div className="flex items-center gap-2 text-tbw-ink/60">
+              <div className="flex items-center gap-2 text-to-text2">
                 {state.nextGame && (
                   <span className={selectedIds.has(p.id) ? 'pill pill-ok' : 'pill pill-open'}>
                     {selectedIds.has(p.id) ? 'im Kader' : 'nicht im Kader'}
@@ -493,7 +493,7 @@ export function Trikots() {
       </section>
 
       <section className="card">
-        <p className="mb-2 text-sm font-bold text-tbw-navyDark">Verlauf</p>
+        <p className="mb-2 text-sm font-bold text-to-text">Verlauf</p>
         {(() => {
           // Beide Vorgangsarten (Waschen + direkte Übergabe) chronologisch
           // gemeinsam anzeigen, damit im Verlauf keine Lücke entsteht, wenn
@@ -533,7 +533,7 @@ export function Trikots() {
           ].sort((a, b) => b.created_at.localeCompare(a.created_at));
 
           return history.length === 0 ? (
-            <p className="text-sm text-tbw-ink/50">Noch keine Übergaben erfasst.</p>
+            <p className="text-sm text-to-text3">Noch keine Übergaben erfasst.</p>
           ) : (
             <ul className="space-y-1.5 text-sm">
               {history.slice(0, 15).map((row) => {
@@ -546,16 +546,16 @@ export function Trikots() {
                 return (
                   <li key={`${row.kind}-${row.id}`}>
                     <div className="flex items-center justify-between">
-                      <span className="text-tbw-ink/70">
+                      <span className="text-to-text2">
                         {row.setId === 'weiss' ? 'Weiß' : 'Schwarz'}{' '}
                         {row.kind === 'wash'
                           ? `→ ${playersById[row.playerId]?.name ?? '?'}`
                           : `${row.fromId ? playersById[row.fromId]?.name ?? '?' : '?'} → ${playersById[row.toId]?.name ?? '?'} (übergeben)`}
                       </span>
-                      <span className="text-xs text-tbw-ink/40">{fmtDateShort(row.created_at.slice(0, 10))}</span>
+                      <span className="text-xs text-to-text3">{fmtDateShort(row.created_at.slice(0, 10))}</span>
                     </div>
                     {suggestedButNotConfirmed && (
-                      <p className="text-xs text-tbw-ink/40">
+                      <p className="text-xs text-to-text3">
                         Vorschlag war {suggestedButNotConfirmed}, bestätigt von {handover!.changed_by_label}
                       </p>
                     )}

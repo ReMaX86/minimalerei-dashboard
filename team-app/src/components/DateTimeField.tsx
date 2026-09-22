@@ -38,10 +38,10 @@ function FieldShell({
 }) {
   return (
     <label className="block text-xs">
-      <span className="font-semibold text-tbw-ink/50">{label}</span>
+      <span className="font-semibold text-to-text3">{label}</span>
       <span className="relative mt-1 block overflow-hidden rounded-2xl">
         {children}
-        <span className={`input pointer-events-none block ${display ? '' : 'text-tbw-ink/40'}`}>
+        <span className={`input pointer-events-none block ${display ? '' : 'text-to-text3'}`}>
           {display || placeholder}
         </span>
       </span>

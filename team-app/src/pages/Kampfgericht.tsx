@@ -172,13 +172,13 @@ export function Kampfgericht() {
     <div className="space-y-4">
       {role === 'player' && (
         <section className="card flex items-center justify-between">
-          <p className="text-sm font-semibold text-tbw-navyDark">Deine Einsätze diese Saison</p>
+          <p className="text-sm font-semibold text-to-text">Deine Einsätze diese Saison</p>
           <span className={ownCount >= SEASON_TARGET_MIN ? 'pill pill-ok' : 'pill pill-warn'}>{ownCount}×</span>
         </section>
       )}
 
       <section className="card flex items-center justify-between">
-        <p className="text-sm font-semibold text-tbw-navyDark">Offene Kampfgericht-Positionen</p>
+        <p className="text-sm font-semibold text-to-text">Offene Kampfgericht-Positionen</p>
         <span className={upcomingOpenCount > 0 ? 'pill pill-warn' : 'pill pill-ok'}>
           {upcomingOpenCount > 0 ? `${upcomingOpenCount} offen` : 'Alles besetzt'}
         </span>
@@ -186,7 +186,7 @@ export function Kampfgericht() {
 
       {state.signupDeadline && (
         <section className="card flex items-center justify-between gap-3">
-          <p className="text-sm text-tbw-ink/70">
+          <p className="text-sm text-to-text2">
             {deadlinePassed
               ? `Zuteilungen sind seit ${fmtDate(state.signupDeadline)} fix. Kann jemand spontan doch nicht, bitte privat einen Tausch klären und danach Trainer oder Kapitän Bescheid geben.`
               : `Bis ${fmtDate(state.signupDeadline)} könnt ihr eure Kampfgericht-Termine hier noch selbst übernehmen und abwählen.`}
@@ -215,7 +215,7 @@ export function Kampfgericht() {
 
       <section className="card">
         <button
-          className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+          className="flex w-full items-center justify-between text-sm font-bold text-to-text"
           onClick={() => setShowPast((v) => !v)}
         >
           Vergangene Termine
@@ -245,17 +245,17 @@ export function Kampfgericht() {
 
       <section className="card">
         <button
-          className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+          className="flex w-full items-center justify-between text-sm font-bold text-to-text"
           onClick={() => setShowPlayerCounts((v) => !v)}
         >
           Einsätze pro Spieler
           <span>{showPlayerCounts ? '▲' : '▼'}</span>
         </button>
         {showPlayerCounts && (
-          <ul className="mt-3 divide-y divide-black/5">
+          <ul className="mt-3 divide-y divide-to-divider">
             {sortedPlayersByCount.map((p) => (
               <li key={p.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="font-medium text-tbw-navyDark">{p.name}</span>
+                <span className="font-medium text-to-text">{p.name}</span>
                 <span className={(taskCountByPlayer[p.id] ?? 0) > 0 ? 'pill pill-ok' : 'pill pill-warn'}>
                   {taskCountByPlayer[p.id] ?? 0}×
                 </span>
@@ -267,7 +267,7 @@ export function Kampfgericht() {
 
       <section className="card">
         <button
-          className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+          className="flex w-full items-center justify-between text-sm font-bold text-to-text"
           onClick={() => setShowLog((v) => !v)}
         >
           Letzte Änderungen
@@ -275,7 +275,7 @@ export function Kampfgericht() {
         </button>
         {showLog &&
           (state.assignmentLog.length === 0 ? (
-            <p className="mt-3 text-sm text-tbw-ink/50">Noch keine Änderungen protokolliert.</p>
+            <p className="mt-3 text-sm text-to-text3">Noch keine Änderungen protokolliert.</p>
           ) : (
             <ul className="mt-3 space-y-2">
               {state.assignmentLog.map((row) => {
@@ -284,17 +284,17 @@ export function Kampfgericht() {
                 const fromName = row.from_player_id ? (playersById[row.from_player_id]?.name ?? '?') : 'offen';
                 const toName = row.to_player_id ? (playersById[row.to_player_id]?.name ?? '?') : 'offen';
                 return (
-                  <li key={row.id} className="border-b border-black/5 pb-2 text-sm last:border-0 last:pb-0">
+                  <li key={row.id} className="border-b border-to-divider pb-2 text-sm last:border-0 last:pb-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-tbw-navyDark">
+                      <span className="font-medium text-to-text">
                         {task ? OFFICIATING_TASK_LABELS[task.task_type] : 'Aufgabe gelöscht'}
                         {game ? ` · ${officiatingGameLabel(game)}` : ''}
                       </span>
-                      <span className="shrink-0 text-xs text-tbw-ink/40">
+                      <span className="shrink-0 text-xs text-to-text3">
                         {fmtDateShort(row.created_at.slice(0, 10))}
                       </span>
                     </div>
-                    <p className="text-xs text-tbw-ink/50">
+                    <p className="text-xs text-to-text3">
                       {fromName} → {toName} · geändert von {row.changed_by_label}
                     </p>
                   </li>
@@ -340,8 +340,8 @@ function GameList({
 }) {
   return (
     <div className={flat ? 'space-y-3' : 'space-y-3'}>
-      {title && <p className="text-sm font-bold text-tbw-navyDark">{title}</p>}
-      {games.length === 0 && <p className="text-sm text-tbw-ink/50">{emptyText}</p>}
+      {title && <p className="text-sm font-bold text-to-text">{title}</p>}
+      {games.length === 0 && <p className="text-sm text-to-text3">{emptyText}</p>}
       {games.map((game) => {
         const tasks = TASK_TYPES.map(
           (type) =>
@@ -354,11 +354,11 @@ function GameList({
         );
         const openCount = tasks.filter((t) => t.id && !t.assigned_player_id).length;
         return (
-          <div key={game.id} className={flat ? 'rounded-xl bg-tbw-bg p-3' : 'card'}>
+          <div key={game.id} className={flat ? 'rounded-xl bg-to-bg p-3' : 'card'}>
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-sm font-semibold text-tbw-navyDark">{officiatingGameLabel(game)}</p>
-                <p className="text-xs text-tbw-ink/50">
+                <p className="text-sm font-semibold text-to-text">{officiatingGameLabel(game)}</p>
+                <p className="text-xs text-to-text3">
                   {fmtDate(game.game_date)}
                   {game.game_time ? ` · ${fmtTime(game.game_time)} Uhr` : ''} · {game.location}
                 </p>
@@ -372,15 +372,15 @@ function GameList({
             <ul className="mt-2 space-y-2">
               {tasks.map((task) => (
                 <li key={task.task_type} className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-tbw-ink/70">{OFFICIATING_TASK_LABELS[task.task_type]}</span>
+                  <span className="text-sm text-to-text2">{OFFICIATING_TASK_LABELS[task.task_type]}</span>
                   {!task.id ? (
-                    <span className="text-sm text-tbw-ink/30">–</span>
+                    <span className="text-sm text-to-text3">–</span>
                   ) : canReassign ? (
                     <select
                       className={`input !w-auto !py-1 text-xs ${
                         task.assigned_player_id
-                          ? '!border-status-ok/40 !bg-status-ok/10'
-                          : '!border-tbw-red/40 !bg-tbw-red/10'
+                          ? '!border-to-accent/40 !bg-to-accentSoft/10'
+                          : '!border-to-danger !bg-to-dangerSoft'
                       }`}
                       value={task.assigned_player_id ?? ''}
                       disabled={busyTaskId === task.id}

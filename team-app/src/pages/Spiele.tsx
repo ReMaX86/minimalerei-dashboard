@@ -37,11 +37,11 @@ interface State {
 
 function GameListItem({ game }: { game: Game }) {
   return (
-    <li className="rounded-xl bg-tbw-bg p-3 text-sm">
-      <p className="font-semibold text-tbw-navyDark">
+    <li className="rounded-xl bg-to-bg p-3 text-sm">
+      <p className="font-semibold text-to-text">
         vs. {game.opponent} <span className="pill pill-open ml-1">{game.is_home ? 'Heim' : 'Auswärts'}</span>
       </p>
-      <p className="text-tbw-ink/60">
+      <p className="text-to-text2">
         {fmtDate(game.game_date)} · {fmtTime(game.game_time)} Uhr · {game.location}
       </p>
     </li>
@@ -56,17 +56,17 @@ function GameListItem({ game }: { game: Game }) {
 function PastGameListItem({ game }: { game: Game }) {
   const result = gameResult(game);
   return (
-    <li className="rounded-xl bg-tbw-bg p-3 text-sm">
+    <li className="rounded-xl bg-to-bg p-3 text-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-semibold text-tbw-navyDark">
+          <p className="font-semibold text-to-text">
             vs. {game.opponent} <span className="pill pill-open ml-1">{game.is_home ? 'Heim' : 'Auswärts'}</span>
           </p>
-          <p className="text-tbw-ink/60">{fmtDate(game.game_date)}</p>
+          <p className="text-to-text2">{fmtDate(game.game_date)}</p>
         </div>
         {result && (
           <div className="shrink-0 text-right">
-            <p className="font-bold text-tbw-navyDark">
+            <p className="font-bold text-to-text">
               {game.final_score_us}:{game.final_score_opponent}
             </p>
             <span
@@ -79,7 +79,7 @@ function PastGameListItem({ game }: { game: Game }) {
           </div>
         )}
       </div>
-      <Link to={`/stats/${game.id}`} className="mt-1.5 inline-block text-xs font-bold text-tbw-navy">
+      <Link to={`/stats/${game.id}`} className="mt-1.5 inline-block text-xs font-bold text-to-accent">
         Box-Score ansehen →
       </Link>
     </li>
@@ -208,7 +208,7 @@ export function Spiele() {
   const pastRest = state.pastGames.slice(PAST_PREVIEW_COUNT);
   const pastGamesSection = flags.stats && state.pastGames.length > 0 && (
     <section className="card">
-      <p className="text-sm font-bold text-tbw-navyDark">Vergangene Spiele</p>
+      <p className="text-sm font-bold text-to-text">Vergangene Spiele</p>
       <ul className="mt-2 space-y-2">
         {pastPreview.map((g) => (
           <PastGameListItem key={g.id} game={g} />
@@ -217,7 +217,7 @@ export function Spiele() {
       {pastRest.length > 0 && (
         <>
           <button
-            className="mt-3 flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+            className="mt-3 flex w-full items-center justify-between text-sm font-bold text-to-text"
             onClick={() => setShowPastMore((v) => !v)}
           >
             Weitere vergangene Spiele anzeigen
@@ -240,13 +240,13 @@ export function Spiele() {
   // Sync (api/sync-league-standings.ts) noch nie erfolgreich lief.
   const leagueStandingsSection = flags.standings && state.leagueStandings.length > 0 && (
     <section className="card">
-      <p className="text-sm font-bold text-tbw-navyDark">Tabelle</p>
+      <p className="text-sm font-bold text-to-text">Tabelle</p>
       <div className="mt-2 overflow-x-auto">
         <table className="min-w-full text-left text-xs">
           <thead>
-            <tr className="text-tbw-ink/40">
+            <tr className="text-to-text3">
               <th className="py-1 pr-2 font-semibold">#</th>
-              <th className="sticky left-0 z-10 whitespace-nowrap border-r border-black/5 bg-white py-1 pr-2 font-semibold">
+              <th className="sticky left-0 z-10 whitespace-nowrap border-r border-to-divider bg-to-surface py-1 pr-2 font-semibold">
                 Team
               </th>
               <th className="px-1 py-1 text-right font-semibold">Sp</th>
@@ -258,32 +258,32 @@ export function Spiele() {
           </thead>
           <tbody>
             {state.leagueStandings.map((row) => (
-              <tr key={row.id} className={`border-t border-black/5 ${row.is_own_team ? 'bg-tbw-gold/10' : ''}`}>
-                <td className={`py-1.5 pr-2 ${row.is_own_team ? 'font-bold text-tbw-gold' : 'text-tbw-ink/60'}`}>
+              <tr key={row.id} className={`border-t border-to-divider ${row.is_own_team ? 'bg-to-accentSoft' : ''}`}>
+                <td className={`py-1.5 pr-2 ${row.is_own_team ? 'font-bold text-to-accent' : 'text-to-text2'}`}>
                   {row.rang}
                 </td>
                 <td
-                  className={`sticky left-0 z-10 whitespace-nowrap border-r border-black/5 py-1.5 pr-2 font-semibold ${
-                    row.is_own_team ? 'bg-tbw-gold/10 text-tbw-gold' : 'bg-white text-tbw-navyDark'
+                  className={`sticky left-0 z-10 whitespace-nowrap border-r border-to-divider py-1.5 pr-2 font-semibold ${
+                    row.is_own_team ? 'bg-to-accentSoft text-to-accent' : 'bg-to-surface text-to-text'
                   }`}
                 >
                   {row.team_name}
                 </td>
-                <td className="px-1 py-1.5 text-right text-tbw-ink/60">{row.spiele}</td>
-                <td className="whitespace-nowrap px-1 py-1.5 text-right text-tbw-ink/60">
+                <td className="px-1 py-1.5 text-right text-to-text2">{row.spiele}</td>
+                <td className="whitespace-nowrap px-1 py-1.5 text-right text-to-text2">
                   {row.siege}-{row.niederlagen}
                 </td>
                 <td
                   className={`px-1 py-1.5 text-right font-bold ${
-                    row.is_own_team ? 'text-tbw-gold' : 'text-tbw-navyDark'
+                    row.is_own_team ? 'text-to-accent' : 'text-to-text'
                   }`}
                 >
                   {row.punkte}
                 </td>
-                <td className="whitespace-nowrap px-1 py-1.5 text-right text-tbw-ink/60">
+                <td className="whitespace-nowrap px-1 py-1.5 text-right text-to-text2">
                   {row.koerbe_erzielt}:{row.koerbe_erhalten}
                 </td>
-                <td className="py-1.5 pl-1 text-right text-tbw-ink/60">
+                <td className="py-1.5 pl-1 text-right text-to-text2">
                   {row.diff > 0 ? `+${row.diff}` : row.diff}
                 </td>
               </tr>
@@ -291,7 +291,7 @@ export function Spiele() {
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[10px] text-tbw-ink/40">
+      <p className="mt-2 text-[10px] text-to-text3">
         Quelle: basketball-bund.net · Stand {fmtDateTimeShort(state.leagueStandings[0].updated_at)}
       </p>
     </section>
@@ -301,7 +301,7 @@ export function Spiele() {
     <div className="flex gap-2">
       <button
         className={`flex-1 rounded-xl py-2 text-sm font-bold ${
-          activeTab === 'spielplan' ? 'bg-tbw-navy text-white' : 'bg-tbw-bg text-tbw-ink/60'
+          activeTab === 'spielplan' ? 'bg-to-accent text-to-onAccent' : 'bg-to-bg text-to-text2'
         }`}
         onClick={() => setActiveTab('spielplan')}
       >
@@ -309,7 +309,7 @@ export function Spiele() {
       </button>
       <button
         className={`flex-1 rounded-xl py-2 text-sm font-bold ${
-          activeTab === 'tabelle' ? 'bg-tbw-navy text-white' : 'bg-tbw-bg text-tbw-ink/60'
+          activeTab === 'tabelle' ? 'bg-to-accent text-to-onAccent' : 'bg-to-bg text-to-text2'
         }`}
         onClick={() => setActiveTab('tabelle')}
       >
@@ -319,13 +319,13 @@ export function Spiele() {
   );
 
   const tabelleTab = leagueStandingsSection || (
-    <p className="card text-sm text-tbw-ink/50">Tabelle ist aktuell nicht verfügbar.</p>
+    <p className="card text-sm text-to-text3">Tabelle ist aktuell nicht verfügbar.</p>
   );
 
   if (!state.nextGame) {
     return (
       <div className="space-y-4">
-        <p className="card text-sm text-tbw-ink/50">Kein anstehendes Spiel geplant.</p>
+        <p className="card text-sm text-to-text3">Kein anstehendes Spiel geplant.</p>
         {tabsBar}
         {activeTab === 'spielplan' ? pastGamesSection : tabelleTab}
       </div>
@@ -438,19 +438,19 @@ export function Spiele() {
       <section className="card">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">Nächster Spieltag</p>
-            <p className="text-base font-bold text-tbw-navyDark">vs. {state.nextGame.opponent}</p>
-            <p className="text-sm font-bold text-tbw-navyDark">
+            <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Nächster Spieltag</p>
+            <p className="text-base font-bold text-to-text">vs. {state.nextGame.opponent}</p>
+            <p className="text-sm font-bold text-to-text">
               {fmtDate(state.nextGame.game_date)} · {fmtTime(state.nextGame.game_time)} Uhr ·{' '}
               {state.nextGame.is_home ? 'Heim' : 'Auswärts'}
             </p>
-            <p className="text-sm text-tbw-ink/60">{state.nextGame.location}</p>
+            <p className="text-sm text-to-text2">{state.nextGame.location}</p>
             {!isAdmin && meetingPoints(state.nextGame).length > 0 && (
-              <div className="mt-2 rounded-xl bg-tbw-bg px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-ink/40">Treffpunkt</p>
+              <div className="mt-2 rounded-xl bg-to-bg px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-to-text3">Treffpunkt</p>
                 {meetingPoints(state.nextGame).map((m) => (
-                  <p key={m.label} className="text-xs text-tbw-ink/60">
-                    {m.time && <span className="font-semibold text-tbw-ink/80">{fmtTime(m.time)} Uhr</span>}
+                  <p key={m.label} className="text-xs text-to-text2">
+                    {m.time && <span className="font-semibold text-to-text2">{fmtTime(m.time)} Uhr</span>}
                     {m.time && ' · '}
                     {m.label}
                     {m.place ? `, ${m.place}` : ''}
@@ -470,7 +470,7 @@ export function Spiele() {
 
         {isAdmin && (
           <>
-            <div className="mt-3 flex gap-2 border-t border-black/5 pt-3">
+            <div className="mt-3 flex gap-2 border-t border-to-divider pt-3">
               <button
                 type="button"
                 onClick={() => setSquadEditorOpen((v) => !v)}
@@ -498,8 +498,8 @@ export function Spiele() {
             </div>
 
             {meetingEditorOpen && (
-              <div className="mt-3 border-t border-black/5 pt-3">
-                <p className="text-sm font-bold text-tbw-navyDark">Treffpunkt</p>
+              <div className="mt-3 border-t border-to-divider pt-3">
+                <p className="text-sm font-bold text-to-text">Treffpunkt</p>
                 <div className="mt-2">
                   <MeetingPointFields
                     isHome={state.nextGame.is_home}
@@ -521,8 +521,8 @@ export function Spiele() {
             )}
 
             {squadEditorOpen && (
-              <div className="mt-3 border-t border-black/5 pt-3">
-                <ul className="divide-y divide-black/5">
+              <div className="mt-3 border-t border-to-divider pt-3">
+                <ul className="divide-y divide-to-divider">
                   {sortedForTrainer.map((p) => {
                     const declined = !selectedByPlayer[p.id] && confirmationByPlayer[p.id] === 'declined';
                     const confirmed = selectedByPlayer[p.id] && confirmationByPlayer[p.id] === 'confirmed';
@@ -531,16 +531,16 @@ export function Spiele() {
                     return (
                       <li key={p.id} className="py-2">
                         <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1.5 text-sm font-medium text-tbw-navyDark">
+                          <span className="flex items-center gap-1.5 text-sm font-medium text-to-text">
                             {p.name}
                             {isMe && ' (Du)'}
                             {confirmed && (
-                              <span className="font-bold text-status-ok" title="Hat zugesagt">
+                              <span className="font-bold text-to-accent" title="Hat zugesagt">
                                 ✓
                               </span>
                             )}
                             {awaitingResponse && (
-                              <span className="text-tbw-ink/40" title="Hat noch nicht geantwortet">
+                              <span className="text-to-text3" title="Hat noch nicht geantwortet">
                                 🕐
                               </span>
                             )}
@@ -569,14 +569,14 @@ export function Spiele() {
                                   type="button"
                                   disabled={responding}
                                   onClick={() => respond(false)}
-                                  className="text-xs font-semibold text-tbw-ink/40 underline disabled:opacity-40"
+                                  className="text-xs font-semibold text-to-text3 underline disabled:opacity-40"
                                 >
                                   Doch nicht?
                                 </button>
                               </>
                             ) : (
                               <>
-                                <span className="text-xs text-tbw-ink/50">Kannst du selbst?</span>
+                                <span className="text-xs text-to-text3">Kannst du selbst?</span>
                                 <button
                                   type="button"
                                   disabled={responding}
@@ -601,7 +601,7 @@ export function Spiele() {
                     );
                   })}
                 </ul>
-                <p className="mt-2 text-xs text-tbw-ink/50">
+                <p className="mt-2 text-xs text-to-text3">
                   {selectedCount} von max. {MAX_SQUAD_SIZE} im Kader
                   {atCap && ' · Kader ist voll'}
                 </p>
@@ -620,10 +620,10 @@ export function Spiele() {
         {role === 'player' &&
           !isAdmin &&
           (state.nextGame.squad_published ? (
-            <div className="mt-3 border-t border-black/5 pt-3">
+            <div className="mt-3 border-t border-to-divider pt-3">
               <button
                 type="button"
-                className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+                className="flex w-full items-center justify-between text-sm font-bold text-to-text"
                 onClick={() => setSquadOpen((v) => !v)}
               >
                 👥 Kader {squadOpen ? 'ausblenden' : 'anzeigen'}
@@ -631,9 +631,9 @@ export function Spiele() {
               </button>
               {squadOpen &&
                 (state.players.filter((p) => selectedByPlayer[p.id]).length === 0 ? (
-                  <p className="mt-3 text-sm text-tbw-ink/50">Niemand im Kader.</p>
+                  <p className="mt-3 text-sm text-to-text3">Niemand im Kader.</p>
                 ) : (
-                  <ul className="mt-3 divide-y divide-black/5">
+                  <ul className="mt-3 divide-y divide-to-divider">
                     {state.players
                       .filter((p) => selectedByPlayer[p.id])
                       .map((p) => {
@@ -641,7 +641,7 @@ export function Spiele() {
                         const confirmed = isMe && confirmationByPlayer[p.id] === 'confirmed';
                         return (
                           <li key={p.id} className="flex items-center justify-between py-2 text-sm">
-                            <span className={isMe ? 'font-bold text-tbw-navyDark' : 'font-medium text-tbw-navyDark'}>
+                            <span className={isMe ? 'font-bold text-to-text' : 'font-medium text-to-text'}>
                               {p.name}
                               {isMe && ' (Du)'}
                             </span>
@@ -653,7 +653,7 @@ export function Spiele() {
                                     type="button"
                                     disabled={responding}
                                     onClick={() => respond(false)}
-                                    className="text-xs font-semibold text-tbw-ink/40 underline disabled:opacity-40"
+                                    className="text-xs font-semibold text-to-text3 underline disabled:opacity-40"
                                   >
                                     Doch nicht?
                                   </button>
@@ -685,7 +685,7 @@ export function Spiele() {
                 ))}
             </div>
           ) : (
-            <p className="mt-3 text-sm text-tbw-ink/50">Kader für dieses Spiel noch nicht veröffentlicht.</p>
+            <p className="mt-3 text-sm text-to-text3">Kader für dieses Spiel noch nicht veröffentlicht.</p>
           ))}
 
         {flags.carpool && role !== 'viewer' && !state.nextGame.is_home && (
@@ -699,7 +699,7 @@ export function Spiele() {
         <>
           {next3.length > 0 && (
             <section className="card">
-              <p className="text-sm font-bold text-tbw-navyDark">Nächste Spiele</p>
+              <p className="text-sm font-bold text-to-text">Nächste Spiele</p>
               <ul className="mt-2 space-y-2">
                 {next3.map((g) => (
                   <GameListItem key={g.id} game={g} />
@@ -711,7 +711,7 @@ export function Spiele() {
           {rest.length > 0 && (
             <section className="card">
               <button
-                className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+                className="flex w-full items-center justify-between text-sm font-bold text-to-text"
                 onClick={() => setShowMore((v) => !v)}
               >
                 Weitere Spieltage anzeigen

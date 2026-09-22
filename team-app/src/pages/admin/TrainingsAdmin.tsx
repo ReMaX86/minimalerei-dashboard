@@ -32,7 +32,7 @@ function ModeToggle({
         type="button"
         onClick={() => onChange('regular')}
         className={`btn-secondary flex-1 !py-2 text-sm ${
-          value === 'regular' ? '!bg-status-ok/10 !text-status-ok !ring-status-ok/30' : ''
+          value === 'regular' ? '!bg-to-accentSoft/10 !text-to-accent !ring-status-ok/30' : ''
         }`}
       >
         Regulär
@@ -41,7 +41,7 @@ function ModeToggle({
         type="button"
         onClick={() => onChange('cancelled')}
         className={`btn-secondary flex-1 !py-2 text-sm ${
-          value === 'cancelled' ? '!bg-tbw-red/10 !text-tbw-red !ring-tbw-red/30' : ''
+          value === 'cancelled' ? '!bg-to-dangerSoft !text-to-dangerText !ring-tbw-red/30' : ''
         }`}
       >
         Fällt aus
@@ -50,7 +50,7 @@ function ModeToggle({
         type="button"
         onClick={() => onChange('special')}
         className={`btn-secondary flex-1 !py-2 text-sm ${
-          value === 'special' ? '!bg-tbw-gold/10 !text-tbw-navyDark !ring-tbw-gold/30' : ''
+          value === 'special' ? '!bg-to-accentSoft !text-to-text !ring-tbw-gold/30' : ''
         }`}
       >
         Sonderzeiten
@@ -61,7 +61,7 @@ function ModeToggle({
 
 function ModeHint({ mode }: { mode: 'regular' | 'cancelled' | 'special' }) {
   return (
-    <p className="text-xs text-tbw-ink/40">
+    <p className="text-xs text-to-text3">
       {mode === 'regular' && 'Reguläres Training findet wie gewohnt statt — nur zur eigenen Notiz.'}
       {mode === 'cancelled' && 'Alle regulären Trainings entfallen im ganzen Zeitraum, ohne Ersatztermine.'}
       {mode === 'special' &&
@@ -322,9 +322,9 @@ export function TrainingsAdmin() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Wöchentliche Trainingszeiten</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-to-text3">Wöchentliche Trainingszeiten</p>
         {!showTrainingForm && (
-          <button className="text-xs font-bold text-tbw-navy" onClick={() => setShowTrainingForm(true)}>
+          <button className="text-xs font-bold text-to-accent" onClick={() => setShowTrainingForm(true)}>
             + Neu
           </button>
         )}
@@ -332,7 +332,7 @@ export function TrainingsAdmin() {
 
       {showTrainingForm && (
         <form onSubmit={addTraining} className="card space-y-2">
-          <p className="text-sm font-bold text-tbw-navyDark">Neue Trainingszeit</p>
+          <p className="text-sm font-bold text-to-text">Neue Trainingszeit</p>
           <select
             className="input"
             value={form.weekday}
@@ -387,22 +387,22 @@ export function TrainingsAdmin() {
         {trainings.map((t) => (
           <li key={t.id} className="card flex items-center justify-between">
             <div>
-              <p className="font-semibold text-tbw-navyDark">{t.weekday}</p>
-              <p className="text-sm text-tbw-ink/60">
+              <p className="font-semibold text-to-text">{t.weekday}</p>
+              <p className="text-sm text-to-text2">
                 {fmtTime(t.start_time)}–{fmtTime(t.end_time)} · {t.location}
               </p>
             </div>
-            <button className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red" onClick={() => remove(t.id)}>
+            <button className="btn-secondary !px-2 !py-1 text-xs !text-to-dangerText" onClick={() => remove(t.id)}>
               Löschen
             </button>
           </li>
         ))}
-        {trainings.length === 0 && <p className="text-sm text-tbw-ink/50">Noch keine Trainingszeiten eingetragen.</p>}
+        {trainings.length === 0 && <p className="text-sm text-to-text3">Noch keine Trainingszeiten eingetragen.</p>}
       </ul>
 
-      <p className="pt-2 text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Anstehende Termine</p>
+      <p className="pt-2 text-xs font-bold uppercase tracking-wide text-to-text3">Anstehende Termine</p>
       {upcomingOccurrences.length === 0 ? (
-        <p className="text-sm text-tbw-ink/50">Keine anstehenden Termine.</p>
+        <p className="text-sm text-to-text3">Keine anstehenden Termine.</p>
       ) : (
         <ul className="space-y-2">
           {upcomingOccurrences.map((occ) => {
@@ -411,11 +411,11 @@ export function TrainingsAdmin() {
             if (occ.cancelled) {
               const isSingleDay = occ.cancelledBy?.start_date === occ.cancelledBy?.end_date;
               return (
-                <li key={key} className="card !bg-tbw-red/10 !ring-tbw-red/30">
-                  <p className="text-sm font-semibold text-tbw-red">
+                <li key={key} className="card !bg-to-dangerSoft !ring-tbw-red/30">
+                  <p className="text-sm font-semibold text-to-dangerText">
                     {fmtDate(occ.date)} · {occ.training.weekday} · ❌ Fällt aus
                   </p>
-                  {occ.cancelledBy?.note && <p className="mt-1 text-xs text-tbw-red/70">{occ.cancelledBy.note}</p>}
+                  {occ.cancelledBy?.note && <p className="mt-1 text-xs text-to-dangerText">{occ.cancelledBy.note}</p>}
                   {isSingleDay && occ.cancelledBy && (
                     <button
                       className="btn-secondary mt-2 !px-2 !py-1 text-xs"
@@ -431,13 +431,13 @@ export function TrainingsAdmin() {
             const isCanceling = cancelingKey === key;
             return (
               <li key={key} className="card">
-                <p className="text-sm font-semibold text-tbw-navyDark">
+                <p className="text-sm font-semibold text-to-text">
                   {fmtDate(occ.date)} · {fmtTime(occ.training.start_time)}–{fmtTime(occ.training.end_time)} ·{' '}
                   {occ.training.location}
                 </p>
                 {!isCanceling ? (
                   <button
-                    className="btn-secondary mt-2 !px-2 !py-1 text-xs !text-tbw-red"
+                    className="btn-secondary mt-2 !px-2 !py-1 text-xs !text-to-dangerText"
                     onClick={() => {
                       setCancelingKey(key);
                       setCancelReason('');
@@ -446,7 +446,7 @@ export function TrainingsAdmin() {
                     Absagen
                   </button>
                 ) : (
-                  <div className="mt-2 space-y-2 rounded-xl bg-tbw-bg p-3">
+                  <div className="mt-2 space-y-2 rounded-xl bg-to-bg p-3">
                     <input
                       placeholder="Grund (optional, z. B. Trainer krank)"
                       className="input"
@@ -478,9 +478,9 @@ export function TrainingsAdmin() {
       )}
 
       <div className="flex items-center justify-between pt-2">
-        <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Ferienzeiten &amp; Sonderregelungen</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-to-text3">Ferienzeiten &amp; Sonderregelungen</p>
         {overrides !== null && !showOverrideForm && (
-          <button className="text-xs font-bold text-tbw-navy" onClick={() => setShowOverrideForm(true)}>
+          <button className="text-xs font-bold text-to-accent" onClick={() => setShowOverrideForm(true)}>
             + Neu
           </button>
         )}
@@ -492,7 +492,7 @@ export function TrainingsAdmin() {
         <>
           {showOverrideForm && (
             <form onSubmit={addOverride} className="card space-y-2">
-              <p className="text-sm font-bold text-tbw-navyDark">Neue Ferienzeit</p>
+              <p className="text-sm font-bold text-to-text">Neue Ferienzeit</p>
               <div className="grid grid-cols-2 gap-2">
                 <DateField
                   label="Von"
@@ -547,7 +547,7 @@ export function TrainingsAdmin() {
                 return (
                   <li key={o.id} className="card">
                     <form onSubmit={(e) => saveOverrideEdit(o.id, e)} className="space-y-2">
-                      <p className="text-sm font-bold text-tbw-navyDark">Ferienzeit bearbeiten</p>
+                      <p className="text-sm font-bold text-to-text">Ferienzeit bearbeiten</p>
                       <div className="grid grid-cols-2 gap-2">
                         <DateField
                           label="Von"
@@ -592,10 +592,10 @@ export function TrainingsAdmin() {
                 <li key={o.id} className="card space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="font-semibold text-tbw-navyDark">
+                      <p className="font-semibold text-to-text">
                         {fmtDateShort(o.start_date)}–{fmtDateShort(o.end_date)}
                       </p>
-                      <p className="text-sm text-tbw-ink/60">
+                      <p className="text-sm text-to-text2">
                         {o.mode === 'regular' ? 'Reguläres Training' : o.mode === 'cancelled' ? 'Fällt aus' : 'Sonderzeiten'}
                         {o.note ? ` · ${o.note}` : ''}
                       </p>
@@ -605,7 +605,7 @@ export function TrainingsAdmin() {
                         Bearbeiten
                       </button>
                       <button
-                        className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red"
+                        className="btn-secondary !px-2 !py-1 text-xs !text-to-dangerText"
                         onClick={() => removeOverride(o.id)}
                       >
                         Löschen
@@ -614,27 +614,27 @@ export function TrainingsAdmin() {
                   </div>
 
                   {o.mode === 'special' && (
-                    <div className="space-y-2 border-t border-black/5 pt-3">
+                    <div className="space-y-2 border-t border-to-divider pt-3">
                       {ownSessions.length > 0 ? (
                         <ul className="space-y-1.5">
                           {ownSessions.map((s) => (
-                            <li key={s.id} className="flex items-center justify-between rounded-xl bg-tbw-bg p-2 text-sm">
-                              <span className="text-tbw-navyDark">
+                            <li key={s.id} className="flex items-center justify-between rounded-xl bg-to-bg p-2 text-sm">
+                              <span className="text-to-text">
                                 {fmtDate(s.specific_date!)} · {fmtTime(s.start_time)}–{fmtTime(s.end_time)} · {s.location}
                               </span>
-                              <button className="text-xs font-bold text-tbw-red" onClick={() => removeSession(s.id)}>
+                              <button className="text-xs font-bold text-to-dangerText" onClick={() => removeSession(s.id)}>
                                 ✕
                               </button>
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-xs text-tbw-ink/40">Noch keine Sondertermine eingetragen.</p>
+                        <p className="text-xs text-to-text3">Noch keine Sondertermine eingetragen.</p>
                       )}
 
                       {sessionFormOpen ? (
-                        <form onSubmit={(e) => addSession(o.id, e)} className="space-y-2 rounded-xl bg-tbw-bg p-3">
-                          <p className="text-xs font-bold text-tbw-ink/50">Sondertermin hinzufügen</p>
+                        <form onSubmit={(e) => addSession(o.id, e)} className="space-y-2 rounded-xl bg-to-bg p-3">
+                          <p className="text-xs font-bold text-to-text3">Sondertermin hinzufügen</p>
                           <DateField
                             label="Datum"
                             required
@@ -679,7 +679,7 @@ export function TrainingsAdmin() {
                         </form>
                       ) : (
                         <button
-                          className="text-xs font-bold text-tbw-navy"
+                          className="text-xs font-bold text-to-accent"
                           onClick={() => toggleSessionForm(o.id)}
                         >
                           + Sondertermin hinzufügen
@@ -690,7 +690,7 @@ export function TrainingsAdmin() {
                 </li>
               );
             })}
-            {overrides.length === 0 && <p className="text-sm text-tbw-ink/50">Keine Ferienzeiten eingetragen.</p>}
+            {overrides.length === 0 && <p className="text-sm text-to-text3">Keine Ferienzeiten eingetragen.</p>}
           </ul>
         </>
       )}

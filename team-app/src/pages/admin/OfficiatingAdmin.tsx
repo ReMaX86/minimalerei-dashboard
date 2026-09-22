@@ -194,8 +194,8 @@ export function OfficiatingAdmin() {
   return (
     <div className="space-y-4">
       <div className="card space-y-2">
-        <p className="text-sm font-bold text-tbw-navyDark">Meldefrist</p>
-        <p className="text-xs text-tbw-ink/50">
+        <p className="text-sm font-bold text-to-text">Meldefrist</p>
+        <p className="text-xs text-to-text3">
           Bis zu diesem Datum können Spieler ihre Kampfgericht-Termine auf der Kampfgericht-Seite
           selbst übernehmen und auch wieder abwählen. Danach sind die Zuteilungen fix — Änderungen
           (z. B. weil jemand spontan doch nicht kann) laufen dann über Trainer oder Kapitän/
@@ -217,13 +217,13 @@ export function OfficiatingAdmin() {
           >
             {savingDeadline ? 'Speichere…' : 'Speichern'}
           </button>
-          {deadlineSaved && <span className="text-xs font-semibold text-status-ok">Gespeichert ✓</span>}
+          {deadlineSaved && <span className="text-xs font-semibold text-to-accent">Gespeichert ✓</span>}
         </div>
       </div>
 
       <div className="card space-y-2">
         <button
-          className="flex w-full items-center justify-between text-sm font-bold text-tbw-navyDark"
+          className="flex w-full items-center justify-between text-sm font-bold text-to-text"
           onClick={() => setShowTeams((v) => !v)}
           type="button"
         >
@@ -244,14 +244,14 @@ export function OfficiatingAdmin() {
               </button>
             </form>
             {teams.length === 0 ? (
-              <p className="text-sm text-tbw-ink/50">Noch keine Teams eingetragen.</p>
+              <p className="text-sm text-to-text3">Noch keine Teams eingetragen.</p>
             ) : (
-              <ul className="divide-y divide-black/5">
+              <ul className="divide-y divide-to-divider">
                 {teams.map((t) => (
                   <li key={t.id} className="flex items-center justify-between py-1.5 text-sm">
-                    <span className="text-tbw-navyDark">{t.name}</span>
+                    <span className="text-to-text">{t.name}</span>
                     <button
-                      className="text-xs font-semibold text-tbw-red"
+                      className="text-xs font-semibold text-to-dangerText"
                       onClick={() => removeTeam(t.id)}
                       type="button"
                     >
@@ -267,7 +267,7 @@ export function OfficiatingAdmin() {
 
       {!showForm && (
         <div className="flex justify-end">
-          <button className="text-xs font-bold text-tbw-navy" onClick={() => setShowForm(true)}>
+          <button className="text-xs font-bold text-to-accent" onClick={() => setShowForm(true)}>
             + Neu
           </button>
         </div>
@@ -275,7 +275,7 @@ export function OfficiatingAdmin() {
 
       {showForm && (
         <form onSubmit={addGame} className="card space-y-2">
-          <p className="text-sm font-bold text-tbw-navyDark">Neuer Kampfgericht-Termin</p>
+          <p className="text-sm font-bold text-to-text">Neuer Kampfgericht-Termin</p>
           <div className="space-y-2">
             <DateField
               label="Datum"
@@ -323,12 +323,12 @@ export function OfficiatingAdmin() {
             onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
           />
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-to-text3">
               Welche Aufgaben müssen wir stellen?
             </p>
             <div className="flex flex-wrap gap-3">
               {TASK_TYPES.map((type) => (
-                <label key={type} className="flex items-center gap-1.5 text-sm text-tbw-ink/80">
+                <label key={type} className="flex items-center gap-1.5 text-sm text-to-text2">
                   <input
                     type="checkbox"
                     checked={taskSelection[type]}
@@ -363,13 +363,13 @@ export function OfficiatingAdmin() {
           <li key={g.id} className="card">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="font-semibold text-tbw-navyDark">{officiatingGameLabel(g)}</p>
-                <p className="text-sm text-tbw-ink/60">
+                <p className="font-semibold text-to-text">{officiatingGameLabel(g)}</p>
+                <p className="text-sm text-to-text2">
                   {fmtDate(g.game_date)}
                   {g.game_time ? ` · ${fmtTime(g.game_time)} Uhr` : ''} · {g.location}
                 </p>
               </div>
-              <button className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red" onClick={() => removeGame(g.id)}>
+              <button className="btn-secondary !px-2 !py-1 text-xs !text-to-dangerText" onClick={() => removeGame(g.id)}>
                 Löschen
               </button>
             </div>
@@ -378,7 +378,7 @@ export function OfficiatingAdmin() {
                 const task = tasksByGame[g.id]?.find((t) => t.task_type === type);
                 return (
                   <li key={type} className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-tbw-ink/70">{OFFICIATING_TASK_LABELS[type]}</span>
+                    <span className="text-sm text-to-text2">{OFFICIATING_TASK_LABELS[type]}</span>
                     {task ? (
                       <select
                         className="input !w-auto !py-1 text-xs"
@@ -401,7 +401,7 @@ export function OfficiatingAdmin() {
             </ul>
           </li>
         ))}
-        {games.length === 0 && <p className="text-sm text-tbw-ink/50">Noch keine Termine eingetragen.</p>}
+        {games.length === 0 && <p className="text-sm text-to-text3">Noch keine Termine eingetragen.</p>}
       </ul>
     </div>
   );

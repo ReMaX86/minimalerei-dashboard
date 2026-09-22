@@ -51,6 +51,14 @@ import {
 // Schritt) in eine gemeinsame Stelle gezogen statt an zwei Stellen gepflegt.
 const MAX_SQUAD_SIZE = 12;
 
+// Lokales Datum, NICHT new Date().toISOString().slice(0,10) (das ist UTC —
+// würde in den ersten ein bis zwei Stunden nach Mitternacht fälschlich noch
+// den Vortag liefern, z. B. den heutigen Spieltag verfehlen).
+function localTodayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 interface DashboardData {
   nextGame: Game | null;
   upcomingGames: Game[];
@@ -121,7 +129,7 @@ export function Dashboard() {
 
     async function load() {
       setError(null);
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localTodayIso();
 
       const [gameRes, upcomingGamesRes, trikotRes, trikotWashRes, trikotTransferRes, playersRes, announcementsRes] =
         await Promise.all([
@@ -605,7 +613,7 @@ export function Dashboard() {
   // (nicht den kompletten load() mit seinen ~10 Abfragen) — automatisch alle
   // 15s (wie der Herzschlag im Tracker selbst) und sofort, sobald die Seite
   // wieder sichtbar wird, plus ein manueller Button für "jetzt sofort".
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localTodayIso();
   const nextGameIsLive = !!(data?.nextGame && flags.stats && !data.nextGame.stats_finalized_at && data.nextGame.game_date <= today);
   const [refreshingLive, setRefreshingLive] = useState(false);
 
@@ -1087,7 +1095,7 @@ export function Dashboard() {
 
       <section className="sheet">
         {showAbsencesOverview && data.absencesOverview.length > 0 && (() => {
-          const today = new Date().toISOString().slice(0, 10);
+          const today = localTodayIso();
           const currentAbsences = data.absencesOverview.filter((a) => a.start_date <= today);
           const upcomingAbsences = data.absencesOverview.filter((a) => a.start_date > today);
           return (

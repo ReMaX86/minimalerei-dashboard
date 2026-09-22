@@ -182,13 +182,13 @@ export function PlayersAdmin() {
       </form>
 
       {newCode && (
-        <div className="card border-l-4 border-tbw-gold">
-          <p className="text-sm text-tbw-ink/70">
-            Zugangscode für <span className="font-semibold text-tbw-navyDark">{newCode.name}</span>:
+        <div className="card border-l-4 border-to-accent">
+          <p className="text-sm text-to-text2">
+            Zugangscode für <span className="font-semibold text-to-text">{newCode.name}</span>:
           </p>
-          <p className="mt-1 text-2xl font-extrabold tracking-widest text-tbw-navyDark">{newCode.code}</p>
-          <p className="mt-1 text-xs text-tbw-ink/50">Bitte per WhatsApp/SMS an den Spieler weitergeben.</p>
-          <button className="mt-2 text-xs font-semibold text-tbw-ink/50" onClick={() => setNewCode(null)}>
+          <p className="mt-1 text-2xl font-extrabold tracking-widest text-to-text">{newCode.code}</p>
+          <p className="mt-1 text-xs text-to-text3">Bitte per WhatsApp/SMS an den Spieler weitergeben.</p>
+          <button className="mt-2 text-xs font-semibold text-to-text3" onClick={() => setNewCode(null)}>
             Schließen
           </button>
         </div>
@@ -198,14 +198,14 @@ export function PlayersAdmin() {
         {players.map((p) => (
           <li key={p.id} className={`card space-y-3 ${!p.is_active ? 'opacity-50' : ''}`}>
             <div>
-              <p className="flex flex-wrap items-center gap-1.5 font-semibold text-tbw-navyDark">
+              <p className="flex flex-wrap items-center gap-1.5 font-semibold text-to-text">
                 {p.name}
                 {p.is_admin && <span className="pill pill-warn">Trainer</span>}
                 {p.is_captain && <span className="pill pill-ok">Captain</span>}
                 {p.is_co_captain && <span className="pill pill-ok">Co-Captain</span>}
                 {p.officiating_exempt && <span className="pill pill-open">Kampfgericht befreit</span>}
               </p>
-              <p className="text-xs text-tbw-ink/50">Code: {codes[p.id] ?? '…'}</p>
+              <p className="text-xs text-to-text3">Code: {codes[p.id] ?? '…'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => regenerate(p.id, p.name)}>
@@ -250,7 +250,7 @@ export function PlayersAdmin() {
             </div>
 
             {detailsId === p.id && (
-              <div className="space-y-2 border-t border-black/5 pt-3">
+              <div className="space-y-2 border-t border-to-divider pt-3">
                 <div className="grid grid-cols-2 gap-2">
                   <select
                     className="input min-w-0"
@@ -280,7 +280,7 @@ export function PlayersAdmin() {
                   onChange={(v) => setDetailsForm((f) => ({ ...f, birth_date: v }))}
                 />
                 <label className="block text-xs">
-                  <span className="font-semibold text-tbw-ink/50">Foto</span>
+                  <span className="font-semibold text-to-text3">Foto</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -289,7 +289,7 @@ export function PlayersAdmin() {
                   />
                 </label>
                 <div>
-                  <p className="text-xs font-semibold text-tbw-ink/50">Stärken</p>
+                  <p className="text-xs font-semibold text-to-text3">Stärken</p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {SKILL_OPTIONS.map((skill) => (
                       <button

@@ -83,7 +83,7 @@ export function AnnouncementsAdmin() {
   return (
     <div className="space-y-4">
       <form onSubmit={submit} className="card space-y-2">
-        <p className="text-sm font-bold text-tbw-navyDark">Neue Meldung</p>
+        <p className="text-sm font-bold text-to-text">Neue Meldung</p>
         <textarea
           required
           rows={3}
@@ -104,8 +104,8 @@ export function AnnouncementsAdmin() {
       <ul className="space-y-2">
         {items.map((a) => (
           <li key={a.id} className="card space-y-2">
-            <p className="text-sm text-tbw-navyDark">{a.message}</p>
-            <p className="text-xs text-tbw-ink/50">
+            <p className="text-sm text-to-text">{a.message}</p>
+            <p className="text-xs text-to-text3">
               {a.author_name} · {new Date(a.created_at).toLocaleDateString('de-DE')}
               {a.pinned && ' · angeheftet'}
             </p>
@@ -113,13 +113,13 @@ export function AnnouncementsAdmin() {
               <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => togglePinned(a)}>
                 {a.pinned ? 'Lösen' : 'Anheften'}
               </button>
-              <button className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red" onClick={() => remove(a.id)}>
+              <button className="btn-secondary !px-2 !py-1 text-xs !text-to-dangerText" onClick={() => remove(a.id)}>
                 Löschen
               </button>
             </div>
           </li>
         ))}
-        {items.length === 0 && <p className="text-sm text-tbw-ink/50">Noch keine Meldungen.</p>}
+        {items.length === 0 && <p className="text-sm text-to-text3">Noch keine Meldungen.</p>}
       </ul>
     </div>
   );

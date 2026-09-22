@@ -144,7 +144,7 @@ export function FeatureFlagsAdmin() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-tbw-ink/60">
+      <p className="text-sm text-to-text2">
         Zusatzfunktionen, die nicht jedes Team braucht — deaktiviert sind sie in der gesamten App
         ausgeblendet (Nav, Startseite, Admin-Reiter), außer hier.
       </p>
@@ -157,8 +157,8 @@ export function FeatureFlagsAdmin() {
             <li key={key} className="card space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-semibold text-tbw-navyDark">{meta.label}</p>
-                  <p className="text-xs text-tbw-ink/50">{meta.description}</p>
+                  <p className="font-semibold text-to-text">{meta.label}</p>
+                  <p className="text-xs text-to-text3">{meta.description}</p>
                 </div>
                 <button
                   type="button"
@@ -167,7 +167,7 @@ export function FeatureFlagsAdmin() {
                   disabled={loading || savingKey === key}
                   onClick={() => toggle(key)}
                   className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-40 ${
-                    enabled ? 'bg-tbw-gold' : 'bg-black/15'
+                    enabled ? 'bg-to-accent' : 'bg-to-line'
                   }`}
                 >
                   <span
@@ -187,8 +187,8 @@ export function FeatureFlagsAdmin() {
         <div className="card space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="font-semibold text-tbw-navyDark">Erinnerungen</p>
-              <p className="text-xs text-tbw-ink/50">
+              <p className="font-semibold text-to-text">Erinnerungen</p>
+              <p className="text-xs text-to-text3">
                 Auffällige "Für dich zu erledigen"-Karte auf der Spieler-Startseite ab den unten
                 eingestellten Fristen.
               </p>
@@ -199,7 +199,7 @@ export function FeatureFlagsAdmin() {
               aria-checked={reminderForm.enabled}
               onClick={() => setReminderForm({ ...reminderForm, enabled: !reminderForm.enabled })}
               className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-                reminderForm.enabled ? 'bg-tbw-gold' : 'bg-black/15'
+                reminderForm.enabled ? 'bg-to-accent' : 'bg-to-line'
               }`}
             >
               <span
@@ -210,9 +210,9 @@ export function FeatureFlagsAdmin() {
             </button>
           </div>
 
-          <div className="space-y-2 border-t border-black/5 pt-3">
+          <div className="space-y-2 border-t border-to-divider pt-3">
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">
+              <span className="text-to-text2">
                 Kader-Zusage: Erinnerung ab wie vielen Tagen vor dem Spiel?
               </span>
               <input
@@ -224,7 +224,7 @@ export function FeatureFlagsAdmin() {
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">
+              <span className="text-to-text2">
                 Training-Zusage: Erinnerung ab wie vielen Tagen vor dem Termin?
               </span>
               <input
@@ -238,7 +238,7 @@ export function FeatureFlagsAdmin() {
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">Kampfgericht: Mindesteinsätze pro Saison</span>
+              <span className="text-to-text2">Kampfgericht: Mindesteinsätze pro Saison</span>
               <input
                 type="number"
                 min={0}
@@ -247,22 +247,22 @@ export function FeatureFlagsAdmin() {
                 onChange={(e) => setReminderForm({ ...reminderForm, officiating_season_min: e.target.value })}
               />
             </label>
-            <p className="text-xs text-tbw-ink/40">
+            <p className="text-xs text-to-text3">
               U18-Spieler, die schon über ihre eigene Mannschaft eingeteilt werden, lassen sich unter
               "Admin → Spieler" von der Kampfgericht-Erinnerung ausnehmen. Die Meldefrist für die
               Selbstverwaltung der Kampfgericht-Termine ist im Admin unter "Kampfgericht" einstellbar.
             </p>
           </div>
 
-          <div className="space-y-2 border-t border-black/5 pt-3">
-            <p className="text-sm font-semibold text-tbw-navyDark">Push-Erinnerung fürs Training</p>
-            <p className="text-xs text-tbw-ink/50">
+          <div className="space-y-2 border-t border-to-divider pt-3">
+            <p className="text-sm font-semibold text-to-text">Push-Erinnerung fürs Training</p>
+            <p className="text-xs text-to-text3">
               Bis zu drei Zeitpunkte vor Trainingsbeginn, zu denen Spieler ohne Antwort per
               Push erinnert werden (in Stunden, 0 = aus; z. B. 0,5 für 30 Minuten). Wirkt nur,
               wenn "Push-Benachrichtigungen" unter Funktionen aktiviert ist.
             </p>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">1. Erinnerung (z. B. 24 = 1 Tag vorher)</span>
+              <span className="text-to-text2">1. Erinnerung (z. B. 24 = 1 Tag vorher)</span>
               <input
                 type="number"
                 min={0}
@@ -275,7 +275,7 @@ export function FeatureFlagsAdmin() {
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">2. Erinnerung (z. B. 1 = 1 Stunde vorher)</span>
+              <span className="text-to-text2">2. Erinnerung (z. B. 1 = 1 Stunde vorher)</span>
               <input
                 type="number"
                 min={0}
@@ -288,7 +288,7 @@ export function FeatureFlagsAdmin() {
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">3. Erinnerung (z. B. 0,5 = 30 Minuten vorher)</span>
+              <span className="text-to-text2">3. Erinnerung (z. B. 0,5 = 30 Minuten vorher)</span>
               <input
                 type="number"
                 min={0}
@@ -302,9 +302,9 @@ export function FeatureFlagsAdmin() {
             </label>
           </div>
 
-          <div className="space-y-2 border-t border-black/5 pt-3">
-            <p className="text-sm font-semibold text-tbw-navyDark">Push-Erinnerung fürs Kampfgericht</p>
-            <p className="text-xs text-tbw-ink/50">
+          <div className="space-y-2 border-t border-to-divider pt-3">
+            <p className="text-sm font-semibold text-to-text">Push-Erinnerung fürs Kampfgericht</p>
+            <p className="text-xs text-to-text3">
               Bis zu drei Zeitpunkte vor Spielbeginn, zu denen Spieler mit einer zugewiesenen
               Kampfgericht-Aufgabe per Push erinnert werden (in Stunden, 0 = aus). Anders als bei
               der Training-Erinnerung gibt es hier keine Zu-/Absage — die Aufgabe ist bereits fest
@@ -312,7 +312,7 @@ export function FeatureFlagsAdmin() {
               "Push-Benachrichtigungen" unter Funktionen aktiviert ist.
             </p>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">1. Erinnerung (z. B. 120 = 5 Tage vorher)</span>
+              <span className="text-to-text2">1. Erinnerung (z. B. 120 = 5 Tage vorher)</span>
               <input
                 type="number"
                 min={0}
@@ -325,7 +325,7 @@ export function FeatureFlagsAdmin() {
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">2. Erinnerung (z. B. 24 = 1 Tag vorher)</span>
+              <span className="text-to-text2">2. Erinnerung (z. B. 24 = 1 Tag vorher)</span>
               <input
                 type="number"
                 min={0}
@@ -338,7 +338,7 @@ export function FeatureFlagsAdmin() {
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">3. Erinnerung (z. B. 2 = 2 Stunden vorher)</span>
+              <span className="text-to-text2">3. Erinnerung (z. B. 2 = 2 Stunden vorher)</span>
               <input
                 type="number"
                 min={0}
@@ -352,16 +352,16 @@ export function FeatureFlagsAdmin() {
             </label>
           </div>
 
-          <div className="space-y-2 border-t border-black/5 pt-3">
-            <p className="text-sm font-semibold text-tbw-navyDark">Push-Erinnerung für Kader-Zusage</p>
-            <p className="text-xs text-tbw-ink/50">
+          <div className="space-y-2 border-t border-to-divider pt-3">
+            <p className="text-sm font-semibold text-to-text">Push-Erinnerung für Kader-Zusage</p>
+            <p className="text-xs text-to-text3">
               Bis zu drei Zeitpunkte vor Spielbeginn, zu denen Spieler im veröffentlichten Kader ohne
               Zu-/Absage per Push erinnert werden (in ganzen Tagen, 0 = aus). Nur Spieler, die im Kader
               stehen und noch nicht geantwortet haben, bekommen die Push. Wirkt nur, wenn
               "Push-Benachrichtigungen" unter Funktionen aktiviert ist.
             </p>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">1. Erinnerung (Tage vorher, z. B. 5)</span>
+              <span className="text-to-text2">1. Erinnerung (Tage vorher, z. B. 5)</span>
               <input
                 type="number"
                 min={0}
@@ -372,7 +372,7 @@ export function FeatureFlagsAdmin() {
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">2. Erinnerung (Tage vorher, z. B. 3)</span>
+              <span className="text-to-text2">2. Erinnerung (Tage vorher, z. B. 3)</span>
               <input
                 type="number"
                 min={0}
@@ -383,7 +383,7 @@ export function FeatureFlagsAdmin() {
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-tbw-ink/70">3. Erinnerung (Tage vorher, z. B. 1)</span>
+              <span className="text-to-text2">3. Erinnerung (Tage vorher, z. B. 1)</span>
               <input
                 type="number"
                 min={0}
@@ -395,7 +395,7 @@ export function FeatureFlagsAdmin() {
             </label>
           </div>
 
-          <div className="flex items-center gap-3 border-t border-black/5 pt-3">
+          <div className="flex items-center gap-3 border-t border-to-divider pt-3">
             <button
               type="button"
               className="btn-primary !px-4 !py-2 text-sm"
@@ -404,7 +404,7 @@ export function FeatureFlagsAdmin() {
             >
               {savingReminders ? 'Speichere…' : 'Speichern'}
             </button>
-            {reminderSaved && <span className="text-xs font-semibold text-status-ok">Gespeichert ✓</span>}
+            {reminderSaved && <span className="text-xs font-semibold text-to-accent">Gespeichert ✓</span>}
           </div>
         </div>
       )}

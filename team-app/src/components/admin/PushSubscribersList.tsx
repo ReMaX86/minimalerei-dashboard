@@ -77,24 +77,24 @@ export function PushSubscribersList() {
     };
   }, []);
 
-  if (error) return <p className="text-xs text-tbw-red">{error}</p>;
+  if (error) return <p className="text-xs text-to-dangerText">{error}</p>;
   if (!subscribers) return <LoadingSpinner />;
 
   return (
-    <div className="space-y-2 border-t border-black/5 pt-3">
-      <p className="text-sm font-semibold text-tbw-navyDark">
+    <div className="space-y-2 border-t border-to-divider pt-3">
+      <p className="text-sm font-semibold text-to-text">
         Wer hat Push aktiviert? ({subscribers.length})
       </p>
       {subscribers.length === 0 ? (
-        <p className="text-xs text-tbw-ink/50">Noch niemand.</p>
+        <p className="text-xs text-to-text3">Noch niemand.</p>
       ) : (
         <ul className="space-y-1">
           {subscribers.map((s) => (
             <li key={`${s.role}-${s.name}`} className="flex items-center justify-between text-sm">
-              <span className="text-tbw-navyDark">
-                {s.name} <span className="text-xs text-tbw-ink/40">({s.role})</span>
+              <span className="text-to-text">
+                {s.name} <span className="text-xs text-to-text3">({s.role})</span>
               </span>
-              <span className="text-xs text-tbw-ink/50">
+              <span className="text-xs text-to-text3">
                 {s.devices > 1 ? `${s.devices} Geräte · ` : ''}seit {fmtDate(s.since.slice(0, 10))}
               </span>
             </li>

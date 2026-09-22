@@ -171,7 +171,7 @@ export function GamesAdmin() {
     <div className="space-y-4">
       {!showForm && (
         <div className="flex justify-end">
-          <button className="text-xs font-bold text-tbw-navy" onClick={() => setShowForm(true)}>
+          <button className="text-xs font-bold text-to-accent" onClick={() => setShowForm(true)}>
             + Neu
           </button>
         </div>
@@ -179,7 +179,7 @@ export function GamesAdmin() {
 
       {showForm && (
         <form onSubmit={submit} className="card space-y-2">
-          <p className="text-sm font-bold text-tbw-navyDark">{editingId ? 'Spiel bearbeiten' : 'Neues Spiel'}</p>
+          <p className="text-sm font-bold text-to-text">{editingId ? 'Spiel bearbeiten' : 'Neues Spiel'}</p>
           <div className="space-y-2">
             <DateField
               label="Datum"
@@ -227,8 +227,8 @@ export function GamesAdmin() {
               <option value="schwarz">Trikot: Schwarz erzwingen</option>
             </select>
           </div>
-          <div className="border-t border-black/5 pt-2">
-            <p className="text-xs font-semibold text-tbw-ink/50">Treffpunkt</p>
+          <div className="border-t border-to-divider pt-2">
+            <p className="text-xs font-semibold text-to-text3">Treffpunkt</p>
             <div className="mt-2">
               <MeetingPointFields
                 isHome={form.is_home}
@@ -253,25 +253,25 @@ export function GamesAdmin() {
           <li key={g.id} className="card">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="font-semibold text-tbw-navyDark">
+                <p className="font-semibold text-to-text">
                   vs. {g.opponent} <span className="pill pill-open ml-1">{g.is_home ? 'Heim' : 'Auswärts'}</span>
                 </p>
-                <p className="text-sm text-tbw-ink/60">
+                <p className="text-sm text-to-text2">
                   {fmtDate(g.game_date)} · {fmtTime(g.game_time)} Uhr · {g.location}
                 </p>
-                <p className="text-xs text-tbw-ink/40">
+                <p className="text-xs text-to-text3">
                   Kader: {g.squad_published ? 'veröffentlicht' : 'Entwurf'}
                   {g.trikot_override ? ` · Trikot fix: ${g.trikot_override === 'weiss' ? 'Weiß' : 'Schwarz'}` : ''}
                 </p>
                 {meetingPoints(g).map((m) => (
-                  <p key={m.label} className="text-xs text-tbw-ink/40">
+                  <p key={m.label} className="text-xs text-to-text3">
                     Treffpunkt {m.label}: {m.time ? `${fmtTime(m.time)} Uhr` : ''}
                     {m.place ? `${m.time ? ', ' : ''}${m.place}` : ''}
                   </p>
                 ))}
                 {flags.stats && scoreFormId === g.id && (
-                  <div className="mt-2 rounded-xl bg-tbw-bg p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/40">
+                  <div className="mt-2 rounded-xl bg-to-bg p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">
                       Endstand nachtragen
                     </p>
                     <div className="mt-2 flex items-center gap-2">
@@ -284,7 +284,7 @@ export function GamesAdmin() {
                         onChange={(e) => setScoreForm((f) => ({ ...f, us: e.target.value }))}
                         className="input !py-1.5 text-center"
                       />
-                      <span className="text-sm font-bold text-tbw-ink/40">:</span>
+                      <span className="text-sm font-bold text-to-text3">:</span>
                       <input
                         type="number"
                         inputMode="numeric"
@@ -310,14 +310,14 @@ export function GamesAdmin() {
                   </div>
                 )}
                 {flags.stats && gameResult(g) && (
-                  <p className="text-xs text-tbw-ink/40">
+                  <p className="text-xs text-to-text3">
                     Endstand: {g.final_score_us}:{g.final_score_opponent} ·{' '}
                     <span
                       className={
                         gameResult(g) === 'sieg'
-                          ? 'font-semibold text-status-ok'
+                          ? 'font-semibold text-to-accent'
                           : gameResult(g) === 'niederlage'
-                            ? 'font-semibold text-tbw-red'
+                            ? 'font-semibold text-to-dangerText'
                             : 'font-semibold'
                       }
                     >
@@ -348,20 +348,20 @@ export function GamesAdmin() {
                   // die Viertel geklickt wurde, aber noch kein Punkt erfasst ist.
                   (gameResult(g) || g.last_announced_quarter > 0 || g.stats_finalized_at) && (
                     <button
-                      className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red"
+                      className="btn-secondary !px-2 !py-1 text-xs !text-to-dangerText"
                       onClick={() => resetStats(g.id)}
                     >
                       Tracking zurücksetzen
                     </button>
                   )}
-                <button className="btn-secondary !px-2 !py-1 text-xs !text-tbw-red" onClick={() => remove(g.id)}>
+                <button className="btn-secondary !px-2 !py-1 text-xs !text-to-dangerText" onClick={() => remove(g.id)}>
                   Löschen
                 </button>
               </div>
             </div>
           </li>
         ))}
-        {games.length === 0 && <p className="text-sm text-tbw-ink/50">Noch keine Spiele eingetragen.</p>}
+        {games.length === 0 && <p className="text-sm text-to-text3">Noch keine Spiele eingetragen.</p>}
       </ul>
     </div>
   );

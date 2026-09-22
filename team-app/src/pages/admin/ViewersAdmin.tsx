@@ -89,7 +89,7 @@ export function ViewersAdmin() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-tbw-ink/60">
+      <p className="text-sm text-to-text2">
         Betrachter sehen Spielplan und Kampfgericht rein lesend — z. B. für einen Abteilungsleiter, der weder
         Spieler noch Trainer ist. Kein Zugriff auf Kader, Trikots oder Admin-Funktionen.
       </p>
@@ -107,13 +107,13 @@ export function ViewersAdmin() {
       </form>
 
       {newCode && (
-        <div className="card border-l-4 border-tbw-gold">
-          <p className="text-sm text-tbw-ink/70">
-            Zugangscode für <span className="font-semibold text-tbw-navyDark">{newCode.name}</span>:
+        <div className="card border-l-4 border-to-accent">
+          <p className="text-sm text-to-text2">
+            Zugangscode für <span className="font-semibold text-to-text">{newCode.name}</span>:
           </p>
-          <p className="mt-1 text-2xl font-extrabold tracking-widest text-tbw-navyDark">{newCode.code}</p>
-          <p className="mt-1 text-xs text-tbw-ink/50">Bitte per WhatsApp/SMS weitergeben.</p>
-          <button className="mt-2 text-xs font-semibold text-tbw-ink/50" onClick={() => setNewCode(null)}>
+          <p className="mt-1 text-2xl font-extrabold tracking-widest text-to-text">{newCode.code}</p>
+          <p className="mt-1 text-xs text-to-text3">Bitte per WhatsApp/SMS weitergeben.</p>
+          <button className="mt-2 text-xs font-semibold text-to-text3" onClick={() => setNewCode(null)}>
             Schließen
           </button>
         </div>
@@ -123,8 +123,8 @@ export function ViewersAdmin() {
         {viewers.map((v) => (
           <li key={v.id} className={`card space-y-3 ${!v.is_active ? 'opacity-50' : ''}`}>
             <div>
-              <p className="font-semibold text-tbw-navyDark">{v.name}</p>
-              <p className="text-xs text-tbw-ink/50">Code: {codes[v.id] ?? '…'}</p>
+              <p className="font-semibold text-to-text">{v.name}</p>
+              <p className="text-xs text-to-text3">Code: {codes[v.id] ?? '…'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => regenerate(v.id, v.name)}>
@@ -136,7 +136,7 @@ export function ViewersAdmin() {
             </div>
           </li>
         ))}
-        {viewers.length === 0 && <p className="text-sm text-tbw-ink/50">Noch keine Betrachter eingetragen.</p>}
+        {viewers.length === 0 && <p className="text-sm text-to-text3">Noch keine Betrachter eingetragen.</p>}
       </ul>
     </div>
   );

@@ -42,13 +42,13 @@ export function Admin() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1 overflow-x-auto rounded-xl bg-black/5 p-1">
+      <div className="flex gap-1 overflow-x-auto rounded-xl bg-to-surface2 p-1">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
-              tab === t.id ? 'bg-white text-tbw-navy shadow-sm' : 'text-tbw-ink/50'
+              tab === t.id ? 'bg-to-accent text-to-onAccent shadow-sm' : 'text-to-text3'
             }`}
           >
             {t.label}

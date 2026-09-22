@@ -53,35 +53,35 @@ export function TrikotsAdmin() {
   return (
     <div className="space-y-4">
       <section className="card">
-        <p className="text-sm font-bold text-tbw-navyDark">Aktueller Stand</p>
+        <p className="text-sm font-bold text-to-text">Aktueller Stand</p>
         <div className="mt-2 grid grid-cols-2 gap-3">
           {sets.map((set) => (
-            <div key={set.id} className="rounded-xl bg-tbw-bg p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">{set.label}</p>
-              <p className="mt-1 text-sm font-semibold text-tbw-navyDark">
+            <div key={set.id} className="rounded-xl bg-to-bg p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">{set.label}</p>
+              <p className="mt-1 text-sm font-semibold text-to-text">
                 {set.current_holder_id ? players[set.current_holder_id]?.name ?? '—' : 'Niemand'}
               </p>
-              {set.since && <p className="text-xs text-tbw-ink/50">seit {fmtDateShort(set.since)}</p>}
+              {set.since && <p className="text-xs text-to-text3">seit {fmtDateShort(set.since)}</p>}
             </div>
           ))}
         </div>
       </section>
 
       <section className="card">
-        <p className="text-sm font-bold text-tbw-navyDark">Rotation zurücksetzen</p>
-        <p className="mt-1 text-sm text-tbw-ink/60">
+        <p className="text-sm font-bold text-to-text">Rotation zurücksetzen</p>
+        <p className="mt-1 text-sm text-to-text2">
           Löscht den kompletten Übergabe-Verlauf, setzt beide Trikot-Sets auf "Niemand" zurück und die Rotation
           beginnt wieder von vorne. Nützlich z. B. nach Testläufen — nicht während der laufenden Saison.
         </p>
         {!confirming ? (
-          <button onClick={() => setConfirming(true)} className="btn-secondary mt-3 w-full !text-tbw-red !ring-tbw-red/30">
+          <button onClick={() => setConfirming(true)} className="btn-secondary mt-3 w-full !text-to-dangerText !ring-tbw-red/30">
             Zurücksetzen
           </button>
         ) : (
           <div className="mt-3 space-y-2">
-            <p className="text-sm font-bold text-tbw-red">Bist du sicher? Das kann nicht rückgängig gemacht werden.</p>
+            <p className="text-sm font-bold text-to-dangerText">Bist du sicher? Das kann nicht rückgängig gemacht werden.</p>
             <div className="flex gap-2">
-              <button onClick={reset} disabled={resetting} className="btn-primary flex-1 !bg-tbw-red">
+              <button onClick={reset} disabled={resetting} className="btn-primary flex-1 !bg-to-danger">
                 {resetting ? 'Setze zurück…' : 'Ja, zurücksetzen'}
               </button>
               <button onClick={() => setConfirming(false)} disabled={resetting} className="btn-secondary flex-1">
