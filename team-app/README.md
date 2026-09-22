@@ -923,6 +923,56 @@ umgebenden Container scrollt weiterhin bei Bedarf) plus `whitespace-nowrap` auf 
 Team-Spalte (Kopf- und Datenzellen), damit ein langer Name nie umbricht, sondern die Spalte
 zuverlässig genau auf seine Breite wächst.
 
+### 9. Staging-Umgebung
+
+Bisher landete jede Änderung nach dem Merge direkt live auf der echten, von der Mannschaft
+genutzten Produktion — kein Zwischenschritt zum ausgiebigen Testen. Ab jetzt gibt es eine
+komplett kostenlose, von Produktion getrennte Testumgebung:
+
+- **Zweites Supabase-Projekt** `tbw-team-app-staging` (Projekt-Ref `bisznnxtfxswvskmlouv`,
+  `eu-west-1`, Free-Tier — zusammen mit der Produktion nutzt das genau die 2 kostenlosen Projekte,
+  die pro Supabase-Konto enthalten sind). Enthält exakt dasselbe Schema wie Produktion (alle
+  Migrationen `0001` bis `0058` eingespielt), aber leer bzw. mit Test-Daten statt echten.
+  Supabase **Branching** (eine automatische Preview-DB pro Pull Request) wäre die elegantere
+  Lösung gewesen, ist aber ein Pro-Plan-Feature und fällt damit für uns raus (geprüft: der
+  Versuch, einen Branch anzulegen, blieb ergebnislos).
+- **Vercel Preview-Deployments** (bereits vorher automatisch bei jedem Push/PR vorhanden, kein
+  Zusatzaufwand) zeigen jetzt auf dieses Staging-Projekt statt auf Produktion: `VITE_SUPABASE_URL`
+  und `VITE_SUPABASE_ANON_KEY` sind in den Vercel-Projekteinstellungen ab jetzt pro Environment
+  unterschiedlich hinterlegt (Production -> echtes Projekt, Preview + Development -> Staging).
+  `VAPID_*`/`PUSH_WEBHOOK_SECRET` bleiben bewusst überall gleich (reine Infrastruktur-Secrets,
+  nicht an ein bestimmtes Supabase-Projekt gebunden).
+
+**Damit die Staging-Umgebung nutzbar ist, fehlen noch zwei einmalige manuelle Schritte** (nicht
+per API/MCP setzbar):
+
+1. Im Staging-Projekt (`tbw-team-app-staging`) unter **Authentication -> Providers**:
+   **Anonymous Sign-Ins** aktivieren — exakt derselbe Schritt wie beim ursprünglichen
+   Produktions-Setup oben, ohne den kann sich niemand per Zugangscode anmelden.
+2. Im Staging-Projekt unter **Settings -> API -> service_role secret** den Wert kopieren und in
+   Vercel unter Project Settings -> Environment Variables bei `SUPABASE_SERVICE_ROLE_KEY` für
+   **Preview** und **Development** einsetzen (aktuell steht dort noch der Produktions-Wert) —
+   dieser Key ist bewusst nicht über die Supabase-/Vercel-MCP-Werkzeuge abrufbar (Sicherheit),
+   daher der einzige Schritt, der wirklich von Hand im Dashboard passieren muss.
+
+**Empfohlener Ablauf ab jetzt:**
+
+1. Änderung auf einem Branch entwickeln (wie bisher) und pushen.
+2. Vercel gibt dafür automatisch eine Preview-URL, die gegen die Staging-Datenbank läuft — dort
+   in Ruhe testen (z. B. auf dem Handy), ohne echte Daten oder echte Spieler-Pushes zu berühren.
+3. Neue Migrationen zuerst im **Staging-SQL-Editor** ausführen und dort testen, danach erst im
+   **Produktions-SQL-Editor**.
+4. Erst wenn alles passt: PR nach `main` mergen -> automatisch live mit den echten
+   Produktions-Werten.
+
+**Für einen längeren Umbau (z. B. das komplette UI/UX-Redesign) parallel zu kleinen Live-Fixes:**
+ein eigener, länger laufender Branch für den Umbau (nicht `main`, nicht der übliche
+Kurzlebige-Feature-Branch), dessen Vercel-Preview ebenfalls automatisch gegen Staging läuft.
+Kleine, dringende Änderungen zweigen währenddessen weiter direkt von `main` ab und gehen wie
+gewohnt sofort nach dem Merge live — der Umbau-Branch bleibt davon unberührt. Nach jedem
+Live-Fix `main` in den Umbau-Branch mergen (`git merge origin/main`), damit er nicht zu weit
+abdriftet und der finale Merge später nicht zum Konfliktmarathon wird.
+
 ## Design
 
 Die Farben in `tailwind.config.js` (`tbw.*`) sind noch Platzhalter — bitte gegen die echten
