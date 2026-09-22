@@ -620,7 +620,7 @@ export function Dashboard() {
 
       {role === 'player' && data.reminders.length > 0 && (
         <section className="card !bg-tbw-red/10 !ring-tbw-red/30">
-          <SectionTitle icon="⚠️" title="Für dich zu erledigen" />
+          <SectionTitle title="Für dich zu erledigen" />
           <ul className="mt-2 space-y-2">
             {data.reminders.map((r) =>
               r.to.startsWith('#') ? (
@@ -657,7 +657,7 @@ export function Dashboard() {
 
       {flags.announcements && data.announcements.length > 0 && (
         <section className="card !bg-tbw-gold/10 !ring-tbw-gold/30">
-          <SectionTitle icon="📣" title="Meldungen" />
+          <SectionTitle title="Meldungen" />
           <ul className="mt-2 space-y-2">
             {data.announcements.map((a) => (
               <li key={a.id} className="rounded-xl bg-white p-3">
@@ -676,7 +676,7 @@ export function Dashboard() {
 
       {isAdmin && data.nextGame?.squad_decline_pending && data.declinedNames.length > 0 && (
         <section className="card !bg-status-warn/10 !ring-status-warn/30">
-          <SectionTitle icon="⚠️" title="Kader-Absage" />
+          <SectionTitle title="Kader-Absage" />
           <p className="mt-2 text-sm text-tbw-navyDark">
             {declinedNamesText(data.declinedNames)} leider am Spiel vs. {data.nextGame.opponent} nicht teilnehmen.
           </p>
@@ -687,7 +687,7 @@ export function Dashboard() {
       )}
 
       <section className="card">
-        <SectionTitle icon="🏀" title="Nächstes Spiel" />
+        <SectionTitle title="Nächstes Spiel" />
         {data.nextGame ? (
           <div className="mt-2 space-y-1">
             <p className="text-base font-semibold">
@@ -703,7 +703,7 @@ export function Dashboard() {
               rel="noopener noreferrer"
               className="inline-block text-sm text-tbw-navy underline decoration-dotted underline-offset-2"
             >
-              📍 {data.nextGame.location}
+              {data.nextGame.location}
             </a>
 
             {meetingPoints(data.nextGame).length > 0 && (
@@ -748,10 +748,10 @@ export function Dashboard() {
               Trikot: {benoetigterSatz(data.nextGame) === 'weiss' ? 'Weiß' : 'Schwarz'}
             </p>
             {nextGameIsLive && (data.activeStatsHolder || data.nextGame.final_score_us !== null) && (
-              <div className="mt-2 overflow-hidden rounded-2xl bg-gradient-to-b from-tbw-navy to-tbw-navyDark px-4 py-3 text-white shadow-[0_8px_30px_-6px_rgba(7,22,15,0.5)]">
+              <div className="mt-2 overflow-hidden rounded-lg border border-white/10 bg-tbw-navyDark px-4 py-3 text-white">
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-tbw-red">
-                    {data.activeStatsHolder && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-tbw-red" />}
+                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-tbw-gold">
+                    {data.activeStatsHolder && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-tbw-gold" />}
                     {data.activeStatsHolder ? 'Live' : 'Zwischenstand'}
                   </span>
                   <button
@@ -759,7 +759,7 @@ export function Dashboard() {
                     onClick={() => refreshLiveScore()}
                     className="text-[10px] font-bold uppercase tracking-wide text-white/50 disabled:opacity-40"
                   >
-                    {refreshingLive ? 'Aktualisiert…' : '🔄 Aktualisieren'}
+                    {refreshingLive ? 'Aktualisiert…' : 'Aktualisieren'}
                   </button>
                 </div>
                 <div className="mt-1 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wide text-white/50">
@@ -767,7 +767,7 @@ export function Dashboard() {
                   <span className="text-white/30">–</span>
                   <span className="truncate">{data.nextGame.opponent}</span>
                 </div>
-                <p className="headline text-center text-6xl tabular-nums">
+                <p className="tabular-score text-center text-6xl text-white">
                   {data.nextGame.final_score_us ?? 0}:{data.nextGame.final_score_opponent ?? 0}
                 </p>
                 {data.lastScoreEvent && (
@@ -799,7 +799,7 @@ export function Dashboard() {
               (role === 'player' || role === 'trainer' || role === 'viewer') &&
               !data.activeStatsHolder && (
               <Link to={`/stats/${data.nextGame.id}`} className="btn-accent mt-2 block w-full text-center !py-2 text-sm">
-                📊 Spiel-Stats tracking übernehmen
+                Spiel-Stats tracking übernehmen
               </Link>
             )}
             {role === 'player' && (
@@ -868,7 +868,7 @@ export function Dashboard() {
 
       {flags.stats && data.lastResult && (
         <section className="card">
-          <SectionTitle icon="🏆" title="Letztes Ergebnis" />
+          <SectionTitle title="Letztes Ergebnis" />
           <div className="mt-2 flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold text-tbw-navyDark">vs. {data.lastResult.opponent}</p>
@@ -910,7 +910,7 @@ export function Dashboard() {
       )}
 
       <section id="training" className="card scroll-mt-20">
-        <SectionTitle icon="🕒" title="Nächste Trainingseinheit" />
+        <SectionTitle title="Nächste Trainingseinheit" />
         <div className="mt-2">
           <UpcomingTrainings refreshKey={absenceVersion} onChange={() => setTrainingVersion((v) => v + 1)} />
         </div>
@@ -918,7 +918,7 @@ export function Dashboard() {
 
       {role === 'player' && (
         <section className="card">
-          <SectionTitle icon="📋" title="Dein nächster Kampfgericht Termin" />
+          <SectionTitle title="Dein nächster Kampfgericht Termin" />
           {data.playerNextTask ? (
             <div className="mt-2 rounded-xl bg-tbw-gold/10 p-3">
               <p className="text-sm font-semibold text-tbw-navyDark">
@@ -952,7 +952,7 @@ export function Dashboard() {
             const isPicking = transferringSetId === set.id;
             return (
               <section key={set.id} className="card">
-                <SectionTitle icon="🧺" title="Deine Trikots" />
+                <SectionTitle title="Deine Trikots" />
                 <p className="mt-2 text-sm font-semibold text-tbw-navyDark">
                   Du hast aktuell den {set.id === 'weiss' ? 'weißen' : 'schwarzen'} Trikotsatz.
                 </p>
@@ -1026,7 +1026,7 @@ export function Dashboard() {
 
       {showOfficiatingOverview && (
         <section className="card">
-          <SectionTitle icon="📋" title="Nächster Kampfgericht Termin" />
+          <SectionTitle title="Nächster Kampfgericht Termin" />
           {data.trainerNextOfficiatingGame ? (
             <div className="mt-2 space-y-2">
               <p className="text-sm font-semibold">
@@ -1059,7 +1059,7 @@ export function Dashboard() {
         const upcomingAbsences = data.absencesOverview.filter((a) => a.start_date > today);
         return (
           <section className="card">
-            <SectionTitle icon="🌴" title="Aktuell abwesend" />
+            <SectionTitle title="Aktuell abwesend" />
             {currentAbsences.length > 0 ? (
               <ul className="mt-2 space-y-1">
                 {currentAbsences.map((a) => (
@@ -1106,7 +1106,7 @@ export function Dashboard() {
       })()}
 
       <section className="card">
-        <SectionTitle icon="👕" title="Wer hat die Trikots?" />
+        <SectionTitle title="Wer hat die Trikots?" />
         <div className="mt-2 grid grid-cols-2 gap-3">
           {data.trikotSets.map((set) => {
             const transferredFrom = latestTransferFrom(set.id, data.trikotWashLog, data.trikotTransferLog);
@@ -1139,7 +1139,7 @@ export function Dashboard() {
       </section>
 
       <section className="card">
-        <SectionTitle icon="🕒" title="Trainingszeiten" />
+        <SectionTitle title="Trainingszeiten" />
         <div className="mt-2">
           <WeeklyTrainingTimes />
         </div>
@@ -1157,10 +1157,10 @@ function declinedNamesText(names: string[]): string {
   return `${names.slice(0, -1).join(', ')} und ${names[names.length - 1]} können`;
 }
 
-function SectionTitle({ icon, title }: { icon: string; title: string }) {
+function SectionTitle({ title }: { title: string }) {
   return (
-    <div className="flex items-center gap-2 text-sm font-bold text-tbw-navyDark">
-      <span>{icon}</span>
+    <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-tbw-navyDark">
+      <span className="h-3.5 w-1 shrink-0 bg-tbw-gold" aria-hidden />
       {title}
     </div>
   );
