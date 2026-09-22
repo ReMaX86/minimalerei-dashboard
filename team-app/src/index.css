@@ -1,30 +1,35 @@
+@import './styles/tipoff-tokens.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* "Hallenanzeige"-Redesign — Richtungsvertrag siehe
-   .impeccable/surfaces/src-pages-dashboard-tsx.md. Zwei Flächen (arena =
-   tbw-navy/navyDark, paper = tbw-bg + weiß) plus ein LED-Akzent (tbw-gold).
-   Browser-Eigenflächen (Selektion, Fokusring, Scrollbar) werden hier bewusst
-   mit den Palette-Farben statt Browser-Standards eingefärbt. */
+/* Tipoff-Redesign ("Night Court" v0.1, Übergabe von Claude Design — siehe
+   docs/design/tipoff-design/DESIGN.md). Durchgehend dunkel: --to-bg als
+   App-Grund, --to-surface für Karten, ein Akzent (--to-accent, "Tip Volt").
+   Wird schrittweise pro Screen ausgerollt (siehe Task-Liste) — bis dahin
+   können einzelne, noch nicht migrierte Screens ihre alten
+   tbw-*-Klassen behalten, die Basisfläche (body) ist aber schon jetzt
+   durchgehend Tipoff, da die ganze App künftig dunkel ist.
+   Browser-Eigenflächen (Selektion, Fokusring, Scrollbar) werden bewusst mit
+   den Token-Farben statt Browser-Standards eingefärbt. */
 
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
   }
   body {
-    @apply bg-tbw-bg text-tbw-ink antialiased;
+    @apply bg-to-bg text-to-text antialiased;
+    font-family: var(--to-font-body), system-ui, sans-serif;
   }
   ::selection {
-    @apply bg-tbw-gold text-tbw-navyDark;
+    @apply bg-to-accent text-to-onAccent;
   }
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-tbw-gold;
+    @apply outline-2 outline-offset-2 outline-to-accent;
   }
-  /* Punktstände/Statistiken sind Messdaten, kein Fließtext — überall dort
-     tabellarische Ziffern statt proportionaler, damit Zahlen untereinander
-     nicht seitlich wandern (siehe .tabular-score für die grossen
-     Scoreboard-Momente). */
+  /* Punktstände/Zähler/Zeiten sind Messdaten, kein Fließtext — überall dort
+     tabellarische Ziffern statt proportionaler (siehe auch .to-data in
+     tipoff-tokens.css für Mono-Zahlen mit Einheiten). */
   table {
     font-variant-numeric: tabular-nums;
   }
@@ -33,83 +38,128 @@
     height: 10px;
   }
   ::-webkit-scrollbar-track {
-    @apply bg-tbw-bg;
+    @apply bg-to-bg;
   }
   ::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-tbw-navy/20;
+    @apply rounded-full bg-to-line;
   }
 }
 
 @layer components {
-  /* Paper-Fläche für dichte Datenlisten/Formulare: klare Kante statt
-     weichem Schatten-Schweben, technischer Radius statt Bubble-Ecken. */
+  /* Karte — DESIGN.md §5: surface, 1px border, Radius 22–26, Innenabstand 20–22px. */
   .card {
-    @apply rounded-xl border border-tbw-ink/10 bg-white p-5 shadow-[0_2px_14px_-6px_rgba(20,17,10,0.14)];
+    @apply rounded-to-2xl border border-to-border bg-to-surface p-5 text-to-text;
   }
-  /* Arena-Fläche für Live/Wichtiges (Hero, Login/Onboarding) — die dunkle
-     Hallenanzeige-Seite der Welt. */
+  /* Alias, solange noch nicht jeder Aufrufer aus der Hallenanzeige-Zeit
+     migriert ist — in Tipoff ist die ganze App dunkel, es gibt keine
+     eigene "dunkle" Kartenvariante mehr. */
   .card-dark {
-    @apply rounded-xl border border-white/10 bg-tbw-navyDark p-5 text-white shadow-[0_10px_34px_-10px_rgba(0,0,0,0.55)];
+    @apply card;
   }
+  /* Screen-Headlines/Hero-Datum — entspricht .to-display aus
+     tipoff-tokens.css, als Klassenname aus der Vorgänger-Version
+     beibehalten, damit noch nicht migrierte Screens (PlayerProfiles,
+     ResetPassword, MyProfileModal) automatisch mitgezogen werden. */
   .headline {
-    @apply font-display font-normal uppercase leading-[0.95] tracking-tight;
+    @apply to-display;
   }
-  /* Grosse Punktstände/Statistiken (Scoreboard-Moment): JetBrains Mono statt
-     Anton, damit Ziffern eine echte Anzeigetafel-Textur bekommen statt nur
-     eine grosse Überschrift zu sein. */
+  /* Punktstände/Zähler — entspricht .to-data, Name aus Vorgänger-Version
+     beibehalten (siehe .headline oben). */
   .tabular-score {
-    @apply font-mono font-extrabold tabular-nums tracking-tight;
+    @apply to-data font-bold;
   }
-  /* Eckig/technisch statt Pill — Buttons sind Bedienelemente einer
-     Anzeigetafel-Konsole, keine weichen App-Store-Buttons. */
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-tbw-navy px-5 py-3 text-sm font-bold text-white transition active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100;
-  }
-  .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-tbw-ink/15 bg-white px-5 py-3 text-sm font-bold text-tbw-navy transition active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100;
-  }
+
+  /* Primär-Button — DESIGN.md §5: Höhe 56–58, Radius 16, Volt-Fläche, Text
+     zentriert (Pfeil-Icon + justify-between wird pro Aufrufer ergänzt, wo
+     der Screen eine Weiter-Aktion zeigt). */
+  .btn-primary,
   .btn-accent {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-tbw-gold px-5 py-3 text-sm font-bold text-tbw-navyDark transition active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100;
+    @apply inline-flex h-[58px] items-center justify-center gap-2 rounded-to-lg bg-to-accent px-6 text-base font-semibold text-to-onAccent transition active:scale-[0.98] disabled:bg-to-surface2 disabled:text-to-text3 disabled:active:scale-100;
+  }
+  /* Sekundär-Button — Höhe 44–54, 1px Rahmen --to-line, transparent. */
+  .btn-secondary {
+    @apply inline-flex h-11 items-center justify-center gap-2 rounded-to-md border border-to-line bg-transparent px-4 text-sm font-medium text-to-text transition active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100;
   }
   .input {
     /* text-base (16px), not text-sm: iOS Safari auto-zooms on focus for any
        input with a font-size below 16px, and doesn't zoom back out after. */
-    @apply w-full rounded-lg border border-tbw-ink/15 bg-white px-3.5 py-2.5 text-base text-tbw-ink outline-none focus:border-tbw-navy focus:ring-2 focus:ring-tbw-gold/40;
-  }
-  /* Status-Readout statt Soft-Chip: kräftigere, satte Flächenfarbe statt
-     blasser Pastell-Tönung, damit sich pill-ok/-warn nicht mit dem
-     gold-Akzent (= primäre Aktion) verwechseln lässt. */
-  .pill {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide;
-  }
-  .pill-ok {
-    @apply bg-status-ok text-white;
-  }
-  .pill-warn {
-    @apply bg-status-warn text-white;
-  }
-  .pill-open {
-    @apply bg-status-open/20 text-tbw-ink/70;
+    @apply w-full rounded-to-md border border-to-line bg-to-surface2 px-3.5 py-2.5 text-base text-to-text outline-none placeholder:text-to-text3 focus:border-to-accent focus:ring-2 focus:ring-to-accentSoft;
   }
 
-  /* Divided Zeilen-Liste statt gestapelter gleichgroßer Karten (craft-floor:
-     "Cards are the lazy container") — eine Fläche, mehrere Zeilen mit
-     dünner Trennlinie statt N einzelner Schatten-Boxen nebeneinander. */
+  /* Status-Pill — DESIGN.md §5 "Badges": Punkt (6–7px) + Text. Volt-soft für
+     "Im Kader" (.pill-ok), surface-2 für "Auf Abruf" (.pill-warn),
+     danger-soft für "Abgemeldet"/offen (.pill-open). Namen aus der
+     Vorgänger-Version beibehalten, nur neu eingefärbt. */
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-to-pill px-2.5 py-1 text-xs font-medium;
+  }
+  .pill::before {
+    content: '';
+    @apply h-1.5 w-1.5 shrink-0 rounded-full bg-current;
+  }
+  .pill-ok {
+    @apply bg-to-accentSoft text-to-accent;
+  }
+  .pill-warn {
+    @apply bg-to-surface2 text-to-text2;
+  }
+  .pill-open {
+    @apply bg-to-dangerSoft text-to-dangerText;
+  }
+  /* Heim/Auswärts-Badges — DESIGN.md §5. */
+  .badge-home {
+    @apply inline-flex h-[26px] items-center rounded-to-pill bg-to-accent px-2.5 text-[11px] font-semibold uppercase tracking-wide text-to-onAccent;
+  }
+  .badge-away {
+    @apply inline-flex h-[26px] items-center rounded-to-pill border border-to-text px-2.5 text-[11px] font-semibold uppercase tracking-wide text-to-text;
+  }
+
+  /* Listenzeile in einer Karte — DESIGN.md §5: min. 64px, 16px Innenabstand,
+     Trenner --to-divider. Eine Fläche, mehrere Zeilen statt gestapelter
+     Einzelkarten. */
   .sheet {
-    @apply divide-y divide-tbw-ink/10 overflow-hidden rounded-xl border border-tbw-ink/10 bg-white;
+    @apply divide-y divide-to-divider overflow-hidden rounded-to-xl border border-to-border bg-to-surface;
   }
   .sheet-header {
-    @apply border-b border-tbw-ink/10 bg-tbw-bg/70 px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-tbw-ink/50;
+    @apply to-label border-b border-to-divider px-4 py-2;
   }
   .sheet-row {
-    @apply flex items-start gap-3 px-4 py-3;
+    @apply flex min-h-[64px] items-center gap-3 px-4 py-3;
   }
   .sheet-row-link {
-    @apply flex items-center gap-3 px-4 py-3 transition hover:bg-tbw-bg active:bg-tbw-bg;
+    @apply sheet-row transition hover:bg-to-surface2 active:bg-to-surface2;
   }
-  /* LED-Punkt statt weicher Badge-Chip für Status/Dringlichkeit (siehe
-     Richtungsvertrag: "Status-Anzeigen als LED-Punkt + Label"). */
+  /* Statuspunkt (z. B. "1 Platz offen") — kleiner als der Punkt in .pill,
+     eigenständig positionierbar statt an Text gebunden. */
   .led-dot {
     @apply mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full;
+  }
+
+  /* Fortschritts-Segmente — DESIGN.md §5: 12 Segmente, 6px hoch, 3px
+     Abstand, Volt gefüllt / --to-line leer, bei Überschreitung alle Rot. */
+  .to-segment-track {
+    @apply flex gap-[3px];
+  }
+  .to-segment {
+    @apply h-1.5 flex-1 rounded-to-sm bg-to-line;
+  }
+  .to-segment-filled {
+    @apply bg-to-accent;
+  }
+  .to-segment-over {
+    @apply bg-to-danger;
+  }
+
+  /* Code-Eingabe-Box — DESIGN.md §5: 46×60px, Mono 26px, aktives Feld
+     Volt-Rahmen. Das eigentliche <input> bleibt unsichtbar darüber (siehe
+     CodeInput-Komponente). */
+  .code-box {
+    @apply to-data flex h-[60px] w-[46px] items-center justify-center rounded-to-md border-[1.5px] border-to-divider bg-to-surface text-2xl font-semibold text-to-text;
+  }
+  .code-box-filled {
+    @apply border-to-line bg-to-surface2;
+  }
+  .code-box-active {
+    @apply border-to-accent;
   }
 }

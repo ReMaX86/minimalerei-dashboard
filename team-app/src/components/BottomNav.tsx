@@ -20,10 +20,11 @@ const VIEWER_ITEMS = [
   { to: '/kampfgericht', label: 'Kampfgericht', Icon: IconClipboard, end: false }
 ];
 
-// Feste Konsolen-Leiste statt schwebender Pill-Kapsel — bildet mit dem
-// Header dieselbe dunkle "Arena"-Rahmung um die helle Papier-Fläche
-// (Richtungsvertrag: Nav lebt auf der Arena-Fläche). Aktiver Zustand als
-// LED-Strich über dem Icon statt gefüllter Kreis dahinter.
+// Tab-Leiste — DESIGN.md §5: Hintergrund --to-bg, oben 1px --to-divider,
+// aktiv = Volt, inaktiv = --to-text-3. Das bestehende (gefüllte) Icon-Set
+// bleibt vorerst wie es ist — die Übergabe verlangt eigentlich Linien-Icons
+// (Strich 1.8), das ist aber ein reiner Icon-Zeichen-Task für eine der
+// späteren Verfeinerungsrunden, kein Layout-/Farb-Thema.
 export function BottomNav() {
   const { role, isAdmin } = useAuth();
   const { flags } = useFeatureFlags();
@@ -39,19 +40,15 @@ export function BottomNav() {
   }
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-tbw-navyDark pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-to-divider bg-to-bg pb-[env(safe-area-inset-bottom)]">
       <ul className="mx-auto flex max-w-lg">
         {items.map((item) => (
           <li key={item.to} className="flex-1">
-            <NavLink to={item.to} end={item.end} className="flex flex-col items-center gap-1 py-2.5 text-[10px] font-bold">
+            <NavLink to={item.to} end={item.end} className="flex flex-col items-center gap-1.5 py-2.5 text-[11px] font-semibold">
               {({ isActive }) => (
                 <>
-                  <span
-                    className={`h-0.5 w-6 rounded-full transition ${isActive ? 'bg-tbw-gold' : 'bg-transparent'}`}
-                    aria-hidden
-                  />
-                  <item.Icon className={`h-5 w-5 transition ${isActive ? 'text-tbw-gold' : 'text-white/45'}`} />
-                  <span className={isActive ? 'text-tbw-gold' : 'text-white/45'}>{item.label}</span>
+                  <item.Icon className={`h-6 w-6 transition ${isActive ? 'text-to-accent' : 'text-to-text3'}`} />
+                  <span className={isActive ? 'text-to-accent' : 'text-to-text3'}>{item.label}</span>
                 </>
               )}
             </NavLink>

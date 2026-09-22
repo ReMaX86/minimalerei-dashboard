@@ -12,13 +12,22 @@ export function Header({ title }: { title: string }) {
   const canEditProfile = role === 'player' && flags.player_profiles;
 
   return (
-    <header className="sticky top-0 z-10 border-b border-white/10 bg-tbw-navyDark">
+    <header className="sticky top-0 z-10 border-b border-to-divider bg-to-bg">
       <div className="mx-auto flex max-w-lg items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-tbw-gold text-[11px] font-black tracking-tight text-tbw-navyDark">
-            TBW
+          {/* "Jump Ball"-Zeichen — DESIGN.md §4 (assets/tipoff-mark-*.svg) */}
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-to-md bg-to-accent text-to-onAccent">
+            <svg viewBox="0 0 100 100" width="22" height="22" aria-hidden="true">
+              <path
+                d="M64.91 34.7 A26 26 0 1 1 35.09 34.7"
+                fill="none"
+                stroke="currentColor"
+                style={{ strokeWidth: 11, strokeLinecap: 'round' }}
+              />
+              <circle cx="50" cy="19" r="10" fill="currentColor" />
+            </svg>
           </span>
-          <h1 className="headline text-xl text-white">{title}</h1>
+          <h1 className="headline text-xl text-to-text">{title}</h1>
         </div>
         <div className="flex items-center gap-2">
           {role === 'trainer' && <RoleBadge role="trainer" />}
@@ -26,7 +35,7 @@ export function Header({ title }: { title: string }) {
             (canEditProfile && player ? (
               <button
                 onClick={() => setProfileOpen(true)}
-                className="flex items-center gap-1.5 rounded-md border border-white/15 py-1 pl-1 pr-2 text-xs font-bold text-white/80"
+                className="flex items-center gap-1.5 rounded-to-md border border-to-line py-1 pl-1 pr-2 text-xs font-semibold text-to-text2"
                 title="Mein Profil bearbeiten"
               >
                 <Avatar player={player} size="xs" />
@@ -38,7 +47,7 @@ export function Header({ title }: { title: string }) {
           {role === 'viewer' && <RoleBadge role="viewer" />}
           <button
             onClick={logout}
-            className="rounded-md px-2 py-1 text-xs font-bold text-white/40 hover:bg-white/10 hover:text-white/70"
+            className="rounded-to-md px-2 py-1 text-xs font-semibold text-to-text3 hover:bg-to-surface2 hover:text-to-text2"
             title={trainer ? trainer.name : player ? player.name : viewer ? viewer.name : 'Abmelden'}
           >
             Abmelden

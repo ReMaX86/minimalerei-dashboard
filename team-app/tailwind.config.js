@@ -4,15 +4,32 @@ export default {
   theme: {
     extend: {
       colors: {
-        // "Hallenanzeige"-Farbwelt (Redesign, siehe .impeccable/surfaces/
-        // src-pages-dashboard-tsx.md und PRODUCT.md "Brand Commitments") —
-        // Tokennamen aus der ersten Version bewusst beibehalten (navy/gold),
-        // nur die Werte getauscht, um die ~100 bestehenden Verwendungsstellen
-        // nicht umbenennen zu müssen (gleiches Vorgehen wie beim vorherigen
-        // Platzhalter-Wechsel). navy/navyDark tragen jetzt die dunklen
-        // "Arena"-Flächen (Live-Ticker, Nav, Login), bg das warme
-        // "Papier"-Grau für dichte Datenlisten, gold die satte
-        // Anzeigetafel-Bernstein-Akzentfarbe.
+        // Tipoff-Redesign (Übergabe von Claude Design, "Night Court" v0.1,
+        // siehe docs/design/tipoff-design/DESIGN.md) — Werte zeigen direkt auf
+        // die CSS-Variablen aus src/styles/tipoff-tokens.css, damit spätere
+        // Feinjustierungen NUR dort passieren müssen, nie hier.
+        to: {
+          bg: 'var(--to-bg)',
+          surface: 'var(--to-surface)',
+          surface2: 'var(--to-surface-2)',
+          border: 'var(--to-border)',
+          line: 'var(--to-line)',
+          divider: 'var(--to-divider)',
+          text: 'var(--to-text)',
+          text2: 'var(--to-text-2)',
+          text3: 'var(--to-text-3)',
+          textDisabled: 'var(--to-text-disabled)',
+          accent: 'var(--to-accent)',
+          accentHover: 'var(--to-accent-hover)',
+          accentSoft: 'var(--to-accent-soft)',
+          onAccent: 'var(--to-on-accent)',
+          danger: 'var(--to-danger)',
+          dangerText: 'var(--to-danger-text)',
+          dangerSoft: 'var(--to-danger-soft)'
+        },
+        // Alte "Hallenanzeige"-Tokens bleiben vorerst bestehen, solange noch
+        // nicht jeder Screen auf Tipoff umgestellt ist (siehe Rollout-Plan) —
+        // werden entfernt, sobald die letzte Seite migriert ist.
         tbw: {
           navy: '#12141C',
           navyDark: '#08090F',
@@ -23,21 +40,27 @@ export default {
         },
         status: {
           ok: '#16A34A',
-          // Bewusst ein gedämpftes Bernstein-Braun statt eines zweiten
-          // hellen Orange/Gelb — sonst kollidiert die Warn-Farbe optisch mit
-          // dem gold-Akzent, der jetzt überall "primäre Aktion" bedeutet.
           warn: '#B45309',
           open: '#8B93A1'
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Anton', 'Inter', 'system-ui', 'sans-serif'],
-        // Für Punktstände/Statistiken: eine echte tabellarische Zifferndarstellung
-        // (siehe .tabular-score in index.css) statt Inter mit nur
-        // font-variant-numeric — JetBrains Mono liefert breitere, klar
-        // unterscheidbare Ziffern im Anzeigetafel-Charakter.
-        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace']
+        // Basis-Familien global auf die Tipoff-Schriften umgestellt — die
+        // volle Typo-Behandlung (font-stretch/italic/letter-spacing) kommt
+        // aus den .to-display/.to-number/.to-label/.to-data-Klassen in
+        // tipoff-tokens.css, diese Familien sind hier nur der Fallback für
+        // gewöhnlichen Tailwind-Gebrauch (font-sans/font-display/font-mono).
+        sans: ['Geist', 'system-ui', 'sans-serif'],
+        display: ['Archivo', 'system-ui', 'sans-serif'],
+        mono: ['"Geist Mono"', 'ui-monospace', 'monospace']
+      },
+      borderRadius: {
+        'to-sm': 'var(--to-radius-sm)',
+        'to-md': 'var(--to-radius-md)',
+        'to-lg': 'var(--to-radius-lg)',
+        'to-xl': 'var(--to-radius-xl)',
+        'to-2xl': 'var(--to-radius-2xl)',
+        'to-pill': 'var(--to-radius-pill)'
       }
     }
   },

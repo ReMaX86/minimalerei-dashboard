@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>TipOff – Zugangscode</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&amp;family=Geist:wght@300..700&amp;family=Geist+Mono:wght@400..700&amp;display=swap">
+<style>body{margin:0;background:#0A0C0F}a{color:#C8FF2E}a:hover{color:#DBFF73}</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: #0A0C0F; color: #F2F4F7; font-family: 'Geist', system-ui, sans-serif; display: flex; flex-direction: column; padding: 56px 24px 36px;">
+
+<svg viewBox="0 0 390 300" width="390" height="300" style="position: absolute; left: 0; bottom: 0; pointer-events: none;" aria-hidden="true"><circle cx="195" cy="330" r="150" fill="none" stroke="#F2F4F7" style="stroke-width: 1; opacity: 0.06;"></circle><circle cx="195" cy="330" r="60" fill="none" stroke="#F2F4F7" style="stroke-width: 1; opacity: 0.06;"></circle></svg>
+
+<div style="position: relative; display: flex; align-items: center; justify-content: space-between;">
+<a href="Welcome.dc.html" aria-label="Zurück" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid #2A303A; display: flex; align-items: center; justify-content: center; color: #F2F4F7;">
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" style="stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;" aria-hidden="true"><path d="M19 12H5"></path><path d="M11 6l-6 6 6 6"></path></svg>
+</a>
+<span style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.12em; color: #7C8594;">ANMELDUNG</span>
+</div>
+
+<div style="position: relative; display: flex; flex-direction: column; gap: 16px; margin-top: 44px;">
+<div style="font-family: 'Geist Mono', monospace; font-size: 12px; letter-spacing: 0.14em; color: #C8FF2E;">ZUGANGSCODE</div>
+<h1 style="margin: 0; font-family: 'Archivo', sans-serif; font-stretch: 125%; font-weight: 800; font-style: italic; font-size: 36px; letter-spacing: -0.035em; line-height: 1;">Dein persönlicher Code.</h1>
+<p style="margin: 0; font-size: 16px; line-height: 1.5; color: #A3ABB8;">Dein Trainer hat dir einen 6-stelligen Code geschickt. Er gilt nur für dich – ein Passwort brauchst du nicht.</p>
+</div>
+
+<div style="position: relative; display: flex; flex-direction: column; gap: 14px; margin-top: 36px;">
+<label for="tipoff-code" style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.12em; color: #7C8594;">CODE EINGEBEN</label>
+<div style="position: relative; display: flex; align-items: center; gap: 8px;">
+<sc-for list="{{ first }}" as="item" hint-placeholder-count="3">
+<div style="width: 46px; height: 60px; box-sizing: border-box; border-radius: 12px; border: 1.5px solid {{item.border}}; background: {{item.bg}}; display: flex; align-items: center; justify-content: center; font-family: 'Geist Mono', monospace; font-size: 26px; font-weight: 600;">
+<span>{{item.ch}}</span>
+<sc-if value="{{ item.caret }}" hint-placeholder-val="{{ false }}"><span style="width: 2px; height: 26px; border-radius: 1px; background: #C8FF2E;"></span></sc-if>
+</div>
+</sc-for>
+<div style="width: 10px; height: 2px; background: #2A303A;"></div>
+<sc-for list="{{ second }}" as="item" hint-placeholder-count="3">
+<div style="width: 46px; height: 60px; box-sizing: border-box; border-radius: 12px; border: 1.5px solid {{item.border}}; background: {{item.bg}}; display: flex; align-items: center; justify-content: center; font-family: 'Geist Mono', monospace; font-size: 26px; font-weight: 600;">
+<span>{{item.ch}}</span>
+<sc-if value="{{ item.caret }}" hint-placeholder-val="{{ false }}"><span style="width: 2px; height: 26px; border-radius: 1px; background: #C8FF2E;"></span></sc-if>
+</div>
+</sc-for>
+<input id="tipoff-code" type="text" value="{{ code }}" onChange="{{ onCode }}" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; box-sizing: border-box; opacity: 0.01; border: 0; font-size: 16px; background: transparent; color: transparent; caret-color: transparent;">
+</div>
+<sc-if value="{{ complete }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #C8FF2E;">
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#C8FF2E" style="stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+<span>Code erkannt · TB Wülfrath · U16 männlich</span>
+</div>
+</sc-if>
+<sc-if value="{{ incomplete }}" hint-placeholder-val="{{ true }}">
+<div style="font-size: 14px; color: #7C8594;">Buchstaben und Zahlen · Groß-/Kleinschreibung egal</div>
+</sc-if>
+</div>
+
+<div style="flex-grow: 1;"></div>
+
+<div style="position: relative; display: flex; flex-direction: column; gap: 12px;">
+<sc-if value="{{ complete }}" hint-placeholder-val="{{ false }}">
+<a href="Dashboard.dc.html" style="display: flex; align-items: center; justify-content: space-between; height: 58px; padding: 0 22px; border-radius: 16px; background: #C8FF2E; color: #0A0C0F; text-decoration: none; font-size: 16px; font-weight: 600;">
+<span>Anmelden</span>
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#0A0C0F" style="stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;" aria-hidden="true"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>
+</a>
+</sc-if>
+<sc-if value="{{ incomplete }}" hint-placeholder-val="{{ true }}">
+<button type="button" disabled="{{ true }}" style="display: flex; align-items: center; justify-content: space-between; height: 58px; padding: 0 22px; border: 0; border-radius: 16px; background: #1A1E25; color: #7C8594; font-family: 'Geist', sans-serif; font-size: 16px; font-weight: 600; width: 100%;">
+<span>Anmelden</span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 13px;">{{ remaining }}</span>
+</button>
+</sc-if>
+<button type="button" style="display: flex; align-items: center; justify-content: center; gap: 10px; height: 54px; border: 1px solid #2A303A; border-radius: 16px; background: transparent; color: #F2F4F7; font-family: 'Geist', sans-serif; font-size: 15px; font-weight: 500; width: 100%;">
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" style="stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;" aria-hidden="true"><rect x="3.5" y="3.5" width="6" height="6" rx="1.2"></rect><rect x="14.5" y="3.5" width="6" height="6" rx="1.2"></rect><rect x="3.5" y="14.5" width="6" height="6" rx="1.2"></rect><path d="M14.5 14.5h2.5v2.5"></path><path d="M20.5 14.5v6h-6"></path></svg>
+<span>QR-Code vom Trainer scannen</span>
+</button>
+<p style="margin: 4px 0 0; text-align: center; font-size: 13px; color: #7C8594;">Code verloren? Dein Trainer erzeugt dir einen neuen.</p>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+const code = (this.state && typeof this.state.code === 'string') ? this.state.code : 'TBW4';
+const slots = [];
+for (let i = 0; i < 6; i++) {
+const ch = code.charAt(i);
+const active = i === code.length;
+slots.push({
+ch: ch,
+caret: active,
+border: active ? '#C8FF2E' : (ch ? '#2E343E' : '#1F242C'),
+bg: ch ? '#1A1E25' : '#12151A'
+});
+}
+const left = 6 - code.length;
+return {
+code: code,
+first: slots.slice(0, 3),
+second: slots.slice(3),
+complete: code.length === 6,
+incomplete: code.length !== 6,
+remaining: left === 1 ? 'noch 1 Zeichen' : 'noch ' + left + ' Zeichen',
+onCode: (e) => {
+const v = String((e && e.target && e.target.value) || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+this.setState({ code: v });
+}
+};
+}
+}
+</script>
+</body>
+</html>

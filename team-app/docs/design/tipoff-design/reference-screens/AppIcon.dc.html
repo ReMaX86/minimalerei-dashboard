@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>TipOff – App-Icon</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&amp;family=Geist:wght@300..700&amp;family=Geist+Mono:wght@400..700&amp;display=swap">
+<style>body{margin:0;background:#0A0C0F}</style>
+</helmet>
+<div style="width: 1000px; height: 1200px; box-sizing: border-box; padding: 64px; background: #0A0C0F; color: #F2F4F7; font-family: 'Geist', system-ui, sans-serif; display: flex; flex-direction: column; gap: 36px;">
+
+<header style="display: flex; flex-direction: column; gap: 12px;">
+<div style="font-family: 'Geist Mono', monospace; font-size: 12px; letter-spacing: 0.14em; color: #C8FF2E;">TIPOFF · APP-ICON</div>
+<h1 style="margin: 0; font-family: 'Archivo', sans-serif; font-stretch: 125%; font-weight: 800; font-style: italic; font-size: 52px; letter-spacing: -0.03em; line-height: 1;">Jump Ball</h1>
+</header>
+
+<div style="display: flex; gap: 32px; align-items: flex-end;">
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<div style="width: 260px; height: 260px; border-radius: 58px; background: #C8FF2E; display: flex;">
+<svg viewBox="-12 -12 124 124" width="100%" height="100%" aria-label="TipOff App-Icon" role="img"><path d="M63.77 37.34 A24 24 0 1 1 36.23 37.34" fill="none" stroke="#0A0C0F" style="stroke-width: 11; stroke-linecap: round;"></path><circle cx="50" cy="22" r="9.5" fill="#0A0C0F"></circle></svg>
+</div>
+<div style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #A3ABB8;">STANDARD · VOLT</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<div style="width: 124px; height: 124px; border-radius: 28px; background: #14181E; border: 1px solid #262B34; display: flex;">
+<svg viewBox="-12 -12 124 124" width="100%" height="100%" aria-hidden="true"><path d="M63.77 37.34 A24 24 0 1 1 36.23 37.34" fill="none" stroke="#C8FF2E" style="stroke-width: 11; stroke-linecap: round;"></path><circle cx="50" cy="22" r="9.5" fill="#C8FF2E"></circle></svg>
+</div>
+<div style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #A3ABB8;">DARK MODE</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<div style="width: 124px; height: 124px; border-radius: 28px; background: #1C1F24; display: flex;">
+<svg viewBox="-12 -12 124 124" width="100%" height="100%" aria-hidden="true"><path d="M63.77 37.34 A24 24 0 1 1 36.23 37.34" fill="none" stroke="#D9DDE3" style="stroke-width: 11; stroke-linecap: round;"></path><circle cx="50" cy="22" r="9.5" fill="#D9DDE3"></circle></svg>
+</div>
+<div style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #A3ABB8;">TINTED</div>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px;">
+<div style="font-family: 'Geist Mono', monospace; font-size: 12px; letter-spacing: 0.1em; color: #A3ABB8;">GRÖSSENTEST · 120 → 20 PX</div>
+<div style="display: flex; align-items: flex-end; gap: 28px; padding: 28px; border-radius: 20px; background: #12151A; border: 1px solid #232830;">
+<sc-for list="{{ sizes }}" as="item" hint-placeholder-count="6">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+<div style="width: {{item.s}}px; height: {{item.s}}px; border-radius: {{item.r}}px; background: #C8FF2E; display: flex;">
+<svg viewBox="-12 -12 124 124" width="100%" height="100%" aria-hidden="true"><path d="M63.77 37.34 A24 24 0 1 1 36.23 37.34" fill="none" stroke="#0A0C0F" style="stroke-width: 11; stroke-linecap: round;"></path><circle cx="50" cy="22" r="9.5" fill="#0A0C0F"></circle></svg>
+</div>
+<span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #7C8594;">{{item.s}}</span>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: flex-end; gap: 28px; padding: 28px; border-radius: 20px; background: #E9ECF0;">
+<sc-for list="{{ sizes }}" as="item" hint-placeholder-count="6">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+<div style="width: {{item.s}}px; height: {{item.s}}px; border-radius: {{item.r}}px; background: #0A0C0F; display: flex;">
+<svg viewBox="-12 -12 124 124" width="100%" height="100%" aria-hidden="true"><path d="M63.77 37.34 A24 24 0 1 1 36.23 37.34" fill="none" stroke="#C8FF2E" style="stroke-width: 11; stroke-linecap: round;"></path><circle cx="50" cy="22" r="9.5" fill="#C8FF2E"></circle></svg>
+</div>
+<span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #4A515C;">{{item.s}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px;">
+<div style="font-family: 'Geist Mono', monospace; font-size: 12px; letter-spacing: 0.1em; color: #A3ABB8;">AUF DEM HOMESCREEN</div>
+<div style="display: flex; gap: 30px; padding: 28px 32px; border-radius: 20px; background: #1E232B;">
+<sc-for list="{{ neighbours }}" as="n" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+<div style="width: 64px; height: 64px; border-radius: 14px; background: #343A45;"></div>
+<span style="font-size: 12px; color: #A3ABB8;">{{n.label}}</span>
+</div>
+</sc-for>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+<div style="width: 64px; height: 64px; border-radius: 14px; background: #C8FF2E; display: flex;">
+<svg viewBox="-12 -12 124 124" width="100%" height="100%" aria-hidden="true"><path d="M63.77 37.34 A24 24 0 1 1 36.23 37.34" fill="none" stroke="#0A0C0F" style="stroke-width: 11; stroke-linecap: round;"></path><circle cx="50" cy="22" r="9.5" fill="#0A0C0F"></circle></svg>
+</div>
+<span style="font-size: 12px; color: #F2F4F7; font-weight: 500;">TipOff</span>
+</div>
+<sc-for list="{{ neighbours2 }}" as="n" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+<div style="width: 64px; height: 64px; border-radius: 14px; background: #343A45;"></div>
+<span style="font-size: 12px; color: #A3ABB8;">{{n.label}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1000,"height":1200}}'>
+class Component extends DCLogic {
+renderVals() {
+const sizes = [120, 87, 60, 40, 29, 20].map(function (s) {
+return { s: s, r: Math.round(s * 0.2237 * 10) / 10 };
+});
+return {
+sizes: sizes,
+neighbours: [{ label: 'Kalender' }, { label: 'Fotos' }, { label: 'Musik' }],
+neighbours2: [{ label: 'Wetter' }, { label: 'Notizen' }]
+};
+}
+}
+</script>
+</body>
+</html>

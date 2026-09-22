@@ -1,0 +1,79 @@
+/* TipOff – Design Tokens · Konzept A "Night Court" (v0.1)
+   Fonts (Google Fonts):
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+*/
+
+:root {
+  /* Farbe */
+  --to-bg: #0A0C0F;          /* Court Black – App-Hintergrund */
+  --to-surface: #12151A;     /* Floor – Karten */
+  --to-surface-2: #1A1E25;   /* Rail – Chips, Felder, verschachtelte Flächen */
+  --to-border: #232830;      /* Karten-Rand */
+  --to-line: #2A303A;        /* Trennlinien, inaktive Segmente, Outline-Buttons */
+  --to-divider: #1F242C;     /* Listen-Trenner innerhalb von Karten */
+  --to-text: #F2F4F7;        /* Chalk – Primärtext */
+  --to-text-2: #A3ABB8;      /* Mist – Sekundärtext */
+  --to-text-3: #7C8594;      /* Labels, Hinweise (min. 4.5:1 auf Surface) */
+  --to-text-disabled: #4A515C;
+  --to-accent: #C8FF2E;      /* Tip Volt – einzige Akzentfarbe */
+  --to-accent-hover: #DBFF73;
+  --to-accent-soft: rgba(200, 255, 46, 0.12);
+  --to-on-accent: #0A0C0F;   /* Text/Icons auf Volt */
+  --to-danger: #FF5A67;      /* Foul Red – nur Warnung/abgemeldet/offen */
+  --to-danger-text: #FF7A85;
+  --to-danger-soft: rgba(255, 90, 103, 0.12);
+
+  /* Schrift */
+  --to-font-display: 'Archivo', system-ui, sans-serif;   /* font-stretch 125%, 800, italic */
+  --to-font-number: 'Archivo', system-ui, sans-serif;    /* font-stretch 62%, 800 – Trikotnummern */
+  --to-font-body: 'Geist', system-ui, sans-serif;
+  --to-font-mono: 'Geist Mono', ui-monospace, monospace; /* Daten, Zeiten, Labels in Versalien */
+
+  /* Radius */
+  --to-radius-sm: 10px;   /* Nummern-Chips */
+  --to-radius-md: 12px;   /* kleine Buttons, Code-Felder */
+  --to-radius-lg: 16px;   /* Primär-Buttons */
+  --to-radius-xl: 22px;   /* Listen-Karten */
+  --to-radius-2xl: 26px;  /* Hero-/Sektionskarten */
+  --to-radius-pill: 999px;
+
+  /* Abstand (4er-Raster) */
+  --to-space-1: 4px;
+  --to-space-2: 8px;
+  --to-space-3: 12px;
+  --to-space-4: 16px;
+  --to-space-5: 20px;   /* Screen-Rand horizontal */
+  --to-space-6: 24px;
+  --to-space-7: 28px;
+
+  --to-tap: 44px;        /* Mindest-Touchfläche */
+}
+
+/* Typo-Rollen */
+.to-display {        /* Screen-Headlines, Datum im Hero */
+  font-family: var(--to-font-display);
+  font-stretch: 125%;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+.to-number {         /* Trikotnummern */
+  font-family: var(--to-font-number);
+  font-stretch: 62%;
+  font-weight: 800;
+  line-height: 1;
+}
+.to-label {          /* Eyebrows: "NÄCHSTES SPIEL", "IM KADER · 10" */
+  font-family: var(--to-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--to-text-3);
+}
+.to-data {           /* Datum, Uhrzeit, Zähler */
+  font-family: var(--to-font-mono);
+  font-variant-numeric: tabular-nums;
+}
