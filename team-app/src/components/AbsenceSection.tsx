@@ -5,6 +5,7 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { ErrorNote } from './ErrorNote';
 import { DateField } from './DateTimeField';
 import { fmtDateShort } from '../lib/format';
+import { IconSuitcase } from './NavIcons';
 import type { PlayerAbsence } from '../types/database';
 
 export function AbsenceSection({ onChange }: { onChange: () => void }) {
@@ -82,7 +83,10 @@ export function AbsenceSection({ onChange }: { onChange: () => void }) {
 
   return (
     <section className="card">
-      <p className="text-sm font-bold text-tbw-navyDark">🌴 Dein Urlaub / Abwesenheit</p>
+      <p className="flex items-center gap-2 text-sm font-bold text-tbw-navyDark">
+        <IconSuitcase className="h-4 w-4 text-tbw-gold" />
+        Dein Urlaub / Abwesenheit
+      </p>
       <p className="mt-1 text-xs text-tbw-ink/50">
         Training in diesem Zeitraum wird automatisch abgesagt, beim Kader sieht der Trainer einen Hinweis.
       </p>

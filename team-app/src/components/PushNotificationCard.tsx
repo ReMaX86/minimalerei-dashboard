@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { subscribeToPush, unsubscribeFromPush, type PushStatus } from '../lib/push';
+import { IconBell } from './NavIcons';
 
 interface PushNotificationCardProps {
   status: PushStatus | 'loading';
@@ -43,7 +44,10 @@ export function PushNotificationCard({ status, onChange }: PushNotificationCardP
 
   return (
     <section className="card">
-      <p className="text-sm font-bold text-tbw-navyDark">🔔 Benachrichtigungen</p>
+      <p className="flex items-center gap-2 text-sm font-bold text-tbw-navyDark">
+        <IconBell className="h-4 w-4 text-tbw-gold" />
+        Benachrichtigungen
+      </p>
 
       {status === 'subscribed' && (
         <>

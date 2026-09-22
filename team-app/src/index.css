@@ -91,4 +91,25 @@
   .pill-open {
     @apply bg-status-open/20 text-tbw-ink/70;
   }
+
+  /* Divided Zeilen-Liste statt gestapelter gleichgroßer Karten (craft-floor:
+     "Cards are the lazy container") — eine Fläche, mehrere Zeilen mit
+     dünner Trennlinie statt N einzelner Schatten-Boxen nebeneinander. */
+  .sheet {
+    @apply divide-y divide-tbw-ink/10 overflow-hidden rounded-xl border border-tbw-ink/10 bg-white;
+  }
+  .sheet-header {
+    @apply border-b border-tbw-ink/10 bg-tbw-bg/70 px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-tbw-ink/50;
+  }
+  .sheet-row {
+    @apply flex items-start gap-3 px-4 py-3;
+  }
+  .sheet-row-link {
+    @apply flex items-center gap-3 px-4 py-3 transition hover:bg-tbw-bg active:bg-tbw-bg;
+  }
+  /* LED-Punkt statt weicher Badge-Chip für Status/Dringlichkeit (siehe
+     Richtungsvertrag: "Status-Anzeigen als LED-Punkt + Label"). */
+  .led-dot {
+    @apply mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full;
+  }
 }

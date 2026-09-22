@@ -1,5 +1,13 @@
 export function RoleBadge({ role }: { role: 'trainer' | 'player' | 'viewer' }) {
-  if (role === 'trainer') return <span className="pill bg-tbw-gold/15 text-tbw-navyDark">Trainer</span>;
-  if (role === 'viewer') return <span className="pill bg-tbw-ink/10 text-tbw-ink/70">Betrachter</span>;
-  return <span className="pill bg-tbw-navy/10 text-tbw-navy">Spieler</span>;
+  if (role === 'trainer')
+    return (
+      <span className="inline-flex items-center rounded-md bg-tbw-gold px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-tbw-navyDark">
+        Trainer
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center rounded-md border border-white/20 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/70">
+      {role === 'viewer' ? 'Betrachter' : 'Spieler'}
+    </span>
+  );
 }

@@ -20,6 +20,10 @@ const VIEWER_ITEMS = [
   { to: '/kampfgericht', label: 'Kampfgericht', Icon: IconClipboard, end: false }
 ];
 
+// Feste Konsolen-Leiste statt schwebender Pill-Kapsel — bildet mit dem
+// Header dieselbe dunkle "Arena"-Rahmung um die helle Papier-Fläche
+// (Richtungsvertrag: Nav lebt auf der Arena-Fläche). Aktiver Zustand als
+// LED-Strich über dem Icon statt gefüllter Kreis dahinter.
 export function BottomNav() {
   const { role, isAdmin } = useAuth();
   const { flags } = useFeatureFlags();
@@ -35,25 +39,19 @@ export function BottomNav() {
   }
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-      <ul className="mx-auto flex max-w-lg justify-around rounded-full bg-tbw-navyDark px-2 py-2 shadow-[0_10px_30px_-8px_rgba(7,22,15,0.5)]">
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-tbw-navyDark pb-[env(safe-area-inset-bottom)]">
+      <ul className="mx-auto flex max-w-lg">
         {items.map((item) => (
           <li key={item.to} className="flex-1">
-            <NavLink
-              to={item.to}
-              end={item.end}
-              className="flex flex-col items-center gap-0.5 rounded-full py-2 text-[10px] font-bold text-white/55"
-            >
+            <NavLink to={item.to} end={item.end} className="flex flex-col items-center gap-1 py-2.5 text-[10px] font-bold">
               {({ isActive }) => (
                 <>
                   <span
-                    className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
-                      isActive ? 'bg-tbw-gold text-tbw-navyDark' : 'text-white/55'
-                    }`}
-                  >
-                    <item.Icon className="h-[18px] w-[18px]" />
-                  </span>
-                  <span className={isActive ? 'text-tbw-gold' : ''}>{item.label}</span>
+                    className={`h-0.5 w-6 rounded-full transition ${isActive ? 'bg-tbw-gold' : 'bg-transparent'}`}
+                    aria-hidden
+                  />
+                  <item.Icon className={`h-5 w-5 transition ${isActive ? 'text-tbw-gold' : 'text-white/45'}`} />
+                  <span className={isActive ? 'text-tbw-gold' : 'text-white/45'}>{item.label}</span>
                 </>
               )}
             </NavLink>

@@ -9,6 +9,7 @@ import { UpcomingTrainings } from '../components/UpcomingTrainings';
 import { WeeklyTrainingTimes } from '../components/WeeklyTrainingTimes';
 import { AbsenceSection } from '../components/AbsenceSection';
 import { PushNotificationCard } from '../components/PushNotificationCard';
+import { IconCheck, IconChevronRight, IconClose } from '../components/NavIcons';
 import { usePushStatus } from '../hooks/usePushStatus';
 import { fmtDate, fmtDateShort, fmtTime, hasKickedOff, mapsUrl } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
@@ -612,106 +613,41 @@ export function Dashboard() {
 
   return (
     <div className="space-y-4">
-      {player && <p className="headline text-3xl text-tbw-navyDark">Hi {firstName}!</p>}
-
-      {flags.push_notifications && (pushStatus === 'unsubscribed' || pushStatus === 'denied') && (
-        <PushNotificationCard status={pushStatus} onChange={refreshPushStatus} />
-      )}
-
-      {role === 'player' && data.reminders.length > 0 && (
-        <section className="card !bg-tbw-red/10 !ring-tbw-red/30">
-          <SectionTitle title="Für dich zu erledigen" />
-          <ul className="mt-2 space-y-2">
-            {data.reminders.map((r) =>
-              r.to.startsWith('#') ? (
-                <li key={r.key}>
-                  <a
-                    href={r.to}
-                    className="flex items-center justify-between gap-2 rounded-xl bg-white/70 p-3 text-sm font-semibold text-tbw-navyDark"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span>{r.icon}</span>
-                      {r.text}
-                    </span>
-                    <span className="text-tbw-red">→</span>
-                  </a>
-                </li>
-              ) : (
-                <li key={r.key}>
-                  <Link
-                    to={r.to}
-                    className="flex items-center justify-between gap-2 rounded-xl bg-white/70 p-3 text-sm font-semibold text-tbw-navyDark"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span>{r.icon}</span>
-                      {r.text}
-                    </span>
-                    <span className="text-tbw-red">→</span>
-                  </Link>
-                </li>
-              )
-            )}
-          </ul>
-        </section>
-      )}
-
-      {flags.announcements && data.announcements.length > 0 && (
-        <section className="card !bg-tbw-gold/10 !ring-tbw-gold/30">
-          <SectionTitle title="Meldungen" />
-          <ul className="mt-2 space-y-2">
-            {data.announcements.map((a) => (
-              <li key={a.id} className="rounded-xl bg-white p-3">
-                {a.pinned && (
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-gold">Angeheftet</p>
-                )}
-                <p className="text-sm text-tbw-navyDark">{a.message}</p>
-                <p className="mt-1 text-xs text-tbw-ink/40">
-                  {a.author_name} · {fmtDate(a.created_at.slice(0, 10))}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {isAdmin && data.nextGame?.squad_decline_pending && data.declinedNames.length > 0 && (
-        <section className="card !bg-status-warn/10 !ring-status-warn/30">
-          <SectionTitle title="Kader-Absage" />
-          <p className="mt-2 text-sm text-tbw-navyDark">
-            {declinedNamesText(data.declinedNames)} leider am Spiel vs. {data.nextGame.opponent} nicht teilnehmen.
-          </p>
-          <Link to="/spiele?kader=1" className="btn-secondary mt-3 block w-full text-center !py-2 text-sm">
-            Kader bearbeiten
-          </Link>
-        </section>
-      )}
-
-      <section className="card">
-        <SectionTitle title="Nächstes Spiel" />
+      {/* Arena-Hero: volle Breite, bricht bewusst aus dem Shell-Container aus
+          (Richtungsvertrag FIRST VIEWPORT) — Live-Ticker/Nächstes-Spiel lebt
+          auf der dunklen Fläche, alles Organisatorische darunter auf Papier. */}
+      <section className="-mx-4 -mt-4 bg-tbw-navyDark px-4 pb-5 pt-5 text-white">
+        {player && <p className="text-sm font-semibold text-white/60">Hi {firstName}!</p>}
         {data.nextGame ? (
-          <div className="mt-2 space-y-1">
-            <p className="text-base font-semibold">
-              vs. {data.nextGame.opponent}{' '}
-              <span className="pill pill-open ml-1">{data.nextGame.is_home ? 'Heim' : 'Auswärts'}</span>
-            </p>
-            <p className="text-base font-bold text-tbw-navyDark">
-              {fmtDate(data.nextGame.game_date)} · {fmtTime(data.nextGame.game_time)} Uhr
-            </p>
+          <div className="mt-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-white/40">
+                  {data.nextGame.is_home ? 'Heimspiel' : 'Auswärtsspiel'}
+                </p>
+                <p className="headline text-2xl leading-none text-white">vs. {data.nextGame.opponent}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-bold text-tbw-gold">{fmtDate(data.nextGame.game_date)}</p>
+                <p className="tabular-score text-lg text-white">{fmtTime(data.nextGame.game_time)}</p>
+              </div>
+            </div>
+
             <a
               href={mapsUrl(data.nextGame.location)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block text-sm text-tbw-navy underline decoration-dotted underline-offset-2"
+              className="mt-2 inline-block text-sm text-white/70 underline decoration-white/25 underline-offset-2"
             >
               {data.nextGame.location}
             </a>
 
             {meetingPoints(data.nextGame).length > 0 && (
-              <div className="mt-2 rounded-xl bg-tbw-bg px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-ink/40">Treffpunkt</p>
+              <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-white/40">Treffpunkt</p>
                 {meetingPoints(data.nextGame).map((m) => (
-                  <p key={m.label} className="text-xs text-tbw-ink/60">
-                    {m.time && <span className="font-semibold text-tbw-ink/80">{fmtTime(m.time)} Uhr</span>}
+                  <p key={m.label} className="text-xs text-white/70">
+                    {m.time && <span className="font-semibold text-white/90">{fmtTime(m.time)} Uhr</span>}
                     {m.time && ' · '}
                     {m.label}
                     {m.place ? `, ${m.place}` : ''}
@@ -721,20 +657,20 @@ export function Dashboard() {
             )}
 
             {flags.carpool && data.carpoolOffers.length > 0 && (
-              <div className="mt-2 rounded-xl bg-tbw-bg px-3 py-2">
+              <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-ink/40">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-white/40">
                     Mitfahrgelegenheit
                   </p>
-                  <Link to="/spiele" className="text-[10px] font-bold text-tbw-navy">
+                  <Link to="/spiele" className="text-[10px] font-bold text-tbw-gold">
                     Verwalten →
                   </Link>
                 </div>
                 {data.carpoolOffers.map((o) => {
                   const free = o.seats - data.carpoolClaims.filter((c) => c.offer_id === o.id).length;
                   return (
-                    <p key={o.id} className="text-xs text-tbw-ink/60">
-                      <span className="font-semibold text-tbw-ink/80">
+                    <p key={o.id} className="text-xs text-white/70">
+                      <span className="font-semibold text-white/90">
                         {data.players[o.driver_player_id]?.name ?? '?'}
                       </span>{' '}
                       · {free > 0 ? `${free} von ${o.seats} Plätzen frei` : 'voll'}
@@ -744,11 +680,11 @@ export function Dashboard() {
               </div>
             )}
 
-            <p className="mt-2 text-xs text-tbw-ink/50">
+            <p className="mt-2 text-xs text-white/50">
               Trikot: {benoetigterSatz(data.nextGame) === 'weiss' ? 'Weiß' : 'Schwarz'}
             </p>
             {nextGameIsLive && (data.activeStatsHolder || data.nextGame.final_score_us !== null) && (
-              <div className="mt-2 overflow-hidden rounded-lg border border-white/10 bg-tbw-navyDark px-4 py-3 text-white">
+              <div className="mt-4 border-t border-white/10 pt-4">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-tbw-gold">
                     {data.activeStatsHolder && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-tbw-gold" />}
@@ -798,24 +734,24 @@ export function Dashboard() {
             {nextGameIsLive &&
               (role === 'player' || role === 'trainer' || role === 'viewer') &&
               !data.activeStatsHolder && (
-              <Link to={`/stats/${data.nextGame.id}`} className="btn-accent mt-2 block w-full text-center !py-2 text-sm">
+              <Link to={`/stats/${data.nextGame.id}`} className="btn-accent mt-3 block w-full text-center !py-2 text-sm">
                 Spiel-Stats tracking übernehmen
               </Link>
             )}
             {role === 'player' && (
-              <div className="mt-3 border-t border-black/5 pt-3">
+              <div className="mt-3 border-t border-white/10 pt-3">
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                   {!data.nextGame.squad_published ? (
-                    <span className="text-sm text-tbw-ink/50">Kader noch nicht veröffentlicht</span>
+                    <span className="text-sm text-white/50">Kader noch nicht veröffentlicht</span>
                   ) : data.playerInSquad ? (
                     <span className="text-sm font-bold text-status-ok">
                       Du bist dabei!{data.myConfirmation === 'confirmed' && ' (zugesagt)'}
                     </span>
                   ) : (
-                    <span className="text-sm font-medium text-tbw-ink/50">Nicht im Kader</span>
+                    <span className="text-sm font-medium text-white/50">Nicht im Kader</span>
                   )}
                   {data.nextGame.squad_published && (
-                    <Link to="/spiele?kader=1" className="shrink-0 text-xs font-bold text-tbw-navy">
+                    <Link to="/spiele?kader=1" className="shrink-0 text-xs font-bold text-tbw-gold">
                       Kader ansehen →
                     </Link>
                   )}
@@ -824,34 +760,39 @@ export function Dashboard() {
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     {data.myConfirmation === 'confirmed' ? (
                       <>
-                        <span className="pill pill-ok">✓ Zugesagt</span>
+                        <span className="pill pill-ok">
+                          <IconCheck className="h-3 w-3" />
+                          Zugesagt
+                        </span>
                         <button
                           type="button"
                           disabled={responding}
                           onClick={() => respondToSquad(false)}
-                          className="text-xs font-semibold text-tbw-ink/40 underline disabled:opacity-40"
+                          className="text-xs font-semibold text-white/40 underline disabled:opacity-40"
                         >
                           Doch nicht?
                         </button>
                       </>
                     ) : (
                       <>
-                        <span className="text-sm font-semibold text-tbw-red">Kannst du?</span>
+                        <span className="text-sm font-semibold text-tbw-gold">Kannst du?</span>
                         <button
                           type="button"
                           disabled={responding}
                           onClick={() => respondToSquad(true)}
                           className="pill pill-ok disabled:opacity-40"
                         >
-                          ✓ Kann
+                          <IconCheck className="h-3 w-3" />
+                          Kann
                         </button>
                         <button
                           type="button"
                           disabled={responding}
                           onClick={() => respondToSquad(false)}
-                          className="pill pill-open disabled:opacity-40"
+                          className="pill pill-open !bg-white/10 !text-white/70 disabled:opacity-40"
                         >
-                          ✗ Kann nicht
+                          <IconClose className="h-3 w-3" />
+                          Kann nicht
                         </button>
                       </>
                     )}
@@ -862,161 +803,227 @@ export function Dashboard() {
             )}
           </div>
         ) : (
-          <p className="mt-2 text-sm text-tbw-ink/50">Kein Spiel geplant.</p>
+          <p className="mt-3 text-sm text-white/50">Kein Spiel geplant.</p>
+        )}
+
+        {flags.stats && data.lastResult && (
+          <div className="mt-4 border-t border-white/10 pt-4">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-white/40">Letztes Ergebnis</p>
+            <div className="mt-1 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">vs. {data.lastResult.opponent}</p>
+                <p className="text-xs text-white/50">{fmtDate(data.lastResult.game_date)}</p>
+              </div>
+              <div className="text-right">
+                <p className="tabular-score text-xl text-white">
+                  {data.lastResult.final_score_us}:{data.lastResult.final_score_opponent}
+                </p>
+                {gameResult(data.lastResult) && (
+                  <span
+                    className={`pill ${
+                      gameResult(data.lastResult) === 'sieg' ? 'pill-ok' : '!bg-white/10 !text-white/70'
+                    }`}
+                  >
+                    {RESULT_LABELS[gameResult(data.lastResult)!]}
+                  </span>
+                )}
+              </div>
+            </div>
+            {role === 'player' && data.myTotalPoints !== null && (
+              <p className="mt-2 border-t border-white/10 pt-2 text-xs text-white/50">
+                Deine Punkte diese Saison: <span className="font-bold text-white">{data.myTotalPoints}</span>
+              </p>
+            )}
+            {(role === 'player' || role === 'trainer' || role === 'viewer') && (
+              <Link
+                to={`/stats/${data.lastResult.id}`}
+                className="mt-2 block border-t border-white/10 pt-2 text-xs font-bold text-tbw-gold"
+              >
+                Box-Score ansehen →
+              </Link>
+            )}
+          </div>
         )}
       </section>
 
-      {flags.stats && data.lastResult && (
-        <section className="card">
-          <SectionTitle title="Letztes Ergebnis" />
-          <div className="mt-2 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-tbw-navyDark">vs. {data.lastResult.opponent}</p>
-              <p className="text-xs text-tbw-ink/50">{fmtDate(data.lastResult.game_date)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xl font-extrabold text-tbw-navyDark">
-                {data.lastResult.final_score_us}:{data.lastResult.final_score_opponent}
-              </p>
-              {gameResult(data.lastResult) && (
-                <span
-                  className={`pill ${
-                    gameResult(data.lastResult) === 'sieg'
-                      ? 'pill-ok'
-                      : gameResult(data.lastResult) === 'niederlage'
-                        ? 'pill-open'
-                        : ''
-                  }`}
-                >
-                  {RESULT_LABELS[gameResult(data.lastResult)!]}
-                </span>
+      {flags.push_notifications && (pushStatus === 'unsubscribed' || pushStatus === 'denied') && (
+        <PushNotificationCard status={pushStatus} onChange={refreshPushStatus} />
+      )}
+
+      {((role === 'player' && data.reminders.length > 0) ||
+        (flags.announcements && data.announcements.length > 0) ||
+        (isAdmin && data.nextGame?.squad_decline_pending && data.declinedNames.length > 0)) && (
+        <section className="sheet">
+          <div className="sheet-header">Für dich</div>
+
+          {role === 'player' &&
+            data.reminders.map((r) =>
+              r.to.startsWith('#') ? (
+                <a key={r.key} href={r.to} className="sheet-row-link">
+                  <span className="led-dot bg-tbw-gold" />
+                  <span className="flex-1 text-sm font-semibold text-tbw-navyDark">{r.text}</span>
+                  <IconChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-tbw-ink/30" />
+                </a>
+              ) : (
+                <Link key={r.key} to={r.to} className="sheet-row-link">
+                  <span className="led-dot bg-tbw-gold" />
+                  <span className="flex-1 text-sm font-semibold text-tbw-navyDark">{r.text}</span>
+                  <IconChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-tbw-ink/30" />
+                </Link>
+              )
+            )}
+
+          {isAdmin && data.nextGame?.squad_decline_pending && data.declinedNames.length > 0 && (
+            <Link to="/spiele?kader=1" className="sheet-row-link">
+              <span className="led-dot bg-status-warn" />
+              <span className="flex-1 text-sm text-tbw-navyDark">
+                <span className="font-semibold">Kader-Absage:</span>{' '}
+                {declinedNamesText(data.declinedNames)} leider am Spiel vs. {data.nextGame.opponent} nicht
+                teilnehmen.
+              </span>
+              <IconChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-tbw-ink/30" />
+            </Link>
+          )}
+
+          {flags.announcements &&
+            data.announcements.map((a) => (
+              <div key={a.id} className="sheet-row">
+                <span className={`led-dot ${a.pinned ? 'bg-tbw-gold' : 'bg-status-open'}`} />
+                <div>
+                  {a.pinned && (
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-tbw-gold">Angeheftet</p>
+                  )}
+                  <p className="text-sm text-tbw-navyDark">{a.message}</p>
+                  <p className="mt-1 text-xs text-tbw-ink/40">
+                    {a.author_name} · {fmtDate(a.created_at.slice(0, 10))}
+                  </p>
+                </div>
+              </div>
+            ))}
+        </section>
+      )}
+
+      <section className="sheet">
+        <div className="sheet-header">Dein Programm</div>
+
+        {role === 'player' && (
+          <div className="sheet-row">
+            <span className="led-dot bg-tbw-navy" />
+            <div className="flex-1">
+              <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Kampfgericht</p>
+              {data.playerNextTask ? (
+                <>
+                  <p className="mt-0.5 text-sm font-semibold text-tbw-navyDark">
+                    {OFFICIATING_TASK_LABELS[data.playerNextTask.task_type]}
+                  </p>
+                  <p className="text-sm text-tbw-ink/60">
+                    {fmtDate(data.playerNextTask.officiating_games.game_date)}
+                    {data.playerNextTask.officiating_games.game_time
+                      ? ` · ${fmtTime(data.playerNextTask.officiating_games.game_time)} Uhr`
+                      : ''}{' '}
+                    · {officiatingGameLabel(data.playerNextTask.officiating_games)}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-0.5 text-sm text-tbw-ink/50">Aktuell kein Termin für dich eingeteilt.</p>
               )}
             </div>
           </div>
-          {role === 'player' && data.myTotalPoints !== null && (
-            <p className="mt-2 border-t border-black/5 pt-2 text-xs text-tbw-ink/50">
-              Deine Punkte diese Saison: <span className="font-bold text-tbw-navyDark">{data.myTotalPoints}</span>
-            </p>
-          )}
-          {(role === 'player' || role === 'trainer' || role === 'viewer') && (
-            <Link
-              to={`/stats/${data.lastResult.id}`}
-              className="mt-2 block border-t border-black/5 pt-2 text-xs font-bold text-tbw-navy"
-            >
-              Box-Score ansehen →
-            </Link>
-          )}
-        </section>
-      )}
+        )}
 
-      <section id="training" className="card scroll-mt-20">
-        <SectionTitle title="Nächste Trainingseinheit" />
-        <div className="mt-2">
-          <UpcomingTrainings refreshKey={absenceVersion} onChange={() => setTrainingVersion((v) => v + 1)} />
-        </div>
-      </section>
-
-      {role === 'player' && (
-        <section className="card">
-          <SectionTitle title="Dein nächster Kampfgericht Termin" />
-          {data.playerNextTask ? (
-            <div className="mt-2 rounded-xl bg-tbw-gold/10 p-3">
-              <p className="text-sm font-semibold text-tbw-navyDark">
-                {OFFICIATING_TASK_LABELS[data.playerNextTask.task_type]}
-              </p>
-              <p className="text-sm text-tbw-ink/70">
-                {fmtDate(data.playerNextTask.officiating_games.game_date)}
-                {data.playerNextTask.officiating_games.game_time
-                  ? ` · ${fmtTime(data.playerNextTask.officiating_games.game_time)} Uhr`
-                  : ''}{' '}
-                · {officiatingGameLabel(data.playerNextTask.officiating_games)}
-              </p>
+        <div id="training" className="sheet-row scroll-mt-20">
+          <span className="led-dot bg-tbw-navy" />
+          <div className="flex-1">
+            <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Nächste Trainingseinheit</p>
+            <div className="mt-1.5">
+              <UpcomingTrainings refreshKey={absenceVersion} onChange={() => setTrainingVersion((v) => v + 1)} />
             </div>
-          ) : (
-            <p className="mt-2 text-sm text-tbw-ink/50">Aktuell kein Termin für dich eingeteilt.</p>
-          )}
-        </section>
-      )}
+          </div>
+        </div>
 
-      {role === 'player' &&
-        player &&
-        data.trikotSets
-          .filter((set) => set.current_holder_id === player.id)
-          .map((set) => {
-            // data.nextGame ist das nächste Spiel überhaupt, braucht aber
-            // nicht zwangsläufig gerade dieses Set (z. B. hält man
-            // "Schwarz", aber das nächste Spiel ist ein Heimspiel, das
-            // "Weiß" braucht) — deshalb stattdessen das nächste Spiel MIT
-            // dem passenden Satz aus der breiteren Liste heraussuchen.
-            const neededGame = data.upcomingGames.find((g) => benoetigterSatz(g) === set.id) ?? null;
-            const isPicking = transferringSetId === set.id;
-            return (
-              <section key={set.id} className="card">
-                <SectionTitle title="Deine Trikots" />
-                <p className="mt-2 text-sm font-semibold text-tbw-navyDark">
-                  Du hast aktuell den {set.id === 'weiss' ? 'weißen' : 'schwarzen'} Trikotsatz.
-                </p>
-                <p className="mt-0.5 text-xs text-tbw-ink/50">
-                  {neededGame
-                    ? `Bitte zum nächsten Einsatz am ${fmtDate(neededGame.game_date)} gegen ${neededGame.opponent} mitbringen.`
-                    : 'Bitte zum nächsten Einsatz mit diesem Set mitbringen.'}
-                </p>
+        {role === 'player' &&
+          player &&
+          data.trikotSets
+            .filter((set) => set.current_holder_id === player.id)
+            .map((set) => {
+              // data.nextGame ist das nächste Spiel überhaupt, braucht aber
+              // nicht zwangsläufig gerade dieses Set (z. B. hält man
+              // "Schwarz", aber das nächste Spiel ist ein Heimspiel, das
+              // "Weiß" braucht) — deshalb stattdessen das nächste Spiel MIT
+              // dem passenden Satz aus der breiteren Liste heraussuchen.
+              const neededGame = data.upcomingGames.find((g) => benoetigterSatz(g) === set.id) ?? null;
+              const isPicking = transferringSetId === set.id;
+              return (
+                <div key={set.id} className="sheet-row">
+                  <span className="led-dot bg-tbw-gold" />
+                  <div className="flex-1">
+                    <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Deine Trikots</p>
+                    <p className="mt-0.5 text-sm font-semibold text-tbw-navyDark">
+                      Du hast aktuell den {set.id === 'weiss' ? 'weißen' : 'schwarzen'} Trikotsatz.
+                    </p>
+                    <p className="mt-0.5 text-xs text-tbw-ink/50">
+                      {neededGame
+                        ? `Bitte zum nächsten Einsatz am ${fmtDate(neededGame.game_date)} gegen ${neededGame.opponent} mitbringen.`
+                        : 'Bitte zum nächsten Einsatz mit diesem Set mitbringen.'}
+                    </p>
 
-                {!isPicking ? (
-                  <button
-                    className="mt-2 text-xs font-bold text-tbw-navy"
-                    onClick={() => {
-                      setTransferringSetId(set.id);
-                      setTransferTargetId('');
-                      setTransferError(null);
-                    }}
-                  >
-                    Set übergeben?
-                  </button>
-                ) : (
-                  <div className="mt-3 space-y-2 rounded-xl bg-tbw-bg p-3">
-                    <p className="text-sm text-tbw-ink/70">An wen?</p>
-                    <select
-                      className="input"
-                      value={transferTargetId}
-                      onChange={(e) => setTransferTargetId(e.target.value)}
-                    >
-                      <option value="">Spieler wählen…</option>
-                      {Object.values(data.players)
-                        .filter((p) => p.id !== player.id)
-                        .sort((a, b) => a.name.localeCompare(b.name, 'de'))
-                        .map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                    </select>
-                    {transferError && <ErrorNote message={transferError} />}
-                    <div className="flex gap-2">
+                    {!isPicking ? (
                       <button
-                        className="btn-primary flex-1 !py-2 text-sm"
-                        disabled={!transferTargetId || transferring}
-                        onClick={() => transferSet(set.id, transferTargetId)}
-                      >
-                        {transferring ? 'Speichere…' : 'Bestätigen'}
-                      </button>
-                      <button
-                        className="btn-secondary flex-1 !py-2 text-sm"
-                        disabled={transferring}
+                        className="mt-2 text-xs font-bold text-tbw-navy"
                         onClick={() => {
-                          setTransferringSetId(null);
+                          setTransferringSetId(set.id);
                           setTransferTargetId('');
                           setTransferError(null);
                         }}
                       >
-                        Abbrechen
+                        Set übergeben?
                       </button>
-                    </div>
+                    ) : (
+                      <div className="mt-3 space-y-2 rounded-lg border border-tbw-ink/10 bg-tbw-bg p-3">
+                        <p className="text-sm text-tbw-ink/70">An wen?</p>
+                        <select
+                          className="input"
+                          value={transferTargetId}
+                          onChange={(e) => setTransferTargetId(e.target.value)}
+                        >
+                          <option value="">Spieler wählen…</option>
+                          {Object.values(data.players)
+                            .filter((p) => p.id !== player.id)
+                            .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                        </select>
+                        {transferError && <ErrorNote message={transferError} />}
+                        <div className="flex gap-2">
+                          <button
+                            className="btn-primary flex-1 !py-2 text-sm"
+                            disabled={!transferTargetId || transferring}
+                            onClick={() => transferSet(set.id, transferTargetId)}
+                          >
+                            {transferring ? 'Speichere…' : 'Bestätigen'}
+                          </button>
+                          <button
+                            className="btn-secondary flex-1 !py-2 text-sm"
+                            disabled={transferring}
+                            onClick={() => {
+                              setTransferringSetId(null);
+                              setTransferTargetId('');
+                              setTransferError(null);
+                            }}
+                          >
+                            Abbrechen
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </section>
-            );
-          })}
+                </div>
+              );
+            })}
+      </section>
 
       {flags.absences && role === 'player' && (
         <AbsenceSection onChange={() => setAbsenceVersion((v) => v + 1)} />
@@ -1024,124 +1031,135 @@ export function Dashboard() {
 
       <p className="pt-1 text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Teaminformationen</p>
 
-      {showOfficiatingOverview && (
-        <section className="card">
-          <SectionTitle title="Nächster Kampfgericht Termin" />
-          {data.trainerNextOfficiatingGame ? (
-            <div className="mt-2 space-y-2">
-              <p className="text-sm font-semibold">
-                {fmtDate(data.trainerNextOfficiatingGame.game_date)}
-                {data.trainerNextOfficiatingGame.game_time
-                  ? ` · ${fmtTime(data.trainerNextOfficiatingGame.game_time)} Uhr`
-                  : ''}{' '}
-                · {officiatingGameLabel(data.trainerNextOfficiatingGame)}
+      <section className="sheet">
+        {showOfficiatingOverview && (
+          <div className="sheet-row">
+            <span className="led-dot bg-tbw-navy" />
+            <div className="flex-1">
+              <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">
+                Nächster Kampfgericht-Termin
               </p>
-              <ul className="space-y-1 text-sm">
-                {data.trainerNextOfficiatingGame.tasks.map((t) => (
-                  <li key={t.id} className="flex items-center justify-between">
-                    <span className="text-tbw-ink/70">{OFFICIATING_TASK_LABELS[t.task_type]}</span>
-                    <span className={t.assigned_player_id ? 'pill pill-ok' : 'pill pill-open'}>
-                      {t.assigned_player_id ? data.players[t.assigned_player_id]?.name ?? '?' : 'offen'}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <p className="mt-2 text-sm text-tbw-ink/50">Kein Kampfgericht-Termin geplant.</p>
-          )}
-        </section>
-      )}
-
-      {showAbsencesOverview && data.absencesOverview.length > 0 && (() => {
-        const today = new Date().toISOString().slice(0, 10);
-        const currentAbsences = data.absencesOverview.filter((a) => a.start_date <= today);
-        const upcomingAbsences = data.absencesOverview.filter((a) => a.start_date > today);
-        return (
-          <section className="card">
-            <SectionTitle title="Aktuell abwesend" />
-            {currentAbsences.length > 0 ? (
-              <ul className="mt-2 space-y-1">
-                {currentAbsences.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-tbw-navyDark">{data.players[a.player_id]?.name ?? '?'}</span>
-                    <span className="text-tbw-ink/50">
-                      {fmtDateShort(a.start_date)} – {fmtDateShort(a.end_date)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-2 text-sm text-tbw-ink/50">Aktuell ist niemand abwesend.</p>
-            )}
-
-            {upcomingAbsences.length > 0 && (
-              <div className="mt-3 border-t border-black/5 pt-2">
-                <button
-                  className="text-xs font-semibold text-tbw-ink/50"
-                  onClick={() => setShowUpcomingAbsences((v) => !v)}
-                >
-                  {showUpcomingAbsences
-                    ? '▲ Kommende Abwesenheiten ausblenden'
-                    : `▼ ${upcomingAbsences.length} kommende Abwesenheit${upcomingAbsences.length > 1 ? 'en' : ''} anzeigen`}
-                </button>
-                {showUpcomingAbsences && (
-                  <ul className="mt-2 space-y-1">
-                    {upcomingAbsences.map((a) => (
-                      <li key={a.id} className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-tbw-navyDark">
-                          {data.players[a.player_id]?.name ?? '?'}
+              {data.trainerNextOfficiatingGame ? (
+                <div className="mt-1 space-y-2">
+                  <p className="text-sm font-semibold text-tbw-navyDark">
+                    {fmtDate(data.trainerNextOfficiatingGame.game_date)}
+                    {data.trainerNextOfficiatingGame.game_time
+                      ? ` · ${fmtTime(data.trainerNextOfficiatingGame.game_time)} Uhr`
+                      : ''}{' '}
+                    · {officiatingGameLabel(data.trainerNextOfficiatingGame)}
+                  </p>
+                  <ul className="space-y-1 text-sm">
+                    {data.trainerNextOfficiatingGame.tasks.map((t) => (
+                      <li key={t.id} className="flex items-center justify-between">
+                        <span className="text-tbw-ink/70">{OFFICIATING_TASK_LABELS[t.task_type]}</span>
+                        <span className={t.assigned_player_id ? 'pill pill-ok' : 'pill pill-open'}>
+                          {t.assigned_player_id ? data.players[t.assigned_player_id]?.name ?? '?' : 'offen'}
                         </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="mt-0.5 text-sm text-tbw-ink/50">Kein Kampfgericht-Termin geplant.</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {showAbsencesOverview && data.absencesOverview.length > 0 && (() => {
+          const today = new Date().toISOString().slice(0, 10);
+          const currentAbsences = data.absencesOverview.filter((a) => a.start_date <= today);
+          const upcomingAbsences = data.absencesOverview.filter((a) => a.start_date > today);
+          return (
+            <div className="sheet-row">
+              <span className="led-dot bg-tbw-navy" />
+              <div className="flex-1">
+                <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Aktuell abwesend</p>
+                {currentAbsences.length > 0 ? (
+                  <ul className="mt-1 space-y-1">
+                    {currentAbsences.map((a) => (
+                      <li key={a.id} className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-tbw-navyDark">{data.players[a.player_id]?.name ?? '?'}</span>
                         <span className="text-tbw-ink/50">
                           {fmtDateShort(a.start_date)} – {fmtDateShort(a.end_date)}
                         </span>
                       </li>
                     ))}
                   </ul>
+                ) : (
+                  <p className="mt-0.5 text-sm text-tbw-ink/50">Aktuell ist niemand abwesend.</p>
                 )}
-              </div>
-            )}
-          </section>
-        );
-      })()}
 
-      <section className="card">
-        <SectionTitle title="Wer hat die Trikots?" />
-        <div className="mt-2 grid grid-cols-2 gap-3">
-          {data.trikotSets.map((set) => {
-            const transferredFrom = latestTransferFrom(set.id, data.trikotWashLog, data.trikotTransferLog);
-            return (
-              <div
-                key={set.id}
-                className={`rounded-xl p-3 ${
-                  set.id === ownSetId ? 'bg-tbw-gold/15 ring-2 ring-tbw-gold' : 'bg-tbw-bg'
-                }`}
-              >
-                <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
-                  {set.label.split(' · ').map((part, i) => (
-                    <span key={i} className="block">
-                      {part}
-                    </span>
-                  ))}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-tbw-navyDark">
-                  {set.current_holder_id ? data.players[set.current_holder_id]?.name ?? '—' : 'Niemand'}
-                </p>
-                {transferredFrom && (
-                  <p className="mt-0.5 text-[10px] text-tbw-ink/40">
-                    Übergeben von {data.players[transferredFrom]?.name ?? '?'}
-                  </p>
+                {upcomingAbsences.length > 0 && (
+                  <div className="mt-3 border-t border-tbw-ink/10 pt-2">
+                    <button
+                      className="text-xs font-semibold text-tbw-ink/50"
+                      onClick={() => setShowUpcomingAbsences((v) => !v)}
+                    >
+                      {showUpcomingAbsences
+                        ? '▲ Kommende Abwesenheiten ausblenden'
+                        : `▼ ${upcomingAbsences.length} kommende Abwesenheit${upcomingAbsences.length > 1 ? 'en' : ''} anzeigen`}
+                    </button>
+                    {showUpcomingAbsences && (
+                      <ul className="mt-2 space-y-1">
+                        {upcomingAbsences.map((a) => (
+                          <li key={a.id} className="flex items-center justify-between text-sm">
+                            <span className="font-medium text-tbw-navyDark">
+                              {data.players[a.player_id]?.name ?? '?'}
+                            </span>
+                            <span className="text-tbw-ink/50">
+                              {fmtDateShort(a.start_date)} – {fmtDateShort(a.end_date)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 )}
               </div>
-            );
-          })}
+            </div>
+          );
+        })()}
+
+        <div className="sheet-row">
+          <span className="led-dot bg-tbw-navy" />
+          <div className="flex-1">
+            <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Wer hat die Trikots?</p>
+            <div className="mt-2 grid grid-cols-2 divide-x divide-tbw-ink/10 overflow-hidden rounded-lg border border-tbw-ink/10">
+              {data.trikotSets.map((set) => {
+                const transferredFrom = latestTransferFrom(set.id, data.trikotWashLog, data.trikotTransferLog);
+                return (
+                  <div key={set.id} className={`p-3 ${set.id === ownSetId ? 'bg-tbw-gold/10' : ''}`}>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-tbw-ink/50">
+                      {set.label.split(' · ').map((part, i) => (
+                        <span key={i} className="block">
+                          {part}
+                        </span>
+                      ))}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-tbw-navyDark">
+                      {set.current_holder_id ? data.players[set.current_holder_id]?.name ?? '—' : 'Niemand'}
+                    </p>
+                    {transferredFrom && (
+                      <p className="mt-0.5 text-[10px] text-tbw-ink/40">
+                        Übergeben von {data.players[transferredFrom]?.name ?? '?'}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
-      </section>
 
-      <section className="card">
-        <SectionTitle title="Trainingszeiten" />
-        <div className="mt-2">
-          <WeeklyTrainingTimes />
+        <div className="sheet-row">
+          <span className="led-dot bg-tbw-navy" />
+          <div className="flex-1">
+            <p className="text-xs font-bold uppercase tracking-wide text-tbw-ink/40">Trainingszeiten</p>
+            <div className="mt-1.5">
+              <WeeklyTrainingTimes />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1155,13 +1173,4 @@ export function Dashboard() {
 function declinedNamesText(names: string[]): string {
   if (names.length === 1) return `${names[0]} kann`;
   return `${names.slice(0, -1).join(', ')} und ${names[names.length - 1]} können`;
-}
-
-function SectionTitle({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-tbw-navyDark">
-      <span className="h-3.5 w-1 shrink-0 bg-tbw-gold" aria-hidden />
-      {title}
-    </div>
-  );
 }

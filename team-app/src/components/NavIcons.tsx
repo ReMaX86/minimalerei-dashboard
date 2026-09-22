@@ -74,6 +74,64 @@ export function IconCalendar(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconBell(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path d="M12 2.4a1.1 1.1 0 0 1 1.1 1.1v.7a6.3 6.3 0 0 1 5.2 6.2v3.4l1.6 2.6a1 1 0 0 1-.86 1.5H5a1 1 0 0 1-.86-1.5l1.6-2.6V10.4a6.3 6.3 0 0 1 5.2-6.2v-.7A1.1 1.1 0 0 1 12 2.4Z" />
+      <path d="M9.4 19.3h5.2a2.6 2.6 0 0 1-5.2 0Z" />
+    </svg>
+  );
+}
+
+export function IconCheck(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M4.5 12.5 9.5 17.5 19.5 6.5" />
+    </svg>
+  );
+}
+
+export function IconClose(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M5.5 5.5 18.5 18.5M18.5 5.5 5.5 18.5" />
+    </svg>
+  );
+}
+
+export function IconChevronRight(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M9 5.5 15.5 12 9 18.5" />
+    </svg>
+  );
+}
+
+export function IconSuitcase(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M4 9.2A1.7 1.7 0 0 1 5.7 7.5h12.6A1.7 1.7 0 0 1 20 9.2v9.1a1.7 1.7 0 0 1-1.7 1.7H5.7A1.7 1.7 0 0 1 4 18.3Zm5.4 3.6h5.2v1.4H9.4Z"
+      />
+      <path d="M9 5.3A1.3 1.3 0 0 1 10.3 4h3.4A1.3 1.3 0 0 1 15 5.3v2.2h-1.7V5.7h-2.6v1.8H9Z" />
+    </svg>
+  );
+}
+
+export function IconAlertTriangle(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M10.3 3.6a2 2 0 0 1 3.4 0l8.3 14.2A2 2 0 0 1 20.3 21H3.7a2 2 0 0 1-1.7-3.2Zm2.8 5.5h-2.2l.3 6h1.6Zm-1.1 8a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Z"
+      />
+    </svg>
+  );
+}
+
 export function IconGear(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
