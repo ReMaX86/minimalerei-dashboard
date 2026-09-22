@@ -9,21 +9,20 @@ import { TrainingCard } from '../components/TrainingCard';
 import { AbsenceCard } from '../components/AbsenceCard';
 import { TeamBoard } from '../components/TeamBoard';
 import { PushNotificationCard } from '../components/PushNotificationCard';
-import { IconChevronRight, IconClipboard, IconJersey } from '../components/NavIcons';
+import { IconChevronRight, IconClipboard } from '../components/NavIcons';
 import { StartHeader } from '../components/StartHeader';
 import { NextGameCard } from '../components/NextGameCard';
 import { LastResultCard } from '../components/LastResultCard';
 import { OfficiatingDutyCard } from '../components/OfficiatingDutyCard';
 import { usePushStatus } from '../hooks/usePushStatus';
-import { fmtDate, fmtDateShort, fmtTime, hasKickedOff } from '../lib/format';
+import { fmtDate, fmtTime, hasKickedOff } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
 import { computeReminders, type ReminderItem } from '../lib/reminders';
-import { latestTransferFrom, pendingWasherFor } from '../lib/trikots';
+import { pendingWasherFor } from '../lib/trikots';
 import { computeBoxScore } from '../lib/gameStats';
 import {
   OFFICIATING_TASK_LABELS,
   STAT_POINT_VALUES,
-  benoetigterSatz,
   officiatingGameLabel,
   type Announcement,
   type CarpoolClaim,
@@ -42,8 +41,6 @@ import {
   type Training,
   type TrainingOverride,
   type TrikotSet,
-  type TrikotSetId,
-  type TrikotTransferLogRow,
   type TrikotWashLogRow
 } from '../types/database';
 
@@ -62,7 +59,6 @@ function localTodayIso(): string {
 
 interface DashboardData {
   nextGame: Game | null;
-  upcomingGames: Game[];
   playerInSquad: boolean | null;
   myConfirmation: SquadConfirmation | null;
   myDeclineReason: DeclineReason | null;
@@ -75,7 +71,6 @@ interface DashboardData {
   trainerNextOfficiatingGame: (OfficiatingGame & { tasks: OfficiatingTask[] }) | null;
   trikotSets: TrikotSet[];
   trikotWashLog: TrikotWashLogRow[];
-  trikotTransferLog: TrikotTransferLogRow[];
   players: Record<string, Player>;
   announcements: Announcement[];
   carpoolOffers: CarpoolOffer[];
@@ -103,21 +98,8 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [absenceVersion, setAbsenceVersion] = useState(0);
   const [trainingVersion, setTrainingVersion] = useState(0);
-  const [trikotVersion, setTrikotVersion] = useState(0);
   const [squadResponseVersion, setSquadResponseVersion] = useState(0);
   const [resultVersion, setResultVersion] = useState(0);
-  // Direkte Trikot-Übergabe (siehe Migration 0048): eigener State statt
-  // pro-Set, da realistisch immer nur ein Set gleichzeitig übergeben wird —
-  // die setId im State legt fest, für welches Set gerade der
-  // Auswahl-Dialog offen ist.
-  const [transferringSetId, setTransferringSetId] = useState<TrikotSetId | null>(null);
-  const [transferTargetId, setTransferTargetId] = useState('');
-  const [transferring, setTransferring] = useState(false);
-  // Eigener Fehler-State statt des Seiten-weiten `error` oben — der würde
-  // bei einem Fehlschlag das komplette Dashboard durch die Fehlermeldung
-  // ersetzen (siehe `if (error) return ...` weiter unten), für einen
-  // fehlgeschlagenen Trikot-Übergabe-Versuch viel zu einschneidend.
-  const [transferError, setTransferError] = useState<string | null>(null);
   // Trainers/admin-players get the full Kampfgericht overview so they can
   // plan; a read-only Betrachter (e.g. Abteilungsleiter) gets to see the
   // same overview, just with no way to assign/edit anything. Captains/
@@ -139,45 +121,29 @@ export function Dashboard() {
       setError(null);
       const today = localTodayIso();
 
-      const [gameRes, upcomingGamesRes, trikotRes, trikotWashRes, trikotTransferRes, playersRes, announcementsRes] =
-        await Promise.all([
-          supabase
-            .from('games')
-            .select('*')
-            .gte('game_date', today)
-            .is('stats_finalized_at', null)
-            .order('game_date')
-            .order('game_time')
-            .limit(1)
-            .maybeSingle(),
-          // Für die "Deine Trikots"-Karte: das EINE `nextGame` oben ist das
-          // nächste Spiel überhaupt, das aber nicht zwangsläufig das eigene
-          // Set braucht (z. B. hält man "Schwarz", aber das nächste Spiel ist
-          // ein Heimspiel, das "Weiß" braucht) — dafür eine breitere Liste,
-          // um darin das nächste Spiel mit dem passenden Satz zu finden.
-          supabase
-            .from('games')
-            .select('*')
-            .gte('game_date', today)
-            .is('stats_finalized_at', null)
-            .order('game_date')
-            .order('game_time')
-            .limit(20),
-          supabase.from('trikot_sets').select('*').order('id'),
-          supabase.from('trikot_wash_log').select('*'),
-          supabase.from('trikot_transfer_log').select('*'),
-          supabase.from('players').select('*').eq('is_active', true),
-          flags.announcements
-            ? supabase
-                .from('announcements')
-                .select('*')
-                .order('pinned', { ascending: false })
-                .order('created_at', { ascending: false })
-                .limit(5)
-            : Promise.resolve({ data: [] as Announcement[], error: null })
-        ]);
+      const [gameRes, trikotRes, trikotWashRes, playersRes, announcementsRes] = await Promise.all([
+        supabase
+          .from('games')
+          .select('*')
+          .gte('game_date', today)
+          .is('stats_finalized_at', null)
+          .order('game_date')
+          .order('game_time')
+          .limit(1)
+          .maybeSingle(),
+        supabase.from('trikot_sets').select('*').order('id'),
+        supabase.from('trikot_wash_log').select('*'),
+        supabase.from('players').select('*').eq('is_active', true),
+        flags.announcements
+          ? supabase
+              .from('announcements')
+              .select('*')
+              .order('pinned', { ascending: false })
+              .order('created_at', { ascending: false })
+              .limit(5)
+          : Promise.resolve({ data: [] as Announcement[], error: null })
+      ]);
       const trikotWashLog = (trikotWashRes.data as TrikotWashLogRow[]) ?? [];
-      const trikotTransferLog = (trikotTransferRes.data as TrikotTransferLogRow[]) ?? [];
 
       let playerNextTask: DashboardData['playerNextTask'] = null;
       let playerNextTaskTeammates: DashboardData['playerNextTaskTeammates'] = [];
@@ -584,14 +550,13 @@ export function Dashboard() {
 
       if (cancelled) return;
 
-      if (gameRes.error || upcomingGamesRes.error || trikotRes.error || trikotWashRes.error || trikotTransferRes.error) {
+      if (gameRes.error || trikotRes.error || trikotWashRes.error) {
         setError('Fehler beim Laden der Startseite.');
         return;
       }
 
       setData({
         nextGame: nextGame ?? null,
-        upcomingGames: (upcomingGamesRes.data as Game[]) ?? [],
         playerInSquad,
         myConfirmation,
         myDeclineReason,
@@ -601,7 +566,6 @@ export function Dashboard() {
         trainerNextOfficiatingGame,
         trikotSets: (trikotRes.data as TrikotSet[]) ?? [],
         trikotWashLog,
-        trikotTransferLog,
         players: playersById,
         announcements: (announcementsRes.data as Announcement[]) ?? [],
         carpoolOffers,
@@ -636,7 +600,6 @@ export function Dashboard() {
     flags.stats,
     absenceVersion,
     trainingVersion,
-    trikotVersion,
     squadResponseVersion,
     resultVersion
   ]);
@@ -734,29 +697,6 @@ export function Dashboard() {
 
   if (error) return <div className="card text-sm text-to-dangerText">{error}</div>;
   if (!data) return <LoadingSpinner />;
-
-  const ownSetId = player
-    ? data.trikotSets.find((s) => s.current_holder_id === player.id)?.id ?? null
-    : null;
-
-  async function transferSet(setId: TrikotSetId, toPlayerId: string) {
-    setTransferring(true);
-    setTransferError(null);
-    try {
-      const { error: rpcError } = await supabase.rpc('transfer_trikot_set', {
-        p_set_id: setId,
-        p_to_player_id: toPlayerId
-      });
-      if (rpcError) throw rpcError;
-      setTransferringSetId(null);
-      setTransferTargetId('');
-      setTrikotVersion((v) => v + 1);
-    } catch {
-      setTransferError('Übergabe konnte nicht gespeichert werden.');
-    } finally {
-      setTransferring(false);
-    }
-  }
 
   return (
     <div className="space-y-4">
@@ -948,144 +888,6 @@ export function Dashboard() {
           ) : (
             <p className="mt-1 text-sm text-to-text2">Kein Kampfgericht-Termin geplant.</p>
           )}
-        </section>
-      )}
-
-      {/* Trikots — DESIGN.md §7: echte Satz-/Wasch-Logik statt des
-          Nummern-Rasters aus dem Mockup. */}
-      <section className="card flex flex-col gap-4 !p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <IconJersey className="h-[22px] w-[22px] text-to-text" />
-            <h2 className="text-lg font-semibold text-to-text">Trikots</h2>
-          </div>
-          {data.nextGame && (
-            <span className="to-data text-sm text-to-text2">
-              Für nächstes Spiel: <span className="text-to-accent">{benoetigterSatz(data.nextGame) === 'weiss' ? 'Weiß' : 'Schwarz'}</span>
-            </span>
-          )}
-        </div>
-        <div className="grid grid-cols-2 divide-x divide-to-divider overflow-hidden rounded-to-md border border-to-divider">
-          {data.trikotSets.map((set) => {
-            const transferredFrom = latestTransferFrom(set.id, data.trikotWashLog, data.trikotTransferLog);
-            return (
-              <div key={set.id} className={`p-3.5 ${set.id === ownSetId ? 'bg-to-accentSoft' : ''}`}>
-                <p className="to-label">
-                  {set.label.split(' · ').map((part, i) => (
-                    <span key={i} className="block">
-                      {part}
-                    </span>
-                  ))}
-                </p>
-                <p className="mt-1.5 text-sm font-semibold text-to-text">
-                  {set.current_holder_id ? data.players[set.current_holder_id]?.name ?? '—' : 'Niemand'}
-                </p>
-                {transferredFrom && (
-                  <p className="mt-0.5 text-[11px] text-to-text3">Übergeben von {data.players[transferredFrom]?.name ?? '?'}</p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {role === 'player' &&
-          player &&
-          data.trikotSets
-            .filter((set) => set.current_holder_id === player.id)
-            .map((set) => {
-              // data.nextGame ist das nächste Spiel überhaupt, braucht aber
-              // nicht zwangsläufig gerade dieses Set (z. B. hält man
-              // "Schwarz", aber das nächste Spiel ist ein Heimspiel, das
-              // "Weiß" braucht) — deshalb stattdessen das nächste Spiel MIT
-              // dem passenden Satz aus der breiteren Liste heraussuchen.
-              const neededGame = data.upcomingGames.find((g) => benoetigterSatz(g) === set.id) ?? null;
-              const isPicking = transferringSetId === set.id;
-              return (
-                <div key={set.id} className="rounded-to-md bg-to-bg p-3.5">
-                  <p className="text-sm font-semibold text-to-text">
-                    Du hast aktuell den {set.id === 'weiss' ? 'weißen' : 'schwarzen'} Trikotsatz.
-                  </p>
-                  <p className="mt-0.5 text-xs text-to-text2">
-                    {neededGame
-                      ? `Bitte zum nächsten Einsatz am ${fmtDate(neededGame.game_date)} gegen ${neededGame.opponent} mitbringen.`
-                      : 'Bitte zum nächsten Einsatz mit diesem Set mitbringen.'}
-                  </p>
-
-                  {!isPicking ? (
-                    <button
-                      className="mt-2 text-xs font-semibold text-to-accent"
-                      onClick={() => {
-                        setTransferringSetId(set.id);
-                        setTransferTargetId('');
-                        setTransferError(null);
-                      }}
-                    >
-                      Set übergeben?
-                    </button>
-                  ) : (
-                    <div className="mt-3 space-y-2">
-                      <p className="text-sm text-to-text2">An wen?</p>
-                      <select className="input" value={transferTargetId} onChange={(e) => setTransferTargetId(e.target.value)}>
-                        <option value="">Spieler wählen…</option>
-                        {Object.values(data.players)
-                          .filter((p) => p.id !== player.id)
-                          .sort((a, b) => a.name.localeCompare(b.name, 'de'))
-                          .map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                            </option>
-                          ))}
-                      </select>
-                      {transferError && <ErrorNote message={transferError} />}
-                      <div className="flex gap-2">
-                        <button
-                          className="btn-primary !h-11 flex-1 text-sm"
-                          disabled={!transferTargetId || transferring}
-                          onClick={() => transferSet(set.id, transferTargetId)}
-                        >
-                          {transferring ? 'Speichere…' : 'Bestätigen'}
-                        </button>
-                        <button
-                          className="btn-secondary flex-1 text-sm"
-                          disabled={transferring}
-                          onClick={() => {
-                            setTransferringSetId(null);
-                            setTransferTargetId('');
-                            setTransferError(null);
-                          }}
-                        >
-                          Abbrechen
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-      </section>
-
-      {/* Spielplan-Vorschau — DESIGN.md Dashboard.dc.html. */}
-      {data.upcomingGames.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-lg font-semibold text-to-text">Spielplan</h2>
-            <Link to="/spiele" className="text-sm font-medium text-to-accent">
-              Alle Spiele
-            </Link>
-          </div>
-          {data.upcomingGames.slice(0, 3).map((g) => (
-            <div key={g.id} className="card flex items-center gap-3.5 !p-3.5">
-              <div className="to-data flex w-[58px] shrink-0 flex-col gap-0.5">
-                <span className="text-[11px] tracking-wide text-to-text3">{fmtDateShort(g.game_date).slice(0, 2).toUpperCase()}</span>
-                <span className="text-sm font-semibold text-to-text">{fmtDateShort(g.game_date)}</span>
-              </div>
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-sm font-semibold text-to-text">{g.opponent}</span>
-                <span className="text-xs text-to-text2">{fmtTime(g.game_time)} Uhr</span>
-              </div>
-              <span className={g.is_home ? 'badge-home' : 'badge-away'}>{g.is_home ? 'Heim' : 'Ausw.'}</span>
-            </div>
-          ))}
         </section>
       )}
 
