@@ -14,7 +14,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icons/favicon.svg', 'icons/apple-touch-icon.png', 'icons/favicon-32.png'],
+      includeAssets: ['favicon-v2.ico', 'icons/favicon-v2.svg', 'icons/apple-touch-icon-v2.png', 'icons/favicon-32-v2.png'],
       manifest: {
         name: 'Tipoff',
         short_name: 'Tipoff',
@@ -25,9 +25,9 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         icons: [
-          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-          { src: 'icons/icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+          { src: 'icons/icon-192-v2.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icons/icon-512-v2.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icons/icon-512-maskable-v2.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       },
       // Precaching + Runtime-Caching (App-Shell + NetworkFirst für die
