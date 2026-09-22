@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Kampfgericht-Einsatz</title>
+<!--
+  REFERENZ-UMSETZUNG der Karte „Dein Kampfgericht-Einsatz" auf der Startseite.
+  Standard ist kompakt (eine Zeile), Tipp auf die Zeile klappt die Details auf.
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=default    kompakt, nächster Einsatz in 3 Wochen (Standard)
+    ?state=open       aufgeklappt, ein Platz unseres Teams noch offen
+    ?state=today      kompakt am Einsatztag (volt)
+    ?state=todayopen  aufgeklappt am Einsatztag
+    ?state=partial    aufgeklappt, nur eine weitere Rolle stellt unser Team
+    ?state=solo       aufgeklappt, keine weitere Rolle von uns bekannt (kein Tisch-Block)
+    ?state=soon       kompakt, Einsatz morgen
+    ?state=empty      kein Einsatz geplant
+  Klickbar: die Kopfzeile (auf/zu), die Adresse (Navigation).
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25;
+  --to-border:#232830; --to-line:#2A303A;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{width:390px;margin:0 auto;padding:24px 20px}
+.mono{font-family:'Geist Mono',ui-monospace,monospace}
+
+/* ---------- Karte ---------- */
+.duty{border-radius:24px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.duty.is-today{border-color:var(--to-accent-frame)}
+
+.duty__head{display:flex;align-items:center;gap:14px;width:100%;
+  padding:16px 18px;border:0;background:transparent;color:var(--to-text);
+  font-family:'Geist',sans-serif;text-align:left;cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+.duty__head[aria-expanded="true"]{background:#14181E}
+
+.duty__tile{width:46px;height:46px;flex:none;border-radius:14px;background:var(--to-surface-2);
+  display:grid;place-items:center}
+.duty.is-today .duty__tile{background:var(--to-accent)}
+.duty__tile svg{stroke:var(--to-accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.duty.is-today .duty__tile svg{stroke:var(--to-on-accent);stroke-width:1.9}
+.duty.is-empty .duty__tile svg{stroke:var(--to-text-4)}
+
+.duty__txt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.duty__eyebrow{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.duty__role{font-size:16px;font-weight:600;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.duty__when{font-family:'Geist Mono',monospace;font-size:13px;color:var(--to-text-2);font-variant-numeric:tabular-nums}
+
+.duty__meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none}
+.pill{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;
+  background:var(--to-surface-2);color:var(--to-text-2);
+  font-family:'Geist Mono',monospace;font-size:10px;font-weight:600;white-space:nowrap}
+.duty.is-today .pill{background:var(--to-accent-soft);color:var(--to-accent)}
+.chev{width:17px;height:17px;fill:none;stroke:var(--to-text-3);stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .18s ease}
+.duty__head[aria-expanded="true"] .chev{transform:rotate(180deg)}
+
+/* ---------- Aufgeklappt ---------- */
+.duty__body{display:flex;flex-direction:column;gap:14px;padding:4px 18px 18px}
+.duty__body[hidden]{display:none}
+
+.row{display:flex;align-items:center;gap:12px;min-height:40px;font-size:15px;
+  color:var(--to-text);text-decoration:none}
+.row svg{width:19px;height:19px;flex:none;fill:none;stroke:var(--to-text-3);
+  stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.row__text{flex:1 1 auto;min-width:0}
+.row__action{font-size:13px;font-weight:600;color:var(--to-accent);flex:none}
+
+.table{display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:16px;background:var(--to-surface-2)}
+.table__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.table__list{display:flex;flex-direction:column;gap:6px}
+.seat{display:flex;align-items:center;gap:8px;font-size:14px}
+.seat__role{font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3);width:88px;flex:none}
+.seat--open{color:var(--to-text-3)}
+.table__note{font-size:12px;color:var(--to-text-3)}
+
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;
+  border:1px solid var(--to-line);border-radius:14px;background:transparent;color:var(--to-text);
+  font-family:'Geist',sans-serif;font-size:14px;font-weight:500;cursor:pointer}
+.btn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- Leerer Zustand ---------- */
+.duty.is-empty{flex-direction:row;align-items:center;gap:14px;padding:16px 18px;
+  text-decoration:none;color:inherit}
+.duty.is-empty .duty__role{color:var(--to-text-2)}
+.duty__link{font-size:13px;color:var(--to-text-3)}
+.duty__arrow{width:16px;height:16px;flex:none;fill:none;stroke:var(--to-text-4);
+  stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <article class="duty" id="card">
+    <button class="duty__head" id="head" type="button" aria-expanded="false" aria-controls="body">
+      <span class="duty__tile">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+          <circle cx="12" cy="13.5" r="7.5"></circle><path d="M12 13.5V9.5"></path>
+          <path d="M9.5 2.5h5"></path><path d="M12 2.5V6"></path>
+        </svg>
+      </span>
+      <span class="duty__txt">
+        <span class="duty__eyebrow">KAMPFGERICHT</span>
+        <span class="duty__role" id="role">24-Sek.-Uhr</span>
+        <span class="duty__when" id="when">SO 20.12. · 13:00 UHR</span>
+      </span>
+      <span class="duty__meta">
+        <span class="pill" id="pill">IN 3 WO.</span>
+        <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+      </span>
+    </button>
+
+    <div class="duty__body" id="body" hidden>
+      <div>
+        <div class="row">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle>
+            <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"></path>
+            <path d="M16 4.5a3.5 3.5 0 0 1 0 7"></path><path d="M18 14c2 .6 3 2.8 3 6"></path></svg>
+          <span class="row__text" id="match">TBW U16 gegen BG Monheim</span>
+        </div>
+        <a class="row" id="maps" href="#">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"></path>
+            <circle cx="12" cy="9.5" r="2.5"></circle></svg>
+          <span class="row__text" id="venue">Goethestraße, Wülfrath</span>
+          <span class="row__action">Route</span>
+        </a>
+      </div>
+
+      <div class="table" id="table">
+        <span class="table__label">MIT DIR AM TISCH</span>
+        <div class="table__list" id="seats"></div>
+        <span class="table__note" id="tablenote" hidden></span>
+      </div>
+
+      <button class="btn" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect>
+          <path d="M12 11v6"></path><path d="M9 14h6"></path></svg>
+        In Kalender
+      </button>
+    </div>
+  </article>
+
+  <!-- Leerer Zustand: dieselbe kompakte Zeile, als Link -->
+  <a class="duty is-empty" id="emptycard" href="#" hidden>
+    <span class="duty__tile">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+        <circle cx="12" cy="13.5" r="7.5"></circle><path d="M12 13.5V9.5"></path>
+        <path d="M9.5 2.5h5"></path><path d="M12 2.5V6"></path>
+      </svg>
+    </span>
+    <span class="duty__txt">
+      <span class="duty__eyebrow">KAMPFGERICHT</span>
+      <span class="duty__role">Kein Einsatz geplant</span>
+      <span class="duty__link">Offene Einsätze ansehen</span>
+    </span>
+    <svg class="duty__arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+  </a>
+
+</div>
+
+<script>
+var SEATS_FULL = [
+  { role: 'ANSCHREIBEN', name: 'Tom Brandt' },
+  { role: 'ZEIT/PUNKTE', name: 'Lena Schröder' }
+];
+var SEATS_OPEN = [
+  { role: 'ANSCHREIBEN', name: 'Tom Brandt' },
+  { role: 'ZEIT/PUNKTE', name: 'Noch offen', open: true }
+];
+var SEATS_ONE = [
+  { role: 'ANSCHREIBEN', name: 'Tom Brandt' }
+];
+
+var BASE = {
+  role: '24-Sek.-Uhr',
+  when: 'SO 20.12. · 13:00 UHR',
+  pill: 'IN 3 WO.',
+  match: 'TBW U16 gegen BG Monheim',
+  venue: 'Goethestraße 4, 42489 Wülfrath',
+  today: false,
+  open: false,
+  seats: SEATS_OPEN,
+  note: null,
+  empty: false
+};
+
+var STATES = {
+  // kompakt, Standardfall auf der Startseite
+  default:   {},
+  // aufgeklappt
+  open:      { open: true },
+  // Einsatztag, kompakt
+  today:     { today: true, when: 'HEUTE · 13:00 UHR', pill: 'IN 2 STD', seats: SEATS_FULL },
+  // Einsatztag, aufgeklappt
+  todayopen: { today: true, when: 'HEUTE · 13:00 UHR', pill: 'IN 2 STD', seats: SEATS_FULL, open: true },
+  // nur eine weitere Rolle stellt unser Team
+  partial:   { open: true, seats: SEATS_ONE, note: 'Den dritten Platz stellt ein anderes Team.' },
+  // keine weitere Rolle von uns bekannt
+  solo:      { open: true, seats: [], note: null },
+  // morgen
+  soon:      { when: 'MO 21.12. · 13:00 UHR', pill: 'MORGEN', seats: SEATS_FULL },
+  // kein Einsatz
+  empty:     { empty: true }
+};
+
+var key = new URLSearchParams(location.search).get('state') || 'default';
+var data = Object.assign({}, BASE, STATES[key] || {});
+
+var card = document.getElementById('card');
+var head = document.getElementById('head');
+var body = document.getElementById('body');
+var table = document.getElementById('table');
+
+if (data.empty) {
+  card.hidden = true;
+  document.getElementById('emptycard').hidden = false;
+} else {
+  card.classList.toggle('is-today', !!data.today);
+  document.getElementById('role').textContent = data.role;
+  document.getElementById('when').textContent = data.when;
+  document.getElementById('pill').textContent = data.pill;
+  document.getElementById('match').textContent = data.match;
+  document.getElementById('venue').textContent = data.venue;
+  document.getElementById('maps').href =
+    'geo:0,0?q=' + encodeURIComponent(data.venue);
+
+  // Tischbesetzung: nur Rollen, die unser Team stellt und die besetzt/offen sind
+  if (!data.seats.length) {
+    table.hidden = true;
+  } else {
+    document.getElementById('seats').innerHTML = data.seats.map(function (s) {
+      return '<span class="seat' + (s.open ? ' seat--open' : '') + '">' +
+             '<span class="seat__role">' + s.role + '</span>' + s.name + '</span>';
+    }).join('');
+    if (data.note) {
+      var n = document.getElementById('tablenote');
+      n.textContent = data.note;
+      n.hidden = false;
+    }
+  }
+
+  function setOpen(open) {
+    head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    body.hidden = !open;
+  }
+  setOpen(!!data.open);
+  head.addEventListener('click', function () {
+    setOpen(head.getAttribute('aria-expanded') !== 'true');
+  });
+}
+</script>
+</body>
+</html>

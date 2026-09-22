@@ -13,6 +13,7 @@ import { IconChevronRight, IconClipboard, IconJersey } from '../components/NavIc
 import { StartHeader } from '../components/StartHeader';
 import { NextGameCard } from '../components/NextGameCard';
 import { LastResultCard } from '../components/LastResultCard';
+import { OfficiatingDutyCard } from '../components/OfficiatingDutyCard';
 import { usePushStatus } from '../hooks/usePushStatus';
 import { fmtDate, fmtDateShort, fmtTime, hasKickedOff } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
@@ -67,6 +68,10 @@ interface DashboardData {
   myDeclineReason: DeclineReason | null;
   myDeclineNote: string | null;
   playerNextTask: (OfficiatingTask & { officiating_games: OfficiatingGame }) | null;
+  // Alle Rollen, die UNSER Team für playerNextTask.officiating_games stellt
+  // (inkl. der eigenen) — für den Block "MIT DIR AM TISCH" auf der Karte
+  // "Dein Kampfgericht-Einsatz" (siehe elements/05-kampfgericht/PROMPT.md).
+  playerNextTaskTeammates: OfficiatingTask[];
   trainerNextOfficiatingGame: (OfficiatingGame & { tasks: OfficiatingTask[] }) | null;
   trikotSets: TrikotSet[];
   trikotWashLog: TrikotWashLogRow[];
@@ -172,6 +177,7 @@ export function Dashboard() {
       const trikotTransferLog = (trikotTransferRes.data as TrikotTransferLogRow[]) ?? [];
 
       let playerNextTask: DashboardData['playerNextTask'] = null;
+      let playerNextTaskTeammates: DashboardData['playerNextTaskTeammates'] = [];
       let trainerNextOfficiatingGame: DashboardData['trainerNextOfficiatingGame'] = null;
       let playerInSquad: DashboardData['playerInSquad'] = null;
       let myConfirmation: DashboardData['myConfirmation'] = null;
@@ -259,7 +265,24 @@ export function Dashboard() {
             } else if (gameRows && gameRows.length > 0) {
               const soonestGame = gameRows[0] as OfficiatingGame;
               const task = (taskRows as OfficiatingTask[]).find((t) => t.officiating_game_id === soonestGame.id);
-              if (task) playerNextTask = { ...task, officiating_games: soonestGame };
+              if (task) {
+                playerNextTask = { ...task, officiating_games: soonestGame };
+                // Alle Rollen, die WIR für diesen Termin stellen (nicht nur
+                // die eigene) — für "MIT DIR AM TISCH" auf der Kampfgericht-
+                // Karte. officiating_tasks enthält laut OfficiatingAdmin.tsx
+                // ohnehin nur Rollen, die unser Team übernimmt (siehe dort
+                // "Bitte mindestens eine Aufgabe auswählen, die wir stellen
+                // müssen") — Rollen anderer Teams tauchen hier nie auf.
+                const { data: teammateRows, error: teammatesErr } = await supabase
+                  .from('officiating_tasks')
+                  .select('*')
+                  .eq('officiating_game_id', soonestGame.id);
+                if (teammatesErr) {
+                  console.error('officiating_tasks (teammates) fetch failed', teammatesErr);
+                } else {
+                  playerNextTaskTeammates = (teammateRows as OfficiatingTask[]) ?? [];
+                }
+              }
             }
           }
         }
@@ -571,6 +594,7 @@ export function Dashboard() {
         myDeclineReason,
         myDeclineNote,
         playerNextTask,
+        playerNextTaskTeammates,
         trainerNextOfficiatingGame,
         trikotSets: (trikotRes.data as TrikotSet[]) ?? [],
         trikotWashLog,
@@ -799,40 +823,28 @@ export function Dashboard() {
         />
       )}
 
-      {/* Status-Kacheln — DESIGN.md: Kader-Stand + eigener nächster
-          Kampfgericht-Einsatz (statt einer Trikotnummer, die es in dieser
-          App gar nicht gibt — siehe DESIGN.md §7). */}
-      {(data.squadCount !== null || (role === 'player' && data.playerNextTask)) && (
-        <div className="grid grid-cols-2 gap-3">
-          {data.squadCount !== null && (
-            <div className="card flex flex-col gap-3.5 !p-4">
-              <div className="flex items-center justify-between">
-                <span className="to-label">Kader</span>
-                <span className="h-2 w-2 rounded-full bg-to-accent" />
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-lg font-semibold text-to-text">{data.squadCount} nominiert</span>
-                <span className="text-[13px] text-to-text2">von {MAX_SQUAD_SIZE} Plätzen</span>
-              </div>
-            </div>
-          )}
-          {role === 'player' && (
-            <div className="card flex flex-col gap-3.5 !p-4">
-              <div className="flex items-center justify-between">
-                <span className="to-label">Kampfgericht</span>
-                <IconClipboard className="h-4 w-4 text-to-accent" />
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-lg font-semibold text-to-text">
-                  {data.playerNextTask ? 'Eingeteilt' : 'Frei'}
-                </span>
-                <span className="truncate text-[13px] text-to-text2">
-                  {data.playerNextTask ? fmtDate(data.playerNextTask.officiating_games.game_date) : 'Kein Termin'}
-                </span>
-              </div>
-            </div>
-          )}
+      {/* Kader-Stand — DESIGN.md: statt einer Trikotnummer, die es in dieser
+          App gar nicht gibt — siehe DESIGN.md §7. Stand bis hierhin neben der
+          Kampfgericht-Kachel in einem 2-spaltigen Raster; die neue, größere
+          Kampfgericht-Karte (elements/05-kampfgericht/) passt nicht mehr in
+          eine halbe Spalte, deshalb jetzt beides untereinander. */}
+      {data.squadCount !== null && (
+        <div className="card flex flex-col gap-3.5 !p-4">
+          <div className="flex items-center justify-between">
+            <span className="to-label">Kader</span>
+            <span className="h-2 w-2 rounded-full bg-to-accent" />
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-lg font-semibold text-to-text">{data.squadCount} nominiert</span>
+            <span className="text-[13px] text-to-text2">von {MAX_SQUAD_SIZE} Plätzen</span>
+          </div>
         </div>
+      )}
+
+      {/* Kampfgericht — Karte "Dein Kampfgericht-Einsatz", siehe
+          docs/design/tipoff-design/elements/05-kampfgericht/PROMPT.md. */}
+      {role === 'player' && (
+        <OfficiatingDutyCard task={data.playerNextTask} teammates={data.playerNextTaskTeammates} players={data.players} />
       )}
 
       {flags.push_notifications && (pushStatus === 'unsubscribed' || pushStatus === 'denied') && (
@@ -928,20 +940,6 @@ export function Dashboard() {
             </>
           ) : (
             <p className="mt-1 text-sm text-to-text2">Kein Kampfgericht-Termin geplant.</p>
-          )}
-          {role === 'player' && data.playerNextTask && (
-            <div className="mt-2 flex items-center gap-3.5 rounded-to-md bg-to-bg p-3.5">
-              <span className="to-data shrink-0 rounded-to-sm border border-to-accent px-2 py-1.5 text-xs font-semibold text-to-accent">
-                {fmtDateShort(data.playerNextTask.officiating_games.game_date)}
-              </span>
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="to-label">Dein nächster Einsatz</span>
-                <span className="truncate text-sm font-semibold text-to-text">
-                  {OFFICIATING_TASK_LABELS[data.playerNextTask.task_type]} ·{' '}
-                  {officiatingGameLabel(data.playerNextTask.officiating_games)}
-                </span>
-              </div>
-            </div>
           )}
         </section>
       )}
