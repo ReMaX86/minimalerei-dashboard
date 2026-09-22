@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { daysUntil, fmtDateTimeShort, hasKickedOff, mapsUrl, shortPlayerName } from './format';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { daysUntil, fmtDateBadge, fmtDateTimeShort, hasKickedOff, mapsUrl, shortPlayerName } from './format';
 
 describe('shortPlayerName', () => {
   it('shortens a two-part name to first name + last initial', () => {
@@ -16,10 +16,25 @@ describe('shortPlayerName', () => {
 });
 
 describe('mapsUrl', () => {
-  it('builds an Apple Maps search link with the location URL-encoded', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('builds an Apple Maps search link with the location URL-encoded by default (iOS/Desktop)', () => {
     expect(mapsUrl('Halle Wülfrath, Am Diek 22, 42489 Wülfrath')).toBe(
       'https://maps.apple.com/?q=Halle%20W%C3%BClfrath%2C%20Am%20Diek%2022%2C%2042489%20W%C3%BClfrath'
     );
+  });
+
+  it('builds a geo: link on Android, for the installed default maps app', () => {
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8)' });
+    expect(mapsUrl('Halle Wülfrath')).toBe('geo:0,0?q=Halle%20W%C3%BClfrath');
+  });
+});
+
+describe('fmtDateBadge', () => {
+  it('formats as uppercase two-letter weekday + day.month.', () => {
+    expect(fmtDateBadge('2026-09-25')).toBe('FR 25.09.');
   });
 });
 

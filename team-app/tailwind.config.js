@@ -13,6 +13,7 @@ export default {
           surface: 'var(--to-surface)',
           surface2: 'var(--to-surface-2)',
           border: 'var(--to-border)',
+          borderMatchday: 'var(--to-border-matchday)',
           line: 'var(--to-line)',
           divider: 'var(--to-divider)',
           text: 'var(--to-text)',

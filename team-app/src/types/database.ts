@@ -213,11 +213,24 @@ export interface Game {
 
 export type SquadConfirmation = 'pending' | 'confirmed' | 'declined';
 
+export type DeclineReason = 'krank' | 'arbeit_schule' | 'urlaub' | 'anderer_grund';
+
+export const DECLINE_REASON_LABELS: Record<DeclineReason, string> = {
+  krank: 'Krank',
+  arbeit_schule: 'Arbeit / Schule',
+  urlaub: 'Urlaub',
+  anderer_grund: 'Anderer Grund'
+};
+
 export interface GameSquadRow {
   game_id: string;
   player_id: string;
   is_selected: boolean;
   confirmation: SquadConfirmation;
+  // Migration 0060 — nur bei confirmation === 'declined' gesetzt, sonst
+  // beide null (respond_to_squad() räumt sie beim erneuten Zusagen ab).
+  decline_reason: DeclineReason | null;
+  decline_note: string | null;
 }
 
 export interface TrikotSet {

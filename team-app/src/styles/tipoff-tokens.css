@@ -11,6 +11,7 @@
   --to-surface: #12151A;     /* Floor – Karten */
   --to-surface-2: #1A1E25;   /* Rail – Chips, Felder, verschachtelte Flächen */
   --to-border: #232830;      /* Karten-Rand */
+  --to-border-matchday: #3A4A12; /* Karten-Rand "Nächstes Spiel" am Spieltag/live */
   --to-line: #2A303A;        /* Trennlinien, inaktive Segmente, Outline-Buttons */
   --to-divider: #1F242C;     /* Listen-Trenner innerhalb von Karten */
   --to-text: #F2F4F7;        /* Chalk – Primärtext */

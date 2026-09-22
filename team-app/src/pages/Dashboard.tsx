@@ -10,10 +10,10 @@ import { WeeklyTrainingTimes } from '../components/WeeklyTrainingTimes';
 import { AbsenceSection } from '../components/AbsenceSection';
 import { PushNotificationCard } from '../components/PushNotificationCard';
 import { IconChevronRight, IconClipboard, IconJersey } from '../components/NavIcons';
-import { Countdown } from '../components/Countdown';
 import { StartHeader } from '../components/StartHeader';
+import { NextGameCard } from '../components/NextGameCard';
 import { usePushStatus } from '../hooks/usePushStatus';
-import { fmtDate, fmtDateShort, fmtTime, hasKickedOff, mapsUrl } from '../lib/format';
+import { fmtDate, fmtDateShort, fmtTime, hasKickedOff } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
 import { computeReminders, type ReminderItem } from '../lib/reminders';
 import { latestTransferFrom, pendingWasherFor } from '../lib/trikots';
@@ -22,11 +22,11 @@ import {
   STAT_POINT_VALUES,
   benoetigterSatz,
   gameResult,
-  meetingPoints,
   officiatingGameLabel,
   type Announcement,
   type CarpoolClaim,
   type CarpoolOffer,
+  type DeclineReason,
   type Game,
   type GameSquadRow,
   type OfficiatingGame,
@@ -51,19 +51,13 @@ const RESULT_LABELS = { sieg: 'Sieg', niederlage: 'Niederlage', unentschieden: '
 // Schritt) in eine gemeinsame Stelle gezogen statt an zwei Stellen gepflegt.
 const MAX_SQUAD_SIZE = 12;
 
-// Grobe, aus dem echten Namen abgeleitete Kurzform fürs Team-Icon im Hero
-// (DESIGN.md: "TBW"/"HMT"-Kacheln) — keine erfundene Abkürzung, nur die
-// ersten drei Buchstaben ohne Leerzeichen/Sonderzeichen.
-function teamAbbrev(name: string): string {
-  const letters = name.replace(/[^a-zA-ZÀ-ÿ]/g, '').toUpperCase();
-  return letters.slice(0, 3) || '?';
-}
-
 interface DashboardData {
   nextGame: Game | null;
   upcomingGames: Game[];
   playerInSquad: boolean | null;
   myConfirmation: SquadConfirmation | null;
+  myDeclineReason: DeclineReason | null;
+  myDeclineNote: string | null;
   playerNextTask: (OfficiatingTask & { officiating_games: OfficiatingGame }) | null;
   trainerNextOfficiatingGame: (OfficiatingGame & { tasks: OfficiatingTask[] }) | null;
   trikotSets: TrikotSet[];
@@ -81,6 +75,8 @@ interface DashboardData {
   reminders: ReminderItem[];
   activeStatsHolder: string | null;
   lastScoreEvent: { team: 'us' | 'opponent'; playerId: string | null; points: number } | null;
+  liveScore: { us: number; opponent: number } | null;
+  liveQuarter: number | null;
 }
 
 export function Dashboard() {
@@ -92,6 +88,7 @@ export function Dashboard() {
   const [absenceVersion, setAbsenceVersion] = useState(0);
   const [trainingVersion, setTrainingVersion] = useState(0);
   const [trikotVersion, setTrikotVersion] = useState(0);
+  const [squadResponseVersion, setSquadResponseVersion] = useState(0);
   const [showUpcomingAbsences, setShowUpcomingAbsences] = useState(false);
   // Direkte Trikot-Übergabe (siehe Migration 0048): eigener State statt
   // pro-Set, da realistisch immer nur ein Set gleichzeitig übergeben wird —
@@ -206,15 +203,25 @@ export function Dashboard() {
         squadCount = ((squadRows as { is_selected: boolean }[] | null) ?? []).filter((r) => r.is_selected).length;
       }
 
+      let myDeclineReason: DashboardData['myDeclineReason'] = null;
+      let myDeclineNote: DashboardData['myDeclineNote'] = null;
       if (role === 'player' && player && nextGame?.squad_published) {
         const { data: squadRow } = await supabase
           .from('game_squad')
-          .select('is_selected, confirmation')
+          .select('is_selected, confirmation, decline_reason, decline_note')
           .eq('game_id', nextGame.id)
           .eq('player_id', player.id)
           .maybeSingle();
-        playerInSquad = squadRow?.is_selected ?? false;
-        myConfirmation = playerInSquad ? (squadRow?.confirmation as SquadConfirmation) ?? 'pending' : null;
+        // Wichtig: myConfirmation NICHT hinter is_selected verstecken — eine
+        // Absage setzt is_selected bewusst auf false (respond_to_squad()),
+        // sonst wäre "abgesagt" von der Karte aus nicht mehr von "nie
+        // nominiert" zu unterscheiden (beides würde sonst als null/"nicht im
+        // Kader" ankommen, siehe NextGameCard.tsx).
+        const row = squadRow as { is_selected: boolean; confirmation: SquadConfirmation; decline_reason: DeclineReason | null; decline_note: string | null } | null;
+        playerInSquad = row?.is_selected ?? false;
+        myConfirmation = row?.confirmation ?? null;
+        myDeclineReason = row?.decline_reason ?? null;
+        myDeclineNote = row?.decline_note ?? null;
       }
 
       let myOfficiatingCount = 0;
@@ -393,6 +400,8 @@ export function Dashboard() {
       // Kachel dauerhaft an Stelle des großen Start-Buttons anzeigen.
       let activeStatsHolder: string | null = null;
       let lastScoreEvent: DashboardData['lastScoreEvent'] = null;
+      let liveScore: DashboardData['liveScore'] = null;
+      let liveQuarter: number | null = null;
       if (flags.stats && nextGame && !nextGame.stats_finalized_at && nextGame.game_date <= today) {
         const { data: sessionRow } = await supabase
           .from('game_stat_sessions')
@@ -408,7 +417,7 @@ export function Dashboard() {
         // nicht überschreiben), jüngstes zuerst.
         const { data: lastScoreRow } = await supabase
           .from('game_stat_events')
-          .select('team, player_id, stat_type')
+          .select('team, player_id, stat_type, quarter')
           .eq('game_id', nextGame.id)
           .in('stat_type', ['fg2_made', 'fg3_made', 'ft_made'])
           .order('created_at', { ascending: false })
@@ -420,6 +429,28 @@ export function Dashboard() {
             playerId: lastScoreRow.player_id,
             points: STAT_POINT_VALUES[lastScoreRow.stat_type as StatType] ?? 0
           };
+          liveQuarter = lastScoreRow.quarter;
+        }
+
+        // Live-Anzeigetafel (Karte "Nächstes Spiel"): games.final_score_us/
+        // -opponent werden erst bei Spielende gesetzt (siehe
+        // GameStatsTracker.tsx), während der Übertragung selbst gibt es nur
+        // die einzelnen game_stat_events — deshalb hier genau wie
+        // myTotalPoints oben direkt aus den wurfrelevanten Events aufsummiert.
+        // Nur abgefragt, wenn gerade wirklich getrackt wird (siehe
+        // NextGameCard.tsx: ohne aktiven Tracker zeigt die Karte bewusst
+        // "– : –" statt eines möglicherweise veralteten Zwischenstands).
+        if (activeStatsHolder) {
+          const { data: scoreRows } = await supabase
+            .from('game_stat_events')
+            .select('team, stat_type')
+            .eq('game_id', nextGame.id)
+            .in('stat_type', ['fg2_made', 'fg3_made', 'ft_made']);
+          const totals = { us: 0, opponent: 0 };
+          ((scoreRows as { team: 'us' | 'opponent'; stat_type: StatType }[] | null) ?? []).forEach((r) => {
+            totals[r.team] += STAT_POINT_VALUES[r.stat_type] ?? 0;
+          });
+          liveScore = totals;
         }
       }
 
@@ -478,6 +509,8 @@ export function Dashboard() {
         upcomingGames: (upcomingGamesRes.data as Game[]) ?? [],
         playerInSquad,
         myConfirmation,
+        myDeclineReason,
+        myDeclineNote,
         playerNextTask,
         trainerNextOfficiatingGame,
         trikotSets: (trikotRes.data as TrikotSet[]) ?? [],
@@ -494,7 +527,9 @@ export function Dashboard() {
         reminders,
         declinedNames,
         activeStatsHolder,
-        lastScoreEvent
+        lastScoreEvent,
+        liveScore,
+        liveQuarter
       });
     }
 
@@ -512,7 +547,8 @@ export function Dashboard() {
     flags.stats,
     absenceVersion,
     trainingVersion,
-    trikotVersion
+    trikotVersion,
+    squadResponseVersion
   ]);
 
   // Live-Anzeigetafel fürs laufende Spiel: der große Initial-Load oben läuft
@@ -536,7 +572,7 @@ export function Dashboard() {
       supabase.from('game_stat_sessions').select('holder_name, last_heartbeat').eq('game_id', gameId).maybeSingle(),
       supabase
         .from('game_stat_events')
-        .select('team, player_id, stat_type')
+        .select('team, player_id, stat_type, quarter')
         .eq('game_id', gameId)
         .in('stat_type', ['fg2_made', 'fg3_made', 'ft_made'])
         .order('created_at', { ascending: false })
@@ -554,6 +590,23 @@ export function Dashboard() {
           points: STAT_POINT_VALUES[lastScoreRes.data.stat_type as StatType] ?? 0
         }
       : null;
+    const liveQuarter = lastScoreRes.data?.quarter ?? null;
+    // Live-Score wie im initialen Load (siehe dort) nur nachladen, wenn
+    // gerade wirklich getrackt wird — ansonsten zeigt die Karte bewusst
+    // "– : –" statt eines möglicherweise veralteten Zwischenstands.
+    let liveScore: DashboardData['liveScore'] = null;
+    if (holder) {
+      const { data: scoreRows } = await supabase
+        .from('game_stat_events')
+        .select('team, stat_type')
+        .eq('game_id', gameId)
+        .in('stat_type', ['fg2_made', 'fg3_made', 'ft_made']);
+      const totals = { us: 0, opponent: 0 };
+      ((scoreRows as { team: 'us' | 'opponent'; stat_type: StatType }[] | null) ?? []).forEach((r) => {
+        totals[r.team] += STAT_POINT_VALUES[r.stat_type] ?? 0;
+      });
+      liveScore = totals;
+    }
     setData((prev) =>
       prev && prev.nextGame && prev.nextGame.id === gameId
         ? {
@@ -565,7 +618,9 @@ export function Dashboard() {
               stats_finalized_at: gameRes.data?.stats_finalized_at ?? prev.nextGame.stats_finalized_at
             },
             activeStatsHolder: holder,
-            lastScoreEvent
+            lastScoreEvent,
+            liveScore,
+            liveQuarter
           }
         : prev
     );
@@ -617,188 +672,55 @@ export function Dashboard() {
     <div className="space-y-4">
       <StartHeader nextGameDate={data.nextGame?.game_date ?? null} pushStatus={pushStatus} onPushChange={refreshPushStatus} />
 
-      {/* Nächstes Spiel — DESIGN.md Dashboard.dc.html: Karte mit Court-Linien-
-          Deko, Team-Zeile, Countdown, Kader-Status (nur Anzeige, siehe §7). */}
-      <section className="card relative overflow-hidden">
-        <svg
-          viewBox="0 0 300 300"
-          width="300"
-          height="300"
-          className="pointer-events-none absolute -right-32 -top-24 -z-0"
-          aria-hidden="true"
-        >
-          <circle cx="150" cy="150" r="140" fill="none" stroke="#F2F4F7" strokeWidth="1" opacity="0.08" />
-          <circle cx="150" cy="150" r="52" fill="none" stroke="#C8FF2E" strokeWidth="1.5" opacity="0.5" />
-        </svg>
+      {/* Nächstes Spiel — Vorlage: docs/design/tipoff-design/elements/
+          02-naechstes-spiel/ (pixelgenau, siehe PROMPT.md dort). */}
+      {data.nextGame ? (
+        <NextGameCard
+          game={data.nextGame}
+          // Dashboard rendert nur für diese drei Rollen (siehe App.tsx) —
+          // 'loading'/'guest' sind an dieser Stelle bereits ausgeschlossen.
+          role={role as 'trainer' | 'player' | 'viewer'}
+          playerInSquad={data.playerInSquad}
+          myConfirmation={data.myConfirmation}
+          myDeclineReason={data.myDeclineReason}
+          myDeclineNote={data.myDeclineNote}
+          squadCount={data.squadCount}
+          showTracking={flags.stats && !data.nextGame.stats_finalized_at}
+          activeStatsHolder={data.activeStatsHolder}
+          liveScore={data.liveScore}
+          liveQuarter={data.liveQuarter}
+          refreshingLive={refreshingLive}
+          onRefreshLive={refreshLiveScore}
+          onResponded={() => setSquadResponseVersion((v) => v + 1)}
+        />
+      ) : (
+        <section className="card">
+          <p className="text-sm text-to-text2">Kein Spiel geplant.</p>
+        </section>
+      )}
 
-        {data.nextGame ? (
-          <div className="relative flex flex-col gap-5">
-            <div className="flex items-center gap-2.5">
-              <span className={data.nextGame.is_home ? 'badge-home' : 'badge-away'}>
-                {data.nextGame.is_home ? 'Heim' : 'Auswärts'}
-              </span>
-              <span className="to-label !text-to-text2">Nächstes Spiel</span>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <p className="to-display-md text-to-text">{fmtDate(data.nextGame.game_date)}</p>
-              <p className="to-data text-sm text-to-text2">
-                {fmtTime(data.nextGame.game_time)} Uhr
-                {meetingPoints(data.nextGame)[0]?.time && ` · Treffpunkt ${fmtTime(meetingPoints(data.nextGame)[0].time!)}`}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-[1fr_28px_1fr] items-center gap-2 border-y border-to-divider py-4">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <TeamTile abbrev="TBW" own />
-                <span className="min-w-0 truncate text-sm font-semibold text-to-text">TB Wülfrath</span>
-              </div>
-              <span className="to-data text-center text-xs text-to-text3">vs</span>
-              <div className="flex min-w-0 items-center justify-end gap-2.5 text-right">
-                <span className="min-w-0 truncate text-sm font-semibold text-to-text">{data.nextGame.opponent}</span>
-                <TeamTile abbrev={teamAbbrev(data.nextGame.opponent)} />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-to-text2" aria-hidden="true">
-                  <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" />
-                  <circle cx="12" cy="9.5" r="2.5" />
-                </svg>
-                <span className="min-w-0 truncate text-sm font-medium text-to-text">{data.nextGame.location}</span>
-              </div>
-              <a
-                href={mapsUrl(data.nextGame.location)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-secondary !h-11 shrink-0 !px-4 text-sm"
-              >
-                Route
-              </a>
-            </div>
-
-            {meetingPoints(data.nextGame).length > 0 && (
-              <div className="rounded-to-md border border-to-divider bg-to-bg px-3.5 py-2.5">
-                <p className="to-label">Treffpunkt</p>
-                {meetingPoints(data.nextGame).map((m) => (
-                  <p key={m.label} className="mt-0.5 text-sm text-to-text2">
-                    {m.time && <span className="font-semibold text-to-text">{fmtTime(m.time)} Uhr</span>}
-                    {m.time && ' · '}
-                    {m.label}
-                    {m.place ? `, ${m.place}` : ''}
-                  </p>
-                ))}
-              </div>
-            )}
-
-            {flags.carpool && data.carpoolOffers.length > 0 && (
-              <div className="rounded-to-md border border-to-divider bg-to-bg px-3.5 py-2.5">
-                <div className="flex items-center justify-between">
-                  <p className="to-label">Mitfahrgelegenheit</p>
-                  <Link to="/spiele" className="text-xs font-semibold text-to-accent">
-                    Verwalten →
-                  </Link>
-                </div>
-                {data.carpoolOffers.map((o) => {
-                  const free = o.seats - data.carpoolClaims.filter((c) => c.offer_id === o.id).length;
-                  return (
-                    <p key={o.id} className="mt-0.5 text-sm text-to-text2">
-                      <span className="font-semibold text-to-text">{data.players[o.driver_player_id]?.name ?? '?'}</span>{' '}
-                      · {free > 0 ? `${free} von ${o.seats} Plätzen frei` : 'voll'}
-                    </p>
-                  );
-                })}
-              </div>
-            )}
-
-            {!nextGameIsLive && <Countdown gameDate={data.nextGame.game_date} gameTime={data.nextGame.game_time} />}
-
-            {nextGameIsLive && (data.activeStatsHolder || data.nextGame.final_score_us !== null) && (
-              <div className="rounded-to-md bg-to-bg px-4 py-3.5">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-to-accent">
-                    {data.activeStatsHolder && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-to-accent" />}
-                    {data.activeStatsHolder ? 'Live' : 'Zwischenstand'}
-                  </span>
-                  <button
-                    disabled={refreshingLive}
-                    onClick={() => refreshLiveScore()}
-                    className="text-[11px] font-semibold uppercase tracking-wide text-to-text3 disabled:opacity-40"
-                  >
-                    {refreshingLive ? 'Aktualisiert…' : 'Aktualisieren'}
-                  </button>
-                </div>
-                <div className="mt-1 flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-to-text3">
-                  <span>TB Wülfrath</span>
-                  <span className="text-to-text3">–</span>
-                  <span className="truncate">{data.nextGame.opponent}</span>
-                </div>
-                <p className="tabular-score text-center text-6xl text-to-text">
-                  {data.nextGame.final_score_us ?? 0}:{data.nextGame.final_score_opponent ?? 0}
-                </p>
-                {data.lastScoreEvent && (
-                  <p className="mt-0.5 text-center text-xs text-to-text3">
-                    Zuletzt:{' '}
-                    <span className="font-semibold text-to-text2">
-                      {data.lastScoreEvent.team === 'opponent'
-                        ? data.nextGame.opponent
-                        : (data.players[data.lastScoreEvent.playerId ?? '']?.name ?? '?')}
-                    </span>{' '}
-                    (+{data.lastScoreEvent.points})
-                  </p>
-                )}
-                {data.activeStatsHolder && (
-                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-to-divider pt-2">
-                    <p className="text-xs text-to-text2">
-                      <span className="font-semibold text-to-text">{data.activeStatsHolder}</span> trackt gerade
-                    </p>
-                    {(role === 'player' || role === 'trainer' || role === 'viewer') && (
-                      <Link to={`/stats/${data.nextGame.id}`} className="shrink-0 text-xs font-semibold text-to-accent">
-                        Tracking übernehmen
-                      </Link>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-            {nextGameIsLive &&
-              (role === 'player' || role === 'trainer' || role === 'viewer') &&
-              !data.activeStatsHolder && (
-              <Link to={`/stats/${data.nextGame.id}`} className="btn-primary w-full text-sm">
-                Spiel-Stats tracking übernehmen
-              </Link>
-            )}
-
-            <div className="flex items-center justify-between gap-3">
-              {!data.nextGame.squad_published ? (
-                <span className="pill pill-warn">Kader noch nicht veröffentlicht</span>
-              ) : role === 'player' ? (
-                <span className={`pill ${data.playerInSquad ? 'pill-ok' : 'pill-open'}`}>
-                  {data.playerInSquad ? 'Im Kader' : 'Nicht im Kader'}
-                </span>
-              ) : (
-                data.squadCount !== null && (
-                  <span className="pill pill-ok">
-                    {data.squadCount}/{MAX_SQUAD_SIZE} im Kader
-                  </span>
-                )
-              )}
-              {data.nextGame.squad_published && (
-                <Link to="/spiele?kader=1" className="shrink-0 text-xs font-semibold text-to-accent">
-                  Kader ansehen →
-                </Link>
-              )}
-            </div>
-
-            <p className="text-xs text-to-text3">
-              Trikot für dieses Spiel: {benoetigterSatz(data.nextGame) === 'weiss' ? 'Weiß' : 'Schwarz'}
-            </p>
+      {/* Mitfahrgelegenheit — kein Bestandteil der neuen Kartenvorlage
+          (Auswärtsspiel-Feature, siehe §7), bleibt deshalb als eigener,
+          unveränderter Block direkt darunter erhalten. */}
+      {flags.carpool && data.nextGame && !data.nextGame.is_home && data.carpoolOffers.length > 0 && (
+        <section className="card">
+          <div className="flex items-center justify-between">
+            <p className="to-label">Mitfahrgelegenheit</p>
+            <Link to="/spiele" className="text-xs font-semibold text-to-accent">
+              Verwalten →
+            </Link>
           </div>
-        ) : (
-          <p className="relative text-sm text-to-text2">Kein Spiel geplant.</p>
-        )}
-      </section>
+          {data.carpoolOffers.map((o) => {
+            const free = o.seats - data.carpoolClaims.filter((c) => c.offer_id === o.id).length;
+            return (
+              <p key={o.id} className="mt-0.5 text-sm text-to-text2">
+                <span className="font-semibold text-to-text">{data.players[o.driver_player_id]?.name ?? '?'}</span>{' '}
+                · {free > 0 ? `${free} von ${o.seats} Plätzen frei` : 'voll'}
+              </p>
+            );
+          })}
+        </section>
+      )}
 
       {/* Letztes Ergebnis — kein Mockup-Pendant, gleiche Kartensprache
           (DESIGN.md §7). */}
@@ -1205,18 +1127,6 @@ export function Dashboard() {
         </div>
       </section>
     </div>
-  );
-}
-
-function TeamTile({ abbrev, own }: { abbrev: string; own?: boolean }) {
-  return (
-    <span
-      className={`to-data flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full text-[15px] font-semibold ${
-        own ? 'bg-to-accent text-to-onAccent' : 'border-[1.5px] border-to-text text-to-text'
-      }`}
-    >
-      {abbrev}
-    </span>
   );
 }
 

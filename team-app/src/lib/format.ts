@@ -8,6 +8,19 @@ export function fmtDateShort(iso: string): string {
   return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
 }
 
+// "FR 25.09." — großes Datum auf der Karte "Nächstes Spiel" (siehe
+// docs/design/tipoff-design/elements/02-naechstes-spiel/): zweistelliges
+// Wochentagskürzel in Versalien + fmtDateShort(), ohne Jahr.
+export function fmtDateBadge(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  const weekday = d
+    .toLocaleDateString('de-DE', { weekday: 'short' })
+    .replace(/[^a-zA-ZÀ-ÿ]/g, '')
+    .slice(0, 2)
+    .toUpperCase();
+  return `${weekday} ${fmtDateShort(iso)}`;
+}
+
 export function fmtTime(time: string): string {
   return time.slice(0, 5);
 }
@@ -23,15 +36,23 @@ export function fmtDateTimeShort(iso: string): string {
   return `${datePart} ${timePart} Uhr`;
 }
 
-// Apple-Maps-Link statt Google Maps (auf Nutzeranfrage — Team nutzt
-// durchgehend iPhones, siehe README). https://maps.apple.com/?q=... ist ein
-// echter https-Universal-Link (kein maps://-Schema, das auf anderen
-// Plattformen/Browsern als ungültiges Protokoll fehlschlagen könnte) — auf
-// iOS öffnet ein Klick darauf direkt die "Karten"-App, akzeptiert wie bei
-// Google Maps reinen Freitext als Suchbegriff (Hallenname oder komplette
-// Adresse aus dem "Halle / Adresse"-Feld) und geocodiert selbst.
+// Navigation direkt in die jeweilige Standard-Karten-App, ohne eigene
+// Auswahl-Abfrage (Karte "Nächstes Spiel", siehe docs/design/tipoff-design/
+// elements/02-naechstes-spiel/PROMPT.md): Android bekommt einen geo:-Link
+// (öffnet dort den installierten Standard, üblicherweise Google Maps);
+// alles andere (iOS, Desktop) bekommt weiterhin den Apple-Maps-Link von
+// vorher — ein echter https-Universal-Link (kein maps://-Schema, das auf
+// anderen Plattformen/Browsern als ungültiges Protokoll fehlschlagen
+// könnte), der auf iOS die "Karten"-App öffnet und sonst als normale
+// Kartenvorschau im Browser funktioniert. Beide Formen akzeptieren reinen
+// Freitext als Suchbegriff (Hallenname oder komplette Adresse) und
+// geocodieren selbst.
 export function mapsUrl(location: string): string {
-  return `https://maps.apple.com/?q=${encodeURIComponent(location)}`;
+  const encoded = encodeURIComponent(location);
+  if (typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent ?? '')) {
+    return `geo:0,0?q=${encoded}`;
+  }
+  return `https://maps.apple.com/?q=${encoded}`;
 }
 
 // "Marc Rewald" -> "Marc R." — für die großen Spieler-Buttons im

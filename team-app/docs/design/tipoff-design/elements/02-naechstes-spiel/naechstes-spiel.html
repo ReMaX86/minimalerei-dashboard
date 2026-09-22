@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff – Referenz: Karte „Nächstes Spiel" (V1)</title>
+<!--
+  REFERENZ-UMSETZUNG der Karte „Nächstes Spiel" (Variante 1).
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=pending     Kader noch nicht veröffentlicht
+    ?state=nominated   im Kader, noch keine Rückmeldung  (Standard)
+    ?state=accepted    zugesagt
+    ?state=declined    abgesagt
+    ?state=matchday    Spieltag, vor dem Sprungball
+    ?state=live        Spiel läuft (Live-Ticker)
+    ?state=notinsquad  Kader veröffentlicht, aber nicht nominiert
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F;--to-surface:#12151A;--to-surface-2:#1A1E25;--to-border:#232830;--to-line:#2A303A;
+  --to-text:#F2F4F7;--to-text-2:#A3ABB8;--to-text-3:#7C8594;
+  --to-accent:#C8FF2E;--to-on-accent:#0A0C0F;--to-accent-soft:rgba(200,255,46,.12);
+  --to-danger:#FF5A67;--to-danger-text:#FF7A85;--to-danger-soft:rgba(255,90,103,.12);
+  --to-display-md:34px;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:20px;background:var(--to-bg);color:var(--to-text);font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:var(--to-accent)}
+[hidden]{display:none !important}
+.mono{font-family:'Geist Mono',monospace;font-variant-numeric:tabular-nums}
+
+/* Karte */
+.game{position:relative;width:350px;overflow:hidden;border-radius:26px;background:var(--to-surface);
+  border:1px solid var(--to-border);padding:20px;display:flex;flex-direction:column;gap:16px}
+.game.is-matchday{border-color:#3A4A12}
+.court{position:absolute;right:-120px;top:-80px;pointer-events:none}
+
+/* Kopfzeile */
+.head{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.badge{display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:999px;
+  font-family:'Geist Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.08em}
+.badge--home{background:var(--to-accent);color:var(--to-on-accent)}
+.badge--away{border:1px solid var(--to-text);color:var(--to-text)}
+.count{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 11px;border-radius:999px;
+  background:var(--to-surface-2);color:var(--to-text-2);font-family:'Geist Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em}
+.count.is-hot{background:var(--to-accent-soft);color:var(--to-accent)}
+.count.is-live{background:var(--to-danger-soft);color:var(--to-danger-text)}
+.count .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+
+/* Kopf: Datum, Zeit, Gegner */
+.when{position:relative;display:flex;flex-direction:column;gap:6px}
+.when .date{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:var(--to-display-md);letter-spacing:-.04em;line-height:1}
+.when .time{font-family:'Geist Mono',monospace;font-size:14px;color:var(--to-text-2)}
+.when .opp{font-size:18px;font-weight:600;letter-spacing:-.01em;margin-top:2px;line-height:1.25}
+
+/* Info-Zeilen */
+.info{position:relative;display:flex;flex-direction:column;gap:2px}
+.row{display:flex;align-items:center;gap:12px;min-height:48px;color:var(--to-text);text-decoration:none}
+.row .ico{width:20px;height:20px;flex:none;color:var(--to-text-3)}
+.row .txt{flex:1;font-size:15px}
+.route{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:600;color:var(--to-accent)}
+.route svg{width:14px;height:14px}
+.kit{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 11px;border-radius:999px;background:var(--to-surface-2);font-size:13px;font-weight:600}
+.kit .swatch{width:10px;height:10px;border-radius:50%;background:#F2F4F7}
+.kit .swatch--dark{background:#15181D;border:1px solid #4A515C}
+
+/* Fußbereich */
+.foot{position:relative;display:flex;flex-direction:column;gap:14px;padding-top:16px;border-top:1px solid var(--to-border)}
+.status{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.status .left{display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:600}
+.status svg{width:18px;height:18px}
+.muted{color:var(--to-text-2)}
+.hint{font-size:13px;color:var(--to-text-3)}
+.link{display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:600;text-decoration:none}
+.link svg{width:15px;height:15px}
+.dot-grey{width:8px;height:8px;border-radius:50%;background:var(--to-text-3);flex:none}
+
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{height:50px;border:0;border-radius:14px;background:var(--to-accent);color:var(--to-on-accent);font-size:15px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;gap:8px}
+.btn--ghost{background:transparent;border:1px solid var(--to-line);color:var(--to-text);font-weight:500}
+.btn--wide{width:100%;height:54px;border-radius:16px;font-size:16px}
+.btn svg{width:18px;height:18px}
+.pill{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:999px;font-size:14px;font-weight:600}
+.pill--ok{background:var(--to-accent-soft);color:var(--to-accent)}
+.pill--no{background:var(--to-danger-soft);color:var(--to-danger-text)}
+.change{background:none;border:0;padding:0;font-size:14px;color:var(--to-text-2);text-decoration:underline}
+
+/* Live-Anzeigetafel */
+.board{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-radius:18px;background:var(--to-bg)}
+.board .side{display:flex;flex-direction:column;gap:4px}
+.board .side.right{align-items:flex-end}
+.board .abbr{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--to-text-3)}
+.board .score{font-family:'Geist Mono',monospace;font-size:30px;font-weight:600;line-height:1}
+.board .score.us{color:var(--to-accent)}
+.board .mid{display:flex;flex-direction:column;align-items:center;gap:4px}
+.board .live{display:inline-flex;align-items:center;gap:6px;font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.1em;color:var(--to-danger-text)}
+.board .live i{width:7px;height:7px;border-radius:50%;background:var(--to-danger);display:inline-block}
+.board .clock{font-family:'Geist Mono',monospace;font-size:13px;color:var(--to-text-2)}
+
+/* Absage-Blatt (Grund optional) */
+.sheet{width:350px;margin-top:16px;border-radius:24px;background:var(--to-surface-2);border:1px solid var(--to-line);
+  padding:20px;display:flex;flex-direction:column;gap:16px}
+.sheet h2{margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em}
+.sheet .sub{margin:-8px 0 0;font-size:14px;color:var(--to-text-2)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--to-line);background:transparent;color:var(--to-text);font-size:14px}
+.chip[aria-pressed="true"]{background:var(--to-accent);border-color:var(--to-accent);color:var(--to-on-accent);font-weight:600}
+.sheet textarea{min-height:64px;padding:12px 14px;border-radius:14px;border:1px solid var(--to-line);background:var(--to-bg);
+  color:var(--to-text);font:inherit;font-size:15px;resize:none}
+.sheet textarea::placeholder{color:var(--to-text-3)}
+</style>
+</head>
+<body>
+
+<section class="game" id="game" aria-label="Nächstes Spiel">
+  <svg class="court" viewBox="0 0 260 260" width="260" height="260" aria-hidden="true">
+    <circle cx="130" cy="130" r="120" fill="none" stroke="#F2F4F7" stroke-width="1" opacity=".07"/>
+    <circle cx="130" cy="130" r="46" fill="none" stroke="#C8FF2E" stroke-width="1.5" opacity=".45"/>
+    <line x1="130" y1="0" x2="130" y2="260" stroke="#F2F4F7" stroke-width="1" opacity=".07"/>
+  </svg>
+
+  <div class="head">
+    <span class="badge badge--home">HEIM</span>
+    <span class="count" id="count"><span class="dot" hidden></span><span id="count-txt">IN 2 TAGEN</span></span>
+  </div>
+
+  <div class="when">
+    <div class="date" id="date">FR 25.09.</div>
+    <div class="time">20:00 Uhr · Treffpunkt 19:15</div>
+    <div class="opp">vs. HSV Solingen-Gräfrath 2</div>
+  </div>
+
+  <div class="info">
+    <a class="row" href="#" id="route">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
+      <span class="txt">Goethestraße, 42489 Wülfrath</span>
+      <span class="route">Route<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg></span>
+    </a>
+    <div class="row" style="min-height:40px">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3c0 2 1.8 3.5 4 3.5S16 5 16 3l3 1.2v4c-1 .5-1.5 1.5-1.5 3V21h-11v-9.8c0-1.5-.5-2.5-1.5-3v-4z"/></svg>
+      <span class="txt muted">Trikotsatz</span>
+      <span class="kit"><span class="swatch"></span>Weiß</span>
+    </div>
+  </div>
+
+  <div class="foot">
+    <!-- A) Kader noch nicht veröffentlicht -->
+    <div class="status" data-state="pending" hidden>
+      <span class="left muted"><span class="dot-grey"></span>Kader noch nicht veröffentlicht</span>
+    </div>
+    <p class="hint" data-state="pending" hidden style="margin:-8px 0 0">Du bekommst eine Nachricht, sobald er steht.</p>
+
+    <!-- B) Kader steht, du bist nicht dabei -->
+    <div class="status" data-state="notinsquad" hidden>
+      <span class="left muted"><span class="dot-grey"></span>Diesmal nicht im Kader</span>
+      <a class="link" href="#">Kader ansehen<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13"/><path d="M13 7l5 5-5 5"/></svg></a>
+    </div>
+
+    <!-- C) Im Kader, noch keine Rückmeldung -->
+    <div class="status" data-state="nominated" hidden>
+      <span class="left" style="color:var(--to-accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Du bist im Kader</span>
+      <a class="link" href="#">Kader ansehen<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13"/><path d="M13 7l5 5-5 5"/></svg></a>
+    </div>
+    <div class="actions" data-state="nominated" hidden>
+      <button type="button" class="btn">Zusagen</button>
+      <button type="button" class="btn btn--ghost">Absagen</button>
+    </div>
+
+    <!-- D) Zugesagt -->
+    <div class="status" data-state="accepted matchday" hidden>
+      <span class="pill pill--ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Zugesagt</span>
+      <a class="link" href="#">Kader ansehen<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13"/><path d="M13 7l5 5-5 5"/></svg></a>
+    </div>
+    <button type="button" class="change" data-state="accepted" hidden style="align-self:flex-start">Doch nicht dabei?</button>
+
+    <!-- E) Abgesagt -->
+    <div class="status" data-state="declined" hidden>
+      <span class="pill pill--no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>Abgesagt</span>
+      <button type="button" class="change">Doch dabei?</button>
+    </div>
+    <p class="hint" data-state="declined" hidden style="margin:-8px 0 0">Der Trainer wurde informiert.</p>
+
+    <!-- F) Spieltag: Tracking -->
+    <button type="button" class="btn btn--wide" data-state="matchday" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M21 19H3"/></svg>
+      Statistiken tracken
+    </button>
+    <p class="hint" data-state="matchday" hidden style="margin:-8px 0 0;text-align:center">Eine Person trackt – alle anderen sehen den Live-Ticker.</p>
+
+    <!-- G) Spiel läuft -->
+    <div class="board" data-state="live" hidden>
+      <span class="side"><span class="abbr">TBW</span><span class="score us">34</span></span>
+      <span class="mid"><span class="live"><i></i>LIVE</span><span class="clock">Q3 · 08:12</span></span>
+      <span class="side right"><span class="abbr">HSV</span><span class="score">28</span></span>
+    </div>
+    <button type="button" class="btn btn--ghost btn--wide" data-state="live" hidden style="height:50px;border-radius:14px;font-size:15px">Live-Ticker öffnen</button>
+  </div>
+</section>
+
+<section class="sheet" data-state="declinesheet" hidden aria-label="Absagen">
+  <h2>Für dieses Spiel absagen?</h2>
+  <p class="sub">Der Trainer bekommt eine Nachricht. Ein Grund hilft ihm beim Planen, ist aber freiwillig.</p>
+  <div class="chips" role="group" aria-label="Grund (optional)">
+    <button type="button" class="chip" aria-pressed="false">Krank</button>
+    <button type="button" class="chip" aria-pressed="true">Arbeit / Schule</button>
+    <button type="button" class="chip" aria-pressed="false">Urlaub</button>
+    <button type="button" class="chip" aria-pressed="false">Anderer Grund</button>
+  </div>
+  <textarea placeholder="Notiz für den Trainer (optional)"></textarea>
+  <div class="actions">
+    <button type="button" class="btn">Absage senden</button>
+    <button type="button" class="btn btn--ghost">Abbrechen</button>
+  </div>
+</section>
+
+<script>
+  const state = new URLSearchParams(location.search).get('state') || 'nominated';
+  const shown = state === 'declinesheet' ? ['nominated', 'declinesheet'] : [state];
+  document.querySelectorAll('[data-state]').forEach(el => {
+    el.hidden = !el.dataset.state.split(' ').some(s => shown.includes(s));
+  });
+  const game = document.getElementById('game');
+  const count = document.getElementById('count');
+  const countTxt = document.getElementById('count-txt');
+  const date = document.getElementById('date');
+  if (state === 'matchday') {
+    game.classList.add('is-matchday'); count.classList.add('is-hot');
+    countTxt.textContent = 'IN 4 STD 12 MIN'; date.textContent = 'HEUTE';
+  }
+  if (state === 'live') {
+    game.classList.add('is-matchday'); count.classList.add('is-live');
+    count.querySelector('.dot').hidden = false;
+    countTxt.textContent = 'LÄUFT'; date.textContent = 'HEUTE';
+  }
+</script>
+</body>
+</html>
