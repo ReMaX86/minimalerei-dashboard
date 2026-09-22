@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Urlaub / Abwesenheit</title>
+<!--
+  REFERENZ-UMSETZUNG der Karte „Abwesenheit" auf der Startseite, direkt unter dem Kampfgericht-Element.
+  Standard ist kompakt (eine Zeile), Tipp auf die Zeile klappt die Zeiträume auf.
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=default     kompakt, zwei Zeiträume eingetragen (Standard)
+    ?state=open        aufgeklappt
+    ?state=active      kompakt, ein Zeitraum läuft gerade (gold)
+    ?state=activeopen  aufgeklappt, erster Zeitraum läuft
+    ?state=single      aufgeklappt mit einem einzelnen Tag
+    ?state=empty       kompakt, nichts eingetragen
+    ?state=sheet       Blatt „Abwesenheit eintragen"
+    ?state=edit        Blatt „Zeitraum ändern" (mit Löschen)
+  Klickbar: die Kopfzeile (auf/zu), eine Zeitraum-Zeile (ändern), der Knopf (eintragen).
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25;
+  --to-border:#232830; --to-line:#2A303A;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F;
+  --to-danger-text:#FF7A85;
+  --to-vacation:#E9B949; --to-vacation-soft:rgba(233,185,73,.12);
+  --to-vacation-frame:#4A3C12;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{width:390px;margin:0 auto;padding:24px 20px}
+
+/* ---------- Karte ---------- */
+.away{border-radius:24px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.away.is-active{border-color:var(--to-vacation-frame)}
+
+.away__head{display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;
+  border:0;background:transparent;color:var(--to-text);font-family:'Geist',sans-serif;
+  text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.away__head[aria-expanded="true"]{background:#14181E}
+
+.away__tile{width:46px;height:46px;flex:none;border-radius:14px;background:var(--to-surface-2);
+  display:grid;place-items:center}
+.away__tile svg{width:23px;height:23px;fill:none;stroke:var(--to-vacation);
+  stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.away.is-active .away__tile{background:var(--to-vacation)}
+.away.is-active .away__tile svg{stroke:var(--to-on-accent);stroke-width:1.9}
+.away.is-empty .away__tile svg{stroke:var(--to-text-4)}
+
+.away__txt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.away__eyebrow{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.away__title{font-size:16px;font-weight:600;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.away.is-empty .away__title{color:var(--to-text-2)}
+.away__sub{font-family:'Geist Mono',monospace;font-size:13px;color:var(--to-text-2);font-variant-numeric:tabular-nums}
+.away__sub--plain{font-family:'Geist',sans-serif;font-size:13px;color:var(--to-text-3)}
+
+.away__meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none}
+.pill{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;
+  background:var(--to-vacation-soft);color:var(--to-vacation);
+  font-family:'Geist Mono',monospace;font-size:10px;font-weight:600;white-space:nowrap}
+.chev{width:17px;height:17px;fill:none;stroke:var(--to-text-3);stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .18s ease}
+.away__head[aria-expanded="true"] .chev{transform:rotate(180deg)}
+
+/* ---------- Aufgeklappt ---------- */
+.away__body{display:flex;flex-direction:column;gap:12px;padding:4px 18px 18px}
+.hint{font-size:13px;color:var(--to-text-3);line-height:1.45}
+.list{display:flex;flex-direction:column;gap:8px}
+
+.item{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:16px;
+  background:var(--to-surface-2)}
+.item--running{background:rgba(233,185,73,.10)}
+.item__bar{width:4px;height:38px;flex:none;border-radius:2px;background:var(--to-vacation)}
+.item__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px;
+  border:0;background:transparent;padding:0;text-align:left;color:var(--to-text);
+  font-family:'Geist',sans-serif;cursor:pointer}
+.item__range{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.item__meta{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.06em;color:var(--to-text-3)}
+.item__del{width:36px;height:36px;flex:none;border:1px solid var(--to-line);border-radius:11px;
+  background:transparent;display:grid;place-items:center;cursor:pointer}
+.item__del svg{width:16px;height:16px;fill:none;stroke:var(--to-danger-text);
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+
+.btn-primary{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;height:52px;
+  border:0;border-radius:14px;background:var(--to-accent);color:var(--to-on-accent);
+  font-family:'Geist',sans-serif;font-size:15px;font-weight:600;cursor:pointer}
+.btn-primary svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4;
+  stroke-linecap:round;stroke-linejoin:round}
+.btn-quiet{height:44px;width:100%;border:0;border-radius:14px;background:transparent;
+  color:var(--to-text-2);font-family:'Geist',sans-serif;font-size:14px;font-weight:500;cursor:pointer}
+.btn-danger{height:44px;width:100%;border:0;border-radius:14px;background:transparent;
+  color:var(--to-danger-text);font-family:'Geist',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
+
+/* ---------- Blatt ---------- */
+.sheet{border-radius:24px 24px 18px 18px;background:var(--to-surface);border:1px solid var(--to-border);
+  padding:20px;display:flex;flex-direction:column;gap:16px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:22px;letter-spacing:-.035em;line-height:1}
+.sheet__sub{font-size:13px;color:var(--to-text-3)}
+.dates{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.date{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:14px;
+  background:var(--to-surface-2);border:1px solid var(--to-line);text-align:left;
+  font-family:'Geist',sans-serif;color:var(--to-text);cursor:pointer}
+.date.is-focus{border-color:var(--to-vacation)}
+.date__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.date__value{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;height:34px;padding:0 13px;border-radius:999px;
+  border:1px solid var(--to-line);background:transparent;color:var(--to-text-2);
+  font-family:'Geist',sans-serif;font-size:13px;cursor:pointer}
+.chip.is-on{border-color:var(--to-vacation);color:var(--to-vacation);background:var(--to-vacation-soft)}
+.note{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;
+  background:rgba(233,185,73,.10)}
+.note svg{width:18px;height:18px;flex:none;fill:none;stroke:var(--to-vacation);
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.note span{flex:1 1 auto;font-size:13px;color:var(--to-vacation)}
+.sheet__actions{display:flex;flex-direction:column;gap:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <article class="away" id="card">
+    <button class="away__head" id="head" type="button" aria-expanded="false" aria-controls="body">
+      <span class="away__tile">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="7" width="18" height="13" rx="3"></rect>
+          <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+          <path d="M3 13h18"></path>
+        </svg>
+      </span>
+      <span class="away__txt">
+        <span class="away__eyebrow">ABWESENHEIT</span>
+        <span class="away__title" id="title">2 Zeiträume eingetragen</span>
+        <span class="away__sub" id="sub">NÄCHSTER: 17.10. – 24.10.</span>
+      </span>
+      <span class="away__meta">
+        <span class="pill" id="pill" hidden>5 TAGE</span>
+        <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+      </span>
+    </button>
+
+    <div class="away__body" id="body" hidden>
+      <span class="hint">Trainings in diesen Zeiträumen werden automatisch abgesagt. Beim Kader sieht der Trainer, dass du nicht da bist.</span>
+      <div class="list" id="list"></div>
+      <button class="btn-primary" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12"></path><path d="M6 12h12"></path></svg>
+        Zeitraum eintragen
+      </button>
+    </div>
+  </article>
+
+  <div class="sheet" id="sheet" hidden>
+    <span class="sheet__grip"></span>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span class="sheet__title" id="sheettitle">Abwesenheit eintragen</span>
+      <span class="sheet__sub">Trainings in diesem Zeitraum werden automatisch abgesagt.</span>
+    </div>
+    <div class="dates">
+      <button class="date is-focus" type="button">
+        <span class="date__label">VON</span>
+        <span class="date__value">17.10.2026</span>
+      </button>
+      <button class="date" type="button">
+        <span class="date__label">BIS</span>
+        <span class="date__value">24.10.2026</span>
+      </button>
+    </div>
+    <div class="chips">
+      <button class="chip" type="button">Nur heute</button>
+      <button class="chip" type="button">Diese Woche</button>
+      <button class="chip is-on" type="button">Eine Woche</button>
+      <button class="chip" type="button">Zwei Wochen</button>
+    </div>
+    <div class="note">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 8h.01"></path><path d="M11 12h1v4h1"></path></svg>
+      <span>3 Trainings werden für dich abgesagt.</span>
+    </div>
+    <div class="sheet__actions">
+      <button class="btn-primary" id="save" type="button">Eintragen</button>
+      <button class="btn-danger" id="delete" type="button" hidden>Zeitraum löschen</button>
+      <button class="btn-quiet" type="button">Abbrechen</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var ITEMS_TWO = [
+  { range: '17.10. – 24.10.', meta: '8 TAGE · 3 TRAININGS' },
+  { range: '27.12. – 04.01.', meta: '9 TAGE · 2 TRAININGS' }
+];
+var ITEMS_RUNNING = [
+  { range: '17.10. – 24.10.', meta: 'LÄUFT · NOCH 5 TAGE', running: true },
+  { range: '27.12. – 04.01.', meta: '9 TAGE · 2 TRAININGS' }
+];
+var ITEMS_SINGLE = [
+  { range: '30.10.', meta: '1 TAG · 1 TRAINING' }
+];
+
+var BASE = {
+  title: '2 Zeiträume eingetragen',
+  sub: 'NÄCHSTER: 17.10. – 24.10.',
+  subPlain: false,
+  pill: null,
+  active: false,
+  empty: false,
+  open: false,
+  items: ITEMS_TWO,
+  sheet: false,
+  sheetTitle: 'Abwesenheit eintragen',
+  sheetDelete: false
+};
+
+var RUNNING = { active: true, title: 'Du bist abwesend', sub: 'NOCH BIS 24.10.', pill: '5 TAGE', items: ITEMS_RUNNING };
+
+var STATES = {
+  default:    {},
+  open:       { open: true },
+  active:     RUNNING,
+  activeopen: Object.assign({}, RUNNING, { open: true }),
+  single:     { open: true, title: '1 Zeitraum eingetragen', sub: 'NÄCHSTER: 30.10.', items: ITEMS_SINGLE },
+  empty:      { empty: true, title: 'Kein Zeitraum eingetragen', sub: 'Antippen zum Eintragen', subPlain: true, items: [] },
+  sheet:      { sheet: true },
+  edit:       { sheet: true, sheetTitle: 'Zeitraum ändern', sheetDelete: true }
+};
+
+var key = new URLSearchParams(location.search).get('state') || 'default';
+var data = Object.assign({}, BASE, STATES[key] || {});
+
+var card = document.getElementById('card');
+var head = document.getElementById('head');
+var body = document.getElementById('body');
+var sheet = document.getElementById('sheet');
+
+if (data.sheet) {
+  card.hidden = true;
+  sheet.hidden = false;
+  document.getElementById('sheettitle').textContent = data.sheetTitle;
+  document.getElementById('save').textContent = data.sheetDelete ? 'Speichern' : 'Eintragen';
+  document.getElementById('delete').hidden = !data.sheetDelete;
+} else {
+  card.classList.toggle('is-active', !!data.active);
+  card.classList.toggle('is-empty', !!data.empty);
+  document.getElementById('title').textContent = data.title;
+
+  var sub = document.getElementById('sub');
+  sub.textContent = data.sub;
+  sub.classList.toggle('away__sub--plain', !!data.subPlain);
+
+  if (data.pill) {
+    var p = document.getElementById('pill');
+    p.textContent = data.pill;
+    p.hidden = false;
+  }
+
+  document.getElementById('list').innerHTML = data.items.map(function (i) {
+    return '<div class="item' + (i.running ? ' item--running' : '') + '">' +
+           '<span class="item__bar"></span>' +
+           '<button class="item__main" type="button">' +
+           '<span class="item__range">' + i.range + '</span>' +
+           '<span class="item__meta">' + i.meta + '</span>' +
+           '</button>' +
+           '<button class="item__del" type="button" aria-label="Zeitraum löschen">' +
+           '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14"></path>' +
+           '<path d="M9 7V5h6v2"></path><path d="M7 7l1 13h8l1-13"></path></svg>' +
+           '</button></div>';
+  }).join('');
+
+  function setOpen(open) {
+    head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    body.hidden = !open;
+  }
+  setOpen(!!data.open && !data.empty);
+  head.addEventListener('click', function () {
+    // Ohne Eintrag führt die Zeile direkt ins Blatt zum Eintragen
+    if (data.empty) { location.search = '?state=sheet'; return; }
+    setOpen(head.getAttribute('aria-expanded') !== 'true');
+  });
+}
+</script>
+</body>
+</html>

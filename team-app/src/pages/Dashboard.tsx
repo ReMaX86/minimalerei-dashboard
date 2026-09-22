@@ -7,7 +7,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { TrainingCard } from '../components/TrainingCard';
 import { WeeklyTrainingTimes } from '../components/WeeklyTrainingTimes';
-import { AbsenceSection } from '../components/AbsenceSection';
+import { AbsenceCard } from '../components/AbsenceCard';
 import { PushNotificationCard } from '../components/PushNotificationCard';
 import { IconChevronRight, IconClipboard, IconJersey } from '../components/NavIcons';
 import { StartHeader } from '../components/StartHeader';
@@ -847,6 +847,10 @@ export function Dashboard() {
         <OfficiatingDutyCard task={data.playerNextTask} teammates={data.playerNextTaskTeammates} players={data.players} />
       )}
 
+      {/* Abwesenheit — direkt unter dem Kampfgericht-Element, siehe
+          docs/design/tipoff-design/elements/06-abwesenheit/PROMPT.md. */}
+      {flags.absences && role === 'player' && <AbsenceCard onChange={() => setAbsenceVersion((v) => v + 1)} />}
+
       {flags.push_notifications && (pushStatus === 'unsubscribed' || pushStatus === 'denied') && (
         <PushNotificationCard status={pushStatus} onChange={refreshPushStatus} />
       )}
@@ -1083,10 +1087,6 @@ export function Dashboard() {
       )}
 
       <TrainingCard refreshKey={absenceVersion} onChange={() => setTrainingVersion((v) => v + 1)} />
-
-      {flags.absences && role === 'player' && (
-        <AbsenceSection onChange={() => setAbsenceVersion((v) => v + 1)} />
-      )}
 
       <p className="to-label pt-1">Teaminformationen</p>
 

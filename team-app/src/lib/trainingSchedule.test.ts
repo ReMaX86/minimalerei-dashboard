@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cancelledOccurrencesUntil, nextTrainingOccurrences } from './trainingSchedule';
+import { cancelledOccurrencesUntil, nextTrainingOccurrences, trainingsInDateRange } from './trainingSchedule';
 import type { Training } from '../types/database';
 
 const dienstag: Training = {
@@ -191,5 +191,46 @@ describe('cancelledOccurrencesUntil', () => {
     const overrides = [{ id: 'ov-1', start_date: '2026-09-08', end_date: '2026-09-08', mode: 'cancelled' as const, note: null }];
     const result = cancelledOccurrencesUntil([sonder], new Date('2026-09-07T10:00:00'), '2026-09-30', overrides);
     expect(result).toEqual([]);
+  });
+});
+
+describe('trainingsInDateRange', () => {
+  it('counts occurrences of multiple weekly trainings within an inclusive range', () => {
+    // Di 08.09., Do 10.09.
+    expect(trainingsInDateRange([dienstag, donnerstag], [], '2026-09-08', '2026-09-10')).toBe(2);
+  });
+
+  it('includes the range start date itself when it matches the weekday', () => {
+    // Di 08.09., Do 10.09., Di 15.09. — Do 17.09. liegt außerhalb
+    expect(trainingsInDateRange([dienstag, donnerstag], [], '2026-09-08', '2026-09-16')).toBe(3);
+  });
+
+  it('excludes occurrences that fall inside a cancelled/special override', () => {
+    const overrides = [{ id: 'ov-1', start_date: '2026-09-10', end_date: '2026-09-10', mode: 'cancelled' as const, note: null }];
+    expect(trainingsInDateRange([dienstag, donnerstag], overrides, '2026-09-08', '2026-09-10')).toBe(1);
+  });
+
+  it('counts a one-off Sondertermin only when its date falls in range', () => {
+    const sonder: Training = {
+      id: 't-sonder',
+      weekday: null,
+      start_time: '17:00',
+      end_time: '18:00',
+      location: 'Halle C',
+      specific_date: '2026-09-09',
+      override_id: null
+    };
+    expect(trainingsInDateRange([sonder], [], '2026-09-08', '2026-09-10')).toBe(1);
+    expect(trainingsInDateRange([sonder], [], '2026-09-10', '2026-09-20')).toBe(0);
+  });
+
+  it('returns 0 when the range is empty or inverted', () => {
+    expect(trainingsInDateRange([dienstag], [], '2026-09-10', '2026-09-08')).toBe(0);
+    expect(trainingsInDateRange([], [], '2026-09-08', '2026-09-10')).toBe(0);
+  });
+
+  it('is inclusive of a single-day range matching the weekday', () => {
+    expect(trainingsInDateRange([dienstag], [], '2026-09-08', '2026-09-08')).toBe(1);
+    expect(trainingsInDateRange([dienstag], [], '2026-09-09', '2026-09-09')).toBe(0);
   });
 });

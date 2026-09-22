@@ -27,6 +27,7 @@
   --to-danger-soft: rgba(255, 90, 103, 0.12);
   --to-vacation: #E9B949;    /* nur für "Urlaub" (Training-Karte) */
   --to-vacation-soft: rgba(233, 185, 73, 0.12);
+  --to-vacation-frame: #4A3C12; /* Karten-Rand "Abwesenheit" während ein Zeitraum läuft */
 
   /* Schrift */
   --to-font-display: 'Archivo', system-ui, sans-serif;   /* font-stretch 125%, 800, italic */

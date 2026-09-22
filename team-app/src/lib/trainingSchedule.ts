@@ -174,3 +174,42 @@ export function cancelledOccurrencesUntil(
   }
   return result.sort((a, b) => a.date.localeCompare(b.date) || a.training.id.localeCompare(b.training.id));
 }
+
+/**
+ * Anzahl der tatsächlich stattfindenden Trainings (wiederkehrend + Sondertermine,
+ * abzüglich 'cancelled'/'special'-Ferienzeiten) innerhalb [startIso, endIso]
+ * (beide Tage inklusive) — für die Live-Vorschau "X Trainings werden für dich
+ * abgesagt" beim Eintragen einer Abwesenheit (Karte "Abwesenheit", siehe
+ * elements/06-abwesenheit/PROMPT.md). Reiner Kalendertag-Vergleich, kein
+ * Uhrzeitbezug wie bei nextTrainingOccurrences() (dort zählt "hat die
+ * Startzeit heute schon begonnen").
+ */
+export function trainingsInDateRange(
+  trainings: Training[],
+  overrides: OverrideInput[],
+  startIso: string,
+  endIso: string
+): number {
+  if (endIso < startIso) return 0;
+  const cancelledRanges = overrides.filter((o) => o.mode === 'cancelled' || o.mode === 'special');
+  const from = new Date(startIso + 'T00:00:00');
+
+  let count = 0;
+  for (const training of trainings.filter((t) => t.weekday !== null)) {
+    let next = firstOccurrenceOnOrAfter(training, from);
+    // Sicherheitsgrenze gegen eine Endlosschleife bei einem unplausibel weit
+    // in der Zukunft liegenden endIso (~5 Jahre wöchentlich).
+    for (let round = 0; round < 260 && toDateKey(next) <= endIso; round++) {
+      const date = toDateKey(next);
+      const cancelled = cancelledRanges.some((o) => date >= o.start_date && date <= o.end_date);
+      if (!cancelled) count++;
+      next = new Date(next.getFullYear(), next.getMonth(), next.getDate() + 7);
+    }
+  }
+
+  for (const training of trainings.filter((t) => t.specific_date !== null)) {
+    if (training.specific_date! >= startIso && training.specific_date! <= endIso) count++;
+  }
+
+  return count;
+}

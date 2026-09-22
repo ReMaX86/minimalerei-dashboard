@@ -138,7 +138,7 @@ export function TrainingCard({ refreshKey, onChange }: { refreshKey?: number; on
       absences: (absencesRes.data as PlayerAbsence[]) ?? []
     });
     // refreshKey wird hier nicht gelesen — löst nur ein Neuladen aus, wenn
-    // AbsenceSection (Geschwister-Komponente auf dem Dashboard) eine
+    // AbsenceCard (Geschwister-Komponente auf dem Dashboard) eine
     // Abwesenheit ändert, die hier den Urlaub-Zustand mitbestimmt.
   }, [flags.absences, refreshKey]);
 

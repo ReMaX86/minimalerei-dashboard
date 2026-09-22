@@ -31,6 +31,7 @@ Die Werte stehen als CSS-Variablen in `tokens.css`, die Logos und Icons in `asse
 | `--to-on-accent` | `#0A0C0F` | Text auf Volt (niemals weiß auf Volt!) |
 | `--to-danger` | `#FF5A67` | offen / abgemeldet / zu viele |
 | `--to-vacation` | `#E9B949` | Update 2026-09-22 — ausschließlich "Urlaub" auf der Training-Karte |
+| `--to-vacation-frame` | `#4A3C12` | Update 2026-09-22 — Karten-Rand "Abwesenheit", während ein Zeitraum läuft |
 
 Regeln: Volt nie großflächig als Hintergrund in Screens (Ausnahme: App-Icon, Primär-Button, kleine Badges). Kein Weiß auf Volt.
 
