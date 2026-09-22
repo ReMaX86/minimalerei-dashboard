@@ -28,6 +28,8 @@
   --to-vacation: #E9B949;    /* nur für "Urlaub" (Training-Karte) */
   --to-vacation-soft: rgba(233, 185, 73, 0.12);
   --to-vacation-frame: #4A3C12; /* Karten-Rand "Abwesenheit" während ein Zeitraum läuft */
+  --to-line-muted: #3A414C;  /* gedämpfter Rand/Punkt für Platzhalter (offene Kampfgericht-Rolle,
+                                 kommende Abwesenheit, dunkles Trikot-Farbfeld) im Team-Board */
 
   /* Schrift */
   --to-font-display: 'Archivo', system-ui, sans-serif;   /* font-stretch 125%, 800, italic */
@@ -56,8 +58,9 @@
 
   /* Display-Headline-Skala — feste Stufen statt Screen-eigener Werte.
      Jede grosse, kursive Archivo-Headline in der App benutzt eine dieser
-     vier Stufen (.to-display-xl/-lg/-md/-num unten), nie einen eigenen
+     Stufen (.to-display-sm/-xl/-lg/-md/-num unten), nie einen eigenen
      Wert im Screen. */
+  --to-display-sm: 20px;  /* Abschnittskopf ("Team" über dem Team-Board) */
   --to-display-xl: 32px;  /* Begrüßung ("Hi Marc!"), Headline im Willkommens-Screen */
   --to-display-lg: 28px;  /* Screen-Titel ("Kader", "Kader bearbeiten") */
   --to-display-md: 34px;  /* Datum im "Nächstes Spiel"-Kasten (z. B. "SA 26.09.") */
@@ -65,6 +68,7 @@
 }
 
 /* Typo-Rollen */
+.to-display-sm,
 .to-display-xl,
 .to-display-lg,
 .to-display-md,
@@ -76,6 +80,7 @@
   letter-spacing: -0.035em;
   line-height: 1.05;
 }
+.to-display-sm { font-size: var(--to-display-sm); }
 .to-display-xl { font-size: var(--to-display-xl); }
 .to-display-lg { font-size: var(--to-display-lg); }
 .to-display-md { font-size: var(--to-display-md); }

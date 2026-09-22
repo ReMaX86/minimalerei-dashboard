@@ -29,7 +29,8 @@ export default {
           dangerSoft: 'var(--to-danger-soft)',
           vacation: 'var(--to-vacation)',
           vacationSoft: 'var(--to-vacation-soft)',
-          vacationFrame: 'var(--to-vacation-frame)'
+          vacationFrame: 'var(--to-vacation-frame)',
+          lineMuted: 'var(--to-line-muted)'
         },
         // Alte "Hallenanzeige"-Tokens bleiben vorerst bestehen, solange noch
         // nicht jeder Screen auf Tipoff umgestellt ist (siehe Rollout-Plan) —

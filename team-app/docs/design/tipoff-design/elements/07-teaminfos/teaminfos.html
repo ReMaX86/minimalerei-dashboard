@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Teaminformationen</title>
+<!--
+  REFERENZ-UMSETZUNG des Abschnitts „Team" auf der Startseite, unterhalb aller persönlichen Karten.
+  Ein Board mit vier Abschnitten, durch Haarlinien getrennt.
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=coach       Trainer/Captain – alle vier Abschnitte (Standard)
+    ?state=player      Spieler – nur Trikots und Trainingszeiten
+    ?state=absentopen  Abwesenheiten aufgeklappt (alle kommenden)
+    ?state=noduty      kein Kampfgericht-Termin für das Team
+    ?state=nobody      aktuell niemand abwesend
+    ?state=nokit       ein Trikotsatz ist niemandem zugeordnet
+  Klickbar: die Zeile „4 kommende anzeigen", der Trikot-Abschnitt (öffnet den Trikot-Reiter).
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-vacation:#E9B949;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{width:390px;margin:0 auto;padding:24px 20px;display:flex;flex-direction:column;gap:14px}
+
+/* ---------- Abschnittskopf ---------- */
+.sectionhead{display:flex;align-items:center;gap:12px;padding-top:6px}
+.sectionhead__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sectionhead__rule{flex:1 1 auto;height:1px;background:var(--to-hairline)}
+.sectionhead__team{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4)}
+
+/* ---------- Board ---------- */
+.board{border-radius:24px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.block{display:flex;flex-direction:column;gap:10px;padding:18px 20px;border-top:1px solid var(--to-hairline)}
+.block:first-child{border-top:0}
+
+.block__head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.label{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--to-text-3)}
+.lock{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px;border-radius:999px;
+  background:var(--to-surface-2);color:var(--to-text-3);
+  font-family:'Geist Mono',monospace;font-size:9px;font-weight:600;white-space:nowrap}
+.lock svg{width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* Kampfgericht */
+.duty__when{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.duty__sub{font-size:13px;color:var(--to-text-3)}
+.seats{display:flex;flex-wrap:wrap;gap:6px;padding-top:2px}
+.seat{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:999px;
+  background:var(--to-surface-2);border:1px solid var(--to-surface-2)}
+.seat--open{background:transparent;border-color:#3A414C}
+.seat__role{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--to-text-3)}
+.seat__name{font-size:13px;font-weight:600}
+.seat--open .seat__name{color:var(--to-text-3);font-weight:500}
+.empty{font-size:14px;color:var(--to-text-3)}
+
+/* Abwesend */
+.rows{display:flex;flex-direction:column;gap:2px}
+.row{display:flex;align-items:center;gap:10px;min-height:36px}
+.dot{width:8px;height:8px;flex:none;border-radius:3px;background:var(--to-vacation)}
+.dot--soon{background:#3A414C}
+.row__name{flex:1 1 auto;min-width:0;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row__name--soon{color:var(--to-text-2)}
+.row__range{font-family:'Geist Mono',monospace;font-size:12px;color:var(--to-text-3);flex:none}
+.grouplabel{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4);
+  padding-top:8px}
+.more{display:flex;align-items:center;gap:8px;width:100%;min-height:36px;padding:0;border:0;
+  background:transparent;color:var(--to-text-3);font-family:'Geist',sans-serif;font-size:13px;
+  text-align:left;cursor:pointer}
+.more span{flex:1 1 auto}
+.more svg{width:14px;height:14px;fill:none;stroke:var(--to-text-4);stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .18s ease}
+.more[aria-expanded="true"] svg{transform:rotate(180deg)}
+
+/* Trikots */
+.kitrow{display:flex;align-items:center;gap:12px;min-height:42px}
+.swatch{width:22px;height:22px;flex:none;border-radius:7px;border:1px solid}
+.swatch--dark{background:#0A0C0F;border-color:#3A414C}
+.swatch--light{background:#F2F4F7;border-color:#F2F4F7}
+.kitrow__label{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.08em;color:var(--to-text-3);
+  width:92px;flex:none}
+.kitrow__name{flex:1 1 auto;font-size:15px;text-align:right;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kitrow__name--none{color:var(--to-text-3)}
+.blocklink{display:flex;align-items:center;gap:8px;width:100%;min-height:36px;padding:0;border:0;
+  background:transparent;color:var(--to-text-3);font-family:'Geist',sans-serif;font-size:13px;
+  text-align:left;cursor:pointer}
+.blocklink span{flex:1 1 auto}
+.blocklink svg{width:14px;height:14px;fill:none;stroke:var(--to-text-4);stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* Trainingszeiten */
+.trow{display:flex;align-items:baseline;gap:10px;min-height:38px}
+.trow__day{width:70px;flex:none;font-size:15px;font-weight:600}
+.trow__time{flex:1 1 auto;font-family:'Geist Mono',monospace;font-size:13px;color:var(--to-text-2);
+  font-variant-numeric:tabular-nums}
+.trow__place{font-size:13px;color:var(--to-text-3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="sectionhead">
+    <span class="sectionhead__title">Team</span>
+    <span class="sectionhead__rule"></span>
+    <span class="sectionhead__team">TBW U16</span>
+  </div>
+
+  <section class="board">
+
+    <!-- 1 Kampfgericht -->
+    <div class="block" id="blockduty">
+      <div class="block__head">
+        <span class="label">KAMPFGERICHT</span>
+        <span class="lock">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2.5"></rect>
+            <path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>TRAINER &amp; CAPTAINS
+        </span>
+      </div>
+      <div id="dutyfilled">
+        <div class="duty__when" id="dutywhen">Fr 25.09. · 20:00 Uhr</div>
+        <div class="duty__sub" id="dutysub">TBW Herren 1 · Goethestraße</div>
+        <div class="seats" id="seats"></div>
+      </div>
+      <span class="empty" id="dutyempty" hidden>Kein Einsatz für das Team geplant.</span>
+    </div>
+
+    <!-- 2 Abwesend -->
+    <div class="block" id="blockabsent">
+      <div class="block__head">
+        <span class="label">ABWESEND</span>
+        <span class="lock">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2.5"></rect>
+            <path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>TRAINER &amp; CAPTAINS
+        </span>
+      </div>
+      <div class="rows" id="absentnow"></div>
+      <span class="empty" id="absentempty" hidden>Aktuell ist niemand abwesend.</span>
+      <button class="more" id="more" type="button" aria-expanded="false" aria-controls="absentsoon">
+        <span id="moretext">4 kommende anzeigen</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+      </button>
+      <div id="absentsoon" hidden>
+        <span class="grouplabel">KOMMEND</span>
+        <div class="rows" id="soonrows"></div>
+      </div>
+    </div>
+
+    <!-- 3 Trikots -->
+    <div class="block" id="blockkits">
+      <div class="block__head"><span class="label">TRIKOTSÄTZE</span></div>
+      <div class="rows" id="kits"></div>
+      <button class="blocklink" type="button">
+        <span>Trikots verwalten</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </button>
+    </div>
+
+    <!-- 4 Trainingszeiten -->
+    <div class="block" id="blocktraining">
+      <div class="block__head"><span class="label">TRAININGSZEITEN</span></div>
+      <div class="rows" id="sessions"></div>
+    </div>
+
+  </section>
+</div>
+
+<script>
+var ABSENT_NOW = [
+  { name: 'Gürkan Ertas', range: '14.09. – 14.10.' },
+  { name: 'Axel Flaujac', range: '21.09. – 27.09.' }
+];
+var ABSENT_SOON = [
+  { name: 'Tim Neuhaus', range: '04.10. – 11.10.' },
+  { name: 'Jonas Pfeiffer', range: '12.10. – 19.10.' },
+  { name: 'Luis Hartmann', range: '18.10. – 25.10.' },
+  { name: 'Ben Kowalski', range: '27.12. – 04.01.' }
+];
+var SEATS_ALL = [
+  { role: 'ANSCHR.', name: 'Daniel T.' },
+  { role: '24 SEK.', name: 'Marc R.' },
+  { role: 'ZEIT', name: 'Offen', open: true }
+];
+var KITS_BOTH = [
+  { tone: 'dark', label: 'AUSWÄRTS', name: 'Peter Woznicki' },
+  { tone: 'light', label: 'HEIM', name: 'Azjargal Atarjargal' }
+];
+var KITS_ONE = [
+  { tone: 'dark', label: 'AUSWÄRTS', name: 'Nicht zugeordnet', none: true },
+  { tone: 'light', label: 'HEIM', name: 'Azjargal Atarjargal' }
+];
+
+var BASE = {
+  coach: true,
+  duty: { when: 'Fr 25.09. · 20:00 Uhr', sub: 'TBW Herren 1 · Goethestraße', seats: SEATS_ALL },
+  absentNow: ABSENT_NOW,
+  absentSoon: ABSENT_SOON,
+  soonOpen: false,
+  kits: KITS_BOTH,
+  sessions: [
+    { day: 'Montag', time: '20:30–22:00', place: 'Goethestr.' },
+    { day: 'Freitag', time: '19:30–21:00', place: 'Goethestr.' }
+  ]
+};
+
+var STATES = {
+  coach:      {},
+  player:     { coach: false },
+  absentopen: { soonOpen: true },
+  noduty:     { duty: null },
+  nobody:     { absentNow: [] },
+  nokit:      { kits: KITS_ONE }
+};
+
+var key = new URLSearchParams(location.search).get('state') || 'coach';
+var data = Object.assign({}, BASE, STATES[key] || {});
+
+// Sichtbarkeit nach Rolle
+document.getElementById('blockduty').hidden = !data.coach;
+document.getElementById('blockabsent').hidden = !data.coach;
+
+// 1 Kampfgericht
+if (!data.duty) {
+  document.getElementById('dutyfilled').hidden = true;
+  document.getElementById('dutyempty').hidden = false;
+} else {
+  document.getElementById('dutywhen').textContent = data.duty.when;
+  document.getElementById('dutysub').textContent = data.duty.sub;
+  document.getElementById('seats').innerHTML = data.duty.seats.map(function (s) {
+    return '<span class="seat' + (s.open ? ' seat--open' : '') + '">' +
+           '<span class="seat__role">' + s.role + '</span>' +
+           '<span class="seat__name">' + s.name + '</span></span>';
+  }).join('');
+}
+
+// 2 Abwesend
+function absentRow(a, soon) {
+  return '<div class="row"><span class="dot' + (soon ? ' dot--soon' : '') + '"></span>' +
+         '<span class="row__name' + (soon ? ' row__name--soon' : '') + '">' + a.name + '</span>' +
+         '<span class="row__range">' + a.range + '</span></div>';
+}
+document.getElementById('absentnow').innerHTML = data.absentNow.map(function (a) { return absentRow(a, false); }).join('');
+document.getElementById('absentempty').hidden = data.absentNow.length > 0;
+document.getElementById('soonrows').innerHTML = data.absentSoon.map(function (a) { return absentRow(a, true); }).join('');
+
+var more = document.getElementById('more');
+var soon = document.getElementById('absentsoon');
+var moretext = document.getElementById('moretext');
+function setSoon(open) {
+  more.setAttribute('aria-expanded', open ? 'true' : 'false');
+  soon.hidden = !open;
+  moretext.textContent = open ? 'Kommende ausblenden' : data.absentSoon.length + ' kommende anzeigen';
+}
+if (!data.absentSoon.length) { more.hidden = true; } else { setSoon(!!data.soonOpen); }
+more.addEventListener('click', function () { setSoon(more.getAttribute('aria-expanded') !== 'true'); });
+
+// 3 Trikots
+document.getElementById('kits').innerHTML = data.kits.map(function (k) {
+  return '<div class="kitrow"><span class="swatch swatch--' + k.tone + '"></span>' +
+         '<span class="kitrow__label">' + k.label + '</span>' +
+         '<span class="kitrow__name' + (k.none ? ' kitrow__name--none' : '') + '">' + k.name + '</span></div>';
+}).join('');
+
+// 4 Trainingszeiten
+document.getElementById('sessions').innerHTML = data.sessions.map(function (t) {
+  return '<div class="trow"><span class="trow__day">' + t.day + '</span>' +
+         '<span class="trow__time">' + t.time + '</span>' +
+         '<span class="trow__place">' + t.place + '</span></div>';
+}).join('');
+</script>
+</body>
+</html>

@@ -32,6 +32,7 @@ Die Werte stehen als CSS-Variablen in `tokens.css`, die Logos und Icons in `asse
 | `--to-danger` | `#FF5A67` | offen / abgemeldet / zu viele |
 | `--to-vacation` | `#E9B949` | Update 2026-09-22 — ausschließlich "Urlaub" auf der Training-Karte |
 | `--to-vacation-frame` | `#4A3C12` | Update 2026-09-22 — Karten-Rand "Abwesenheit", während ein Zeitraum läuft |
+| `--to-line-muted` | `#3A414C` | Update 2026-09-22 — Platzhalter-Rand/-Punkt im Team-Board (offene Rolle, kommende Abwesenheit, dunkles Trikot-Farbfeld) |
 
 Regeln: Volt nie großflächig als Hintergrund in Screens (Ausnahme: App-Icon, Primär-Button, kleine Badges). Kein Weiß auf Volt.
 
@@ -47,18 +48,19 @@ Drei Rollen, alle von Google Fonts (Link steht in `tokens.css`):
 | Daten & Labels | Geist Mono | 11–15 px, Labels in Versalien mit `letter-spacing: 0.12em` | „NÄCHSTES SPIEL · SPIELTAG 3", „14:00 Uhr", Countdown |
 
 **Display-Headline-Skala** (Update 2026-09-22): Statt screen-eigener Größen gilt jetzt eine feste
-Skala für alle Display-Headlines — als Tokens in `tokens.css` (`--to-display-xl/-lg/-md/-num`)
-und passenden Klassen (`.to-display-xl/-lg/-md/-num`), jede mit `font-stretch: 125%`, 800,
+Skala für alle Display-Headlines — als Tokens in `tokens.css` (`--to-display-sm/-xl/-lg/-md/-num`)
+und passenden Klassen (`.to-display-sm/-xl/-lg/-md/-num`), jede mit `font-stretch: 125%`, 800,
 *italic*, `letter-spacing: -0.035em`, `line-height: 1.05`:
 
 | Token/Klasse | Größe | Einsatz |
 |---|---|---|
+| `--to-display-sm` | 20px | Abschnittskopf ("Team" über dem Team-Board) |
 | `--to-display-xl` | 32px | Begrüßung ("Hi Marc!"), Headline im Willkommens-Screen |
 | `--to-display-lg` | 28px | Screen-Titel ("Kader", "Kader bearbeiten") |
 | `--to-display-md` | 34px | Datum im "Nächstes Spiel"-Kasten (z. B. "SA 26.09.") |
 | `--to-display-num` | 40px | Große Zähler (z. B. "10/12" im Kader) |
 
-Kein Screen setzt mehr eine eigene Headline-Größe — immer eine dieser vier Stufen.
+Kein Screen setzt mehr eine eigene Headline-Größe — immer eine dieser fünf Stufen.
 
 Größen: Screen-Titel 30–36 px · Hero-Datum 46 px · Karten-Titel 18 px/600 · Text 15–16 px · Sekundär 12–13 px · Labels 11 px.
 

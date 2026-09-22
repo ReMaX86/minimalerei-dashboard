@@ -6,8 +6,8 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { TrainingCard } from '../components/TrainingCard';
-import { WeeklyTrainingTimes } from '../components/WeeklyTrainingTimes';
 import { AbsenceCard } from '../components/AbsenceCard';
+import { TeamBoard } from '../components/TeamBoard';
 import { PushNotificationCard } from '../components/PushNotificationCard';
 import { IconChevronRight, IconClipboard, IconJersey } from '../components/NavIcons';
 import { StartHeader } from '../components/StartHeader';
@@ -106,7 +106,6 @@ export function Dashboard() {
   const [trikotVersion, setTrikotVersion] = useState(0);
   const [squadResponseVersion, setSquadResponseVersion] = useState(0);
   const [resultVersion, setResultVersion] = useState(0);
-  const [showUpcomingAbsences, setShowUpcomingAbsences] = useState(false);
   // Direkte Trikot-Übergabe (siehe Migration 0048): eigener State statt
   // pro-Set, da realistisch immer nur ein Set gleichzeitig übergeben wird —
   // die setId im State legt fest, für welches Set gerade der
@@ -124,10 +123,14 @@ export function Dashboard() {
   // same overview, just with no way to assign/edit anything. Captains/
   // Co-Captains get it too so they can remind teammates who's up next.
   const showOfficiatingOverview = isAdmin || role === 'viewer' || !!player?.is_captain || !!player?.is_co_captain;
-  // Same audience as the Kampfgericht overview minus Betrachter — knowing
-  // who's away is squad-planning info, which is outside a Betrachter's
-  // original spielplan/Kampfgericht-only scope.
-  const showAbsencesOverview = (isAdmin || !!player?.is_captain || !!player?.is_co_captain) && flags.absences;
+  // Trainer/Captains (ohne Betrachter) — Sichtbarkeits-Gate für die
+  // Kampfgericht- und Abwesend-Abschnitte im Team-Board unten (siehe
+  // docs/design/tipoff-design/elements/07-teaminfos/PROMPT.md "Sichtbarkeit").
+  const showTeamLocked = isAdmin || !!player?.is_captain || !!player?.is_co_captain;
+  // Same audience as showTeamLocked, zusätzlich hinter dem Feature-Flag —
+  // knowing who's away is squad-planning info, which is outside a
+  // Betrachter's original spielplan/Kampfgericht-only scope.
+  const showAbsencesOverview = showTeamLocked && flags.absences;
 
   useEffect(() => {
     let cancelled = false;
@@ -1088,72 +1091,13 @@ export function Dashboard() {
 
       <TrainingCard refreshKey={absenceVersion} onChange={() => setTrainingVersion((v) => v + 1)} />
 
-      <p className="to-label pt-1">Teaminformationen</p>
-
-      <section className="sheet">
-        {showAbsencesOverview && data.absencesOverview.length > 0 && (() => {
-          const today = localTodayIso();
-          const currentAbsences = data.absencesOverview.filter((a) => a.start_date <= today);
-          const upcomingAbsences = data.absencesOverview.filter((a) => a.start_date > today);
-          return (
-            <div className="sheet-row">
-              <span className="led-dot bg-to-text3" />
-              <div className="flex-1">
-                <p className="to-label">Aktuell abwesend</p>
-                {currentAbsences.length > 0 ? (
-                  <ul className="mt-1 space-y-1">
-                    {currentAbsences.map((a) => (
-                      <li key={a.id} className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-to-text">{data.players[a.player_id]?.name ?? '?'}</span>
-                        <span className="text-to-text3">
-                          {fmtDateShort(a.start_date)} – {fmtDateShort(a.end_date)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-0.5 text-sm text-to-text2">Aktuell ist niemand abwesend.</p>
-                )}
-
-                {upcomingAbsences.length > 0 && (
-                  <div className="mt-3 border-t border-to-divider pt-2">
-                    <button
-                      className="text-xs font-semibold text-to-text2"
-                      onClick={() => setShowUpcomingAbsences((v) => !v)}
-                    >
-                      {showUpcomingAbsences
-                        ? '▲ Kommende Abwesenheiten ausblenden'
-                        : `▼ ${upcomingAbsences.length} kommende Abwesenheit${upcomingAbsences.length > 1 ? 'en' : ''} anzeigen`}
-                    </button>
-                    {showUpcomingAbsences && (
-                      <ul className="mt-2 space-y-1">
-                        {upcomingAbsences.map((a) => (
-                          <li key={a.id} className="flex items-center justify-between text-sm">
-                            <span className="font-medium text-to-text">{data.players[a.player_id]?.name ?? '?'}</span>
-                            <span className="text-to-text3">
-                              {fmtDateShort(a.start_date)} – {fmtDateShort(a.end_date)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-
-        <div id="trainingszeiten" className="sheet-row scroll-mt-20">
-          <span className="led-dot bg-to-text3" />
-          <div className="flex-1">
-            <p className="to-label">Trainingszeiten</p>
-            <div className="mt-1.5">
-              <WeeklyTrainingTimes />
-            </div>
-          </div>
-        </div>
-      </section>
+      <TeamBoard
+        showLocked={showTeamLocked}
+        showAbsences={flags.absences}
+        absencesOverview={data.absencesOverview}
+        trikotSets={data.trikotSets}
+        players={data.players}
+      />
     </div>
   );
 }
