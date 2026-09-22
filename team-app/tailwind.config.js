@@ -26,7 +26,9 @@ export default {
           onAccent: 'var(--to-on-accent)',
           danger: 'var(--to-danger)',
           dangerText: 'var(--to-danger-text)',
-          dangerSoft: 'var(--to-danger-soft)'
+          dangerSoft: 'var(--to-danger-soft)',
+          vacation: 'var(--to-vacation)',
+          vacationSoft: 'var(--to-vacation-soft)'
         },
         // Alte "Hallenanzeige"-Tokens bleiben vorerst bestehen, solange noch
         // nicht jeder Screen auf Tipoff umgestellt ist (siehe Rollout-Plan) —

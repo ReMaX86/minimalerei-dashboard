@@ -319,11 +319,25 @@ export interface Training {
   override_id: string | null;
 }
 
+export type TrainingDeclineReason = 'krank' | 'arbeit_schule' | 'termin' | 'anderer_grund';
+
+export const TRAINING_DECLINE_REASON_LABELS: Record<TrainingDeclineReason, string> = {
+  krank: 'Krank',
+  arbeit_schule: 'Arbeit / Schule',
+  termin: 'Termin',
+  anderer_grund: 'Anderer Grund'
+};
+
 export interface TrainingRsvpRow {
   training_id: string;
   session_date: string;
   player_id: string;
   is_attending: boolean;
+  // Migration 0062 — nur bei is_attending === false gesetzt, sonst beide
+  // null (Absage-Grund ist eigenständig von game_squad.decline_reason, hat
+  // hier "Termin" statt "Urlaub" — Urlaub läuft über player_absences).
+  decline_reason: TrainingDeclineReason | null;
+  decline_note: string | null;
   created_at: string;
 }
 

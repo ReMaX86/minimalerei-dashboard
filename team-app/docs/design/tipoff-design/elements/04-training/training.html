@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff – Referenz: Karte „Training" (V3 / Variante C)</title>
+<!--
+  REFERENZ-UMSETZUNG der Trainings-Karte.
+  Erster Termin offen, zweiter Termin klappt in derselben Darstellung auf.
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=open      noch keine Rückmeldung (Standard)
+    ?state=yes       erster Termin zugesagt
+    ?state=no        erster Termin abgesagt
+    ?state=second    zweiter Termin aufgeklappt
+    ?state=names     Namensliste des ersten Termins offen
+    ?state=vacation  du bist an dem Tag im Urlaub
+    ?state=empty     keine Termine geplant
+    ?state=locked    weniger als 1 Stunde vorher – Rückmeldung gesperrt
+    ?state=cancelled Training vom Trainer abgesagt
+    ?state=coach     Trainer-Ansicht mit „Training absagen"
+    ?state=declinesheet  Absage-Blatt mit freiwilligem Grund
+  Klickbar: Zeile des zweiten Termins, Zahlenzeile (Namen), Knöpfe.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F;--to-surface:#12151A;--to-surface-2:#1A1E25;--to-border:#232830;--to-line:#2A303A;
+  --to-text:#F2F4F7;--to-text-2:#A3ABB8;--to-text-3:#7C8594;
+  --to-accent:#C8FF2E;--to-on-accent:#0A0C0F;--to-accent-soft:rgba(200,255,46,.12);
+  --to-danger:#FF5A67;--to-danger-text:#FF7A85;--to-danger-soft:rgba(255,90,103,.14);
+  --to-vacation:#E9B949;--to-vacation-soft:rgba(233,185,73,.12);
+}
+*{box-sizing:border-box}
+body{margin:0;padding:20px;background:var(--to-bg);color:var(--to-text);font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:var(--to-accent)}
+[hidden]{display:none !important}
+
+.training{width:350px;border-radius:26px;background:var(--to-surface);border:1px solid var(--to-border);overflow:hidden;display:flex;flex-direction:column}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 4px}
+.eyebrow{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--to-text-3)}
+.card-head a{font-size:13px;font-weight:600;text-decoration:none}
+
+/* Termin-Block (für beide Termine identisch) */
+.session{display:flex;flex-direction:column;gap:14px;padding:18px 20px;border-top:1px solid var(--to-border)}
+.session--nested{padding-top:4px;border-top:0}
+.when{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.when__main{display:flex;flex-direction:column;gap:5px;min-width:0}
+.when__date{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;font-size:26px;letter-spacing:-.035em;line-height:1}
+.when__time{font-family:'Geist Mono',monospace;font-size:14px;color:var(--to-text-2)}
+.when__place{font-size:13px;color:var(--to-text-3)}
+.pill{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--to-surface-2);
+  color:var(--to-text-2);font-family:'Geist Mono',monospace;font-size:11px;font-weight:600;white-space:nowrap;flex:none}
+
+/* Verteilungsleiste */
+.bars{display:flex;gap:6px}
+.bars span{height:8px;border-radius:4px}
+.bar--yes{background:var(--to-accent)}
+.bar--no{background:var(--to-danger)}
+.bar--vac{background:var(--to-vacation)}
+.bar--open{background:var(--to-border)}
+
+/* Zahlenzeile */
+.counts{display:flex;align-items:center;gap:8px;min-height:40px;padding:0;border:0;background:transparent;
+  color:var(--to-text-2);font-size:13px;text-align:left;width:100%}
+.counts b{color:var(--to-accent);font-weight:600}
+.counts svg{width:15px;height:15px;color:var(--to-text-3)}
+
+/* Namen */
+.people{display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:16px;background:var(--to-bg)}
+.people__group{display:flex;flex-direction:column;gap:8px}
+.people__title{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em}
+.people__chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;height:28px;padding:0 11px;border-radius:999px;font-size:13px}
+.chip--yes{background:var(--to-accent-soft);color:var(--to-accent)}
+.chip--no{background:var(--to-danger-soft);color:var(--to-danger-text)}
+.chip--vac{background:var(--to-vacation-soft);color:var(--to-vacation)}
+.chip--open{background:var(--to-surface-2);color:var(--to-text-2)}
+.people__more{align-self:flex-start;background:none;border:0;padding:4px 0;font-size:13px;font-weight:600;color:var(--to-accent)}
+
+/* Antwort-Knöpfe */
+.answer{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;border:1px solid var(--to-line);
+  border-radius:14px;background:transparent;color:var(--to-text);font-size:15px;font-weight:600}
+.btn svg{width:18px;height:18px}
+.btn[aria-pressed="true"].btn--yes{background:var(--to-accent);border-color:var(--to-accent);color:var(--to-on-accent)}
+.btn[aria-pressed="true"].btn--no{background:var(--to-danger-soft);border-color:var(--to-danger);color:var(--to-danger-text)}
+
+/* Urlaub statt Knöpfe */
+.vacation{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;padding:0 16px;
+  border-radius:14px;background:var(--to-vacation-soft);color:var(--to-vacation);font-size:15px;font-weight:600}
+.vacation button{background:none;border:0;font-size:14px;font-weight:600;color:var(--to-text-2);text-decoration:underline}
+
+/* zusammengeklappter zweiter Termin */
+.row{display:flex;align-items:center;gap:12px;min-height:60px;padding:0 20px;border:0;border-top:1px solid var(--to-border);
+  background:transparent;color:var(--to-text);text-align:left;width:100%}
+.row.is-open{background:#14181E}
+.row__main{flex:1;display:flex;flex-direction:column;gap:2px}
+.row__title{font-size:15px;font-weight:600}
+.row__sub{font-size:13px;color:var(--to-text-3)}
+.row svg{width:18px;height:18px;color:var(--to-text-3);flex:none}
+
+/* keine Termine */
+.empty{display:flex;flex-direction:column;gap:6px;padding:22px 20px;border-top:1px solid var(--to-border)}
+.empty__title{display:flex;align-items:center;gap:10px;font-size:15px;color:var(--to-text-2)}
+.empty__title i{width:8px;height:8px;border-radius:50%;background:var(--to-text-3)}
+.empty__sub{font-size:13px;color:var(--to-text-3);padding-left:18px}
+
+/* gesperrt (weniger als 1 Std vorher) */
+.btn[aria-disabled="true"]{opacity:.45}
+.locknote{font-size:12px;color:var(--to-text-3);text-align:center}
+
+/* vom Trainer abgesagt */
+.session.is-cancelled .when__date,.session.is-cancelled .when__time{color:var(--to-text-3);text-decoration:line-through}
+.pill--cancelled{background:var(--to-danger-soft);color:var(--to-danger-text)}
+.cancelled-note{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 16px;border-radius:14px;
+  background:var(--to-danger-soft);color:var(--to-danger-text);font-size:14px;font-weight:600}
+
+/* Trainer-Aktion */
+.coach{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:12px;border-top:1px solid var(--to-border)}
+.coach__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.coach button{background:none;border:0;padding:8px 0;font-size:14px;font-weight:600;color:var(--to-danger-text)}
+
+/* Absage-Blatt */
+.sheet{width:350px;margin-top:16px;border-radius:24px;background:var(--to-surface-2);border:1px solid var(--to-line);
+  padding:20px;display:flex;flex-direction:column;gap:16px}
+.sheet h2{margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em}
+.sheet .sub{margin:-8px 0 0;font-size:14px;color:var(--to-text-2)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--to-line);background:transparent;color:var(--to-text);font-size:14px}
+.chips button[aria-pressed="true"]{background:var(--to-accent);border-color:var(--to-accent);color:var(--to-on-accent);font-weight:600}
+.sheet textarea{min-height:64px;padding:12px 14px;border-radius:14px;border:1px solid var(--to-line);background:var(--to-bg);
+  color:var(--to-text);font:inherit;font-size:15px;resize:none}
+.sheet textarea::placeholder{color:var(--to-text-3)}
+.sheet .answer .btn{border:0;background:var(--to-accent);color:var(--to-on-accent)}
+.sheet .answer .btn.ghost{border:1px solid var(--to-line);background:transparent;color:var(--to-text)}
+</style>
+</head>
+<body>
+
+<section class="training" aria-label="Training">
+  <div class="card-head">
+    <span class="eyebrow">TRAINING</span>
+    <a href="#">Alle Termine</a>
+  </div>
+
+  <!-- Termin 1 -->
+  <div class="session" data-block="first">
+    <div class="when">
+      <span class="when__main">
+        <span class="when__date">FR 25.09.</span>
+        <span class="when__time">19:30–21:00 Uhr</span>
+        <span class="when__place">Goethestraße, Wülfrath</span>
+      </span>
+      <span class="pill">IN 2 TAGEN</span>
+    </div>
+
+    <div class="bars" aria-hidden="true">
+      <span class="bar--yes" id="b-yes" style="flex-grow:3"></span>
+      <span class="bar--no" style="flex-grow:2"></span>
+      <span class="bar--vac" style="flex-grow:2"></span>
+      <span class="bar--open" id="b-open" style="flex-grow:15"></span>
+    </div>
+
+    <button type="button" class="counts" id="counts-btn" aria-expanded="false" aria-controls="people">
+      <b id="c-yes">3 dabei</b><span>·</span><span>2 abgesagt</span><span>·</span><span>2 Urlaub</span><span>·</span><span id="c-open">15 offen</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="counts-chev"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+
+    <div class="people" id="people" hidden>
+      <div class="people__group">
+        <span class="people__title" style="color:var(--to-accent)">ZUSAGEN (3)</span>
+        <div class="people__chips"><span class="chip chip--yes">Daniel T.</span><span class="chip chip--yes">Finn W.</span><span class="chip chip--yes">Azjargal A.</span></div>
+      </div>
+      <div class="people__group">
+        <span class="people__title" style="color:var(--to-danger-text)">ABSAGEN (2)</span>
+        <div class="people__chips"><span class="chip chip--no">Ryan B.</span><span class="chip chip--no">Peter G.</span></div>
+      </div>
+      <div class="people__group">
+        <span class="people__title" style="color:var(--to-vacation)">URLAUB (2)</span>
+        <div class="people__chips"><span class="chip chip--vac">Gürkan E.</span><span class="chip chip--vac">Axel F.</span></div>
+      </div>
+      <div class="people__group">
+        <span class="people__title" style="color:var(--to-text-3)">NOCH OFFEN (15)</span>
+        <div class="people__chips"><span class="chip chip--open">Radoslaw K.</span><span class="chip chip--open">Paul H.</span><span class="chip chip--open">Tobias E.</span><span class="chip chip--open">Mark H.</span><span class="chip chip--open">Jens M.</span><span class="chip chip--open">Luca B.</span></div>
+        <button type="button" class="people__more">Alle 15 anzeigen</button>
+      </div>
+    </div>
+
+    <div class="answer" id="answer">
+      <button type="button" class="btn btn--yes" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        <span id="yes-label">Bin dabei</span>
+      </button>
+      <button type="button" class="btn btn--no" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>
+        Kann nicht
+      </button>
+    </div>
+
+    <div class="locknote" id="locknote" hidden>Rückmeldung war bis 1 Stunde vorher möglich</div>
+
+    <div class="cancelled-note" id="cancelled-note" hidden>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>
+      Training abgesagt · Halle belegt
+    </div>
+
+    <div class="coach" id="coach" hidden>
+      <span class="coach__label">TRAINER</span>
+      <button type="button">Training absagen</button>
+    </div>
+
+    <div class="vacation" id="vacation" hidden>
+      <span>Du bist im Urlaub</span>
+      <button type="button">Zeitraum ändern</button>
+    </div>
+  </div>
+
+  <!-- Termin 2, zusammengeklappt -->
+  <button type="button" class="row" id="row2" aria-expanded="false" aria-controls="second" data-block="second-row">
+    <span class="row__main">
+      <span class="row__title">Mo 28.09. · 20:30–22:00 Uhr</span>
+      <span class="row__sub" id="row2-sub">Antippen zum Zu- oder Absagen</span>
+    </span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="row2-chev"><path d="M6 9l6 6 6-6"/></svg>
+  </button>
+
+  <!-- Termin 2, aufgeklappt: gleiche Darstellung wie Termin 1 -->
+  <div class="session session--nested" id="second" hidden data-block="second">
+    <div class="bars" aria-hidden="true">
+      <span class="bar--yes" style="flex-grow:1"></span>
+      <span class="bar--vac" style="flex-grow:1"></span>
+      <span class="bar--open" style="flex-grow:20"></span>
+    </div>
+    <button type="button" class="counts">
+      <b>1 dabei</b><span>·</span><span>0 abgesagt</span><span>·</span><span>1 Urlaub</span><span>·</span><span>20 offen</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="answer">
+      <button type="button" class="btn btn--yes" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        Bin dabei
+      </button>
+      <button type="button" class="btn btn--no" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>
+        Kann nicht
+      </button>
+    </div>
+  </div>
+
+  <!-- keine Termine -->
+  <div class="empty" data-block="empty" hidden>
+    <span class="empty__title"><i></i>Keine Trainings geplant</span>
+    <span class="empty__sub">Sobald der Trainer Termine einträgt, stehen sie hier.</span>
+  </div>
+</section>
+
+<section class="sheet" id="sheet" hidden aria-label="Training absagen">
+  <h2>Für dieses Training absagen?</h2>
+  <p class="sub">Ein Grund hilft dem Trainer beim Planen, ist aber freiwillig.</p>
+  <div class="chips" role="group" aria-label="Grund (optional)">
+    <button type="button" aria-pressed="false">Krank</button>
+    <button type="button" aria-pressed="true">Arbeit / Schule</button>
+    <button type="button" aria-pressed="false">Termin</button>
+    <button type="button" aria-pressed="false">Anderer Grund</button>
+  </div>
+  <textarea placeholder="Notiz für den Trainer (optional)"></textarea>
+  <div class="answer">
+    <button type="button" class="btn">Absage senden</button>
+    <button type="button" class="btn ghost">Abbrechen</button>
+  </div>
+</section>
+
+<script>
+  const state = new URLSearchParams(location.search).get('state') || 'open';
+  const $ = id => document.getElementById(id);
+  const CH_DOWN = 'M6 9l6 6 6-6', CH_UP = 'M6 15l6-6 6 6';
+
+  function setSecond(open) {
+    $('second').hidden = !open;
+    $('row2').setAttribute('aria-expanded', String(open));
+    $('row2').classList.toggle('is-open', open);
+    $('row2-chev').innerHTML = `<path d="${open ? CH_UP : CH_DOWN}"/>`;
+    $('row2-sub').textContent = open ? 'Noch keine Rückmeldung von dir' : 'Antippen zum Zu- oder Absagen';
+  }
+  function setPeople(open) {
+    $('people').hidden = !open;
+    $('counts-btn').setAttribute('aria-expanded', String(open));
+    $('counts-chev').innerHTML = `<path d="${open ? CH_UP : CH_DOWN}"/>`;
+  }
+  $('row2').addEventListener('click', () => setSecond($('second').hidden));
+  $('counts-btn').addEventListener('click', () => setPeople($('people').hidden));
+  document.querySelectorAll('#answer .btn').forEach((b, i, all) => b.addEventListener('click', () => {
+    const on = b.getAttribute('aria-pressed') === 'true';
+    all.forEach(x => x.setAttribute('aria-pressed', 'false'));
+    b.setAttribute('aria-pressed', String(!on));
+    $('yes-label').textContent = (!on && i === 0) ? 'Dabei' : 'Bin dabei';
+  }));
+
+  if (state === 'yes') { document.querySelector('#answer .btn--yes').setAttribute('aria-pressed', 'true'); $('yes-label').textContent = 'Dabei';
+    $('c-yes').textContent = '4 dabei'; $('c-open').textContent = '14 offen'; $('b-yes').style.flexGrow = 4; $('b-open').style.flexGrow = 14; }
+  if (state === 'no') { document.querySelector('#answer .btn--no').setAttribute('aria-pressed', 'true'); }
+  if (state === 'second') setSecond(true);
+  if (state === 'names') setPeople(true);
+  if (state === 'vacation') { $('answer').hidden = true; $('vacation').hidden = false; }
+  if (state === 'locked') {
+    document.querySelector('#answer .btn--yes').setAttribute('aria-pressed', 'true');
+    $('yes-label').textContent = 'Dabei';
+    document.querySelectorAll('#answer .btn').forEach(b => b.setAttribute('aria-disabled', 'true'));
+    $('locknote').hidden = false;
+    document.querySelector('.pill').textContent = 'IN 40 MIN';
+  }
+  if (state === 'cancelled') {
+    document.querySelector('.session').classList.add('is-cancelled');
+    $('answer').hidden = true;
+    document.querySelector('.bars').hidden = true;
+    $('counts-btn').hidden = true;
+    $('cancelled-note').hidden = false;
+    const p = document.querySelector('.pill'); p.textContent = 'ABGESAGT'; p.classList.add('pill--cancelled');
+  }
+  if (state === 'coach') $('coach').hidden = false;
+  if (state === 'declinesheet') $('sheet').hidden = false;
+  if (state === 'empty') {
+    document.querySelectorAll('[data-block]').forEach(el => { el.hidden = el.dataset.block !== 'empty'; });
+  }
+</script>
+</body>
+</html>

@@ -7,7 +7,7 @@ import { weekdayIndex } from '../lib/weekdays';
 import type { Training } from '../types/database';
 
 // Reine Übersicht der wöchentlichen Trainingszeiten (ohne Zu-/Absage) —
-// die Zu-/Absage für die nächsten Termine lebt in UpcomingTrainings weiter
+// die Zu-/Absage für die nächsten Termine lebt in TrainingCard weiter
 // oben auf der Startseite. Sondertermine (specific_date gesetzt) gehören
 // zu einer Ferienzeit und tauchen hier bewusst nicht auf, da diese Karte
 // nur den regulären, dauerhaften Fahrplan zeigen soll.

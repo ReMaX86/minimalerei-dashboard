@@ -82,7 +82,7 @@ export function AbsenceSection({ onChange }: { onChange: () => void }) {
   }
 
   return (
-    <section className="card">
+    <section id="absences" className="card scroll-mt-20">
       <p className="flex items-center gap-2 text-sm font-semibold text-to-text">
         <IconSuitcase className="h-4 w-4 text-to-accent" />
         Dein Urlaub / Abwesenheit

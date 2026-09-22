@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
-import { UpcomingTrainings } from '../components/UpcomingTrainings';
+import { TrainingCard } from '../components/TrainingCard';
 import { WeeklyTrainingTimes } from '../components/WeeklyTrainingTimes';
 import { AbsenceSection } from '../components/AbsenceSection';
 import { PushNotificationCard } from '../components/PushNotificationCard';
@@ -1084,17 +1084,7 @@ export function Dashboard() {
         </section>
       )}
 
-      <section className="sheet">
-        <div id="training" className="sheet-row scroll-mt-20">
-          <span className="led-dot bg-to-text3" />
-          <div className="flex-1">
-            <p className="to-label">Nächste Trainingseinheit</p>
-            <div className="mt-1.5">
-              <UpcomingTrainings refreshKey={absenceVersion} onChange={() => setTrainingVersion((v) => v + 1)} />
-            </div>
-          </div>
-        </div>
-      </section>
+      <TrainingCard refreshKey={absenceVersion} onChange={() => setTrainingVersion((v) => v + 1)} />
 
       {flags.absences && role === 'player' && (
         <AbsenceSection onChange={() => setAbsenceVersion((v) => v + 1)} />
@@ -1156,7 +1146,7 @@ export function Dashboard() {
           );
         })()}
 
-        <div className="sheet-row">
+        <div id="trainingszeiten" className="sheet-row scroll-mt-20">
           <span className="led-dot bg-to-text3" />
           <div className="flex-1">
             <p className="to-label">Trainingszeiten</p>
