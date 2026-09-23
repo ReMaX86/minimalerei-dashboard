@@ -682,7 +682,7 @@ function ReasonSheet({
   const [note, setNote] = useState('');
 
   return createPortal(
-    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onCancel}>
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 sm:items-center" onClick={onCancel}>
       <div
         className="w-full max-w-lg rounded-t-[24px] border border-to-line bg-to-surface2 p-5 sm:rounded-b-[24px]"
         onClick={(e) => e.stopPropagation()}

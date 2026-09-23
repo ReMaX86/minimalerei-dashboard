@@ -71,7 +71,7 @@ export function MyProfileModal({ onClose }: { onClose: () => void }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 sm:items-center"
       onClick={onClose}
     >
       <div

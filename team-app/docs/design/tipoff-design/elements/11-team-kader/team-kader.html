@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Team &amp; Spielerprofil</title>
+<!--
+  REFERENZ-UMSETZUNG des Reiters „Team": Kader als Raster, Profil als Blatt von unten.
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=grid        Kaderraster (Standard)
+    ?state=profile     Profil eines Mitspielers, alles gepflegt
+    ?state=profilemin  Profil ohne Position, Stärken und Statistik
+    ?state=profileown  eigenes Profil mit „Bearbeiten"
+    ?state=coachview   Profil aus Trainersicht mit „Im Admin bearbeiten"
+    ?state=picker      Auswahl der Stärken (Admin)
+  Klickbar: Kachel im Raster, Chips in der Auswahl.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{width:390px;margin:0 auto;padding:24px 20px;display:flex;flex-direction:column;gap:14px}
+
+.sectionhead{display:flex;align-items:center;gap:12px}
+.sectionhead__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sectionhead__rule{flex:1 1 auto;height:1px;background:var(--to-hairline)}
+.sectionhead__count{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4)}
+
+/* ---------- Raster ---------- */
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.tile{display:flex;flex-direction:column;align-items:center;gap:9px;padding:16px 8px 13px;
+  border-radius:20px;background:var(--to-surface);border:1px solid var(--to-border);
+  font-family:'Geist',sans-serif;cursor:pointer;text-align:center}
+.tile.has-role{border-color:var(--to-accent-frame)}
+.tile__av{position:relative;display:flex}
+.av{width:58px;height:58px;border-radius:50%;background:var(--to-surface-2);
+  border:1px solid var(--to-line);display:grid;place-items:center;overflow:hidden;
+  font-family:'Geist Mono',monospace;font-size:15px;color:var(--to-text-2)}
+.av img{width:100%;height:100%;object-fit:cover}
+.tile__role{position:absolute;bottom:-2px;right:-4px;display:inline-flex;align-items:center;height:17px;
+  padding:0 6px;border-radius:999px;background:var(--to-accent);color:var(--to-on-accent);
+  border:2px solid var(--to-surface);
+  font-family:'Geist Mono',monospace;font-size:8px;font-weight:700}
+.tile__name{display:flex;flex-direction:column;align-items:center;gap:2px;width:100%}
+.tile__line{font-size:12px;font-weight:600;letter-spacing:-.01em;max-width:100%;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--to-text)}
+.tile__pos{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.06em;color:var(--to-text-4);
+  padding-top:2px}
+
+/* ---------- Profil ---------- */
+.sheet{border-radius:26px 26px 18px 18px;background:var(--to-surface);border:1px solid var(--to-border);
+  padding:20px;display:flex;flex-direction:column;gap:18px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.hero{display:flex;align-items:center;gap:16px}
+.hero .av{width:76px;height:76px;border:2px solid var(--to-accent);font-size:20px;color:var(--to-accent)}
+.hero__main{display:flex;flex-direction:column;gap:6px;min-width:0}
+.hero__name{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:24px;letter-spacing:-.035em;line-height:1}
+.hero__pos{font-family:'Geist Mono',monospace;font-size:12px;letter-spacing:.08em;color:var(--to-text-2)}
+.hero__role{display:inline-flex;align-items:center;align-self:flex-start;height:20px;padding:0 9px;
+  border-radius:999px;background:var(--to-accent-soft);color:var(--to-accent);
+  font-family:'Geist Mono',monospace;font-size:9px;font-weight:600}
+
+.facts{display:grid;gap:8px}
+.fact{display:flex;flex-direction:column;gap:6px;padding:13px 12px;border-radius:16px;
+  background:var(--to-surface-2)}
+.fact__label{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-text-3)}
+.fact__value{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:20px;line-height:1}
+.fact__value span{font-size:12px;color:var(--to-text-3)}
+
+.block{display:flex;flex-direction:column;gap:9px}
+.block--top{padding-top:4px;border-top:1px solid var(--to-hairline)}
+.label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{display:inline-flex;align-items:baseline;gap:6px;height:32px;padding:0 13px;border-radius:999px;
+  background:rgba(200,255,46,.10);border:1px solid var(--to-accent-frame);color:var(--to-accent);
+  font-family:'Geist',sans-serif;font-size:13px;font-weight:600}
+.chip em{font-style:normal;font-size:11px;color:var(--to-text-3)}
+.chip--off{background:transparent;border-color:var(--to-line);color:var(--to-text-2);font-weight:500;
+  cursor:pointer}
+.chip--off em{color:var(--to-text-4)}
+
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 8px}
+.stat{display:flex;flex-direction:column;gap:3px}
+.stat__v{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:24px;line-height:1}
+.stat__k{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--to-text-4)}
+
+.quiet{font-size:13px;color:var(--to-text-3)}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;
+  border:1px solid var(--to-line);border-radius:14px;background:transparent;color:var(--to-text);
+  font-family:'Geist',sans-serif;font-size:14px;font-weight:500;cursor:pointer}
+.btn--primary{border:0;background:var(--to-accent);color:var(--to-on-accent);height:52px;
+  font-size:15px;font-weight:600}
+.btn-quiet{height:44px;width:100%;border:0;border-radius:14px;background:transparent;
+  color:var(--to-text-2);font-family:'Geist',sans-serif;font-size:14px;font-weight:500;cursor:pointer}
+.counter{font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3)}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap"></div>
+
+<script>
+var ROSTER = [
+  { ini: 'AF', first: 'Axel', last: 'Flaujac', pos: 'FLÜGEL' },
+  { ini: 'AA', first: 'Azjargal', last: 'Atarjargal', pos: 'FLÜGEL' },
+  { ini: 'BF', first: 'Benaja', last: 'Feuersänger', pos: '' },
+  { ini: 'DT', first: 'Daniel', last: 'Tekeste', pos: 'AUFBAU', role: 'C' },
+  { ini: 'EZ', first: 'Eldar', last: 'Zherokov', pos: 'AUFBAU' },
+  { ini: 'FP', first: 'Fin', last: 'Petereit', pos: 'CENTER' },
+  { ini: 'FW', first: 'Finn', last: 'Weidemann', pos: '' },
+  { ini: 'FR', first: 'Florian', last: 'Rinke', pos: 'FLÜGEL' },
+  { ini: 'GE', first: 'Gürkan', last: 'Ertas', pos: 'FLÜGEL', role: 'T' },
+  { ini: 'JM', first: 'Jens', last: 'Mühlenbeck', pos: 'CENTER' },
+  { ini: 'JB', first: 'Joscha', last: 'Bohris', pos: 'AUFBAU' },
+  { ini: 'MR', first: 'Marc', last: 'Rewald', pos: 'AUFBAU' }
+];
+
+var STRENGTHS = [
+  ['3-Point', 'Sniper'], ['Rebound', 'Glas-Cleaner'], ['Blocks', 'Blockmaschine'],
+  ['Verteidigung', 'Defense Monster'], ['Passspiel', 'Playmaker'], ['Ballhandling', 'Crossover-King'],
+  ['Athletik', 'Highflyer'], ['Freiwurf', 'Mr. Automatik'], ['Fastbreak', 'Turbo'],
+  ['Motor', 'Energizer'], ['Post-Play', 'Tank']
+];
+
+var BASE = {
+  view: 'grid',
+  pos: 'Shooting Guard',
+  height: '180',
+  age: '39',
+  games: '4',
+  strengths: [0, 4, 8],
+  stats: [['142', 'PUNKTE'], ['31', 'REBOUNDS'], ['24', 'ASSISTS'],
+          ['9', 'STEALS'], ['12', 'TURNOVER'], ['11', 'FOULS']],
+  edit: null
+};
+
+var STATES = {
+  grid:       {},
+  profile:    { view: 'profile' },
+  profilemin: { view: 'profile', pos: '', height: '', age: '', strengths: [], stats: [], games: '0' },
+  profileown: { view: 'profile', edit: 'own' },
+  coachview:  { view: 'profile', edit: 'coach' },
+  picker:     { view: 'picker' }
+};
+
+var key = new URLSearchParams(location.search).get('state') || 'grid';
+var data = Object.assign({}, BASE, STATES[key] || {});
+var wrap = document.getElementById('wrap');
+
+function head(title, count) {
+  return '<div class="sectionhead"><span class="sectionhead__title">' + title + '</span>' +
+         '<span class="sectionhead__rule"></span>' +
+         '<span class="sectionhead__count">' + count + '</span></div>';
+}
+
+function renderGrid() {
+  return head('Kader', ROSTER.length + ' SPIELER') +
+    '<div class="grid">' + ROSTER.map(function (p) {
+      return '<button class="tile' + (p.role ? ' has-role' : '') + '" type="button">' +
+        '<span class="tile__av"><span class="av">' + p.ini + '</span>' +
+        (p.role ? '<span class="tile__role">' + p.role + '</span>' : '') + '</span>' +
+        '<span class="tile__name"><span class="tile__line">' + p.first + '</span>' +
+        '<span class="tile__line">' + p.last + '</span>' +
+        (p.pos ? '<span class="tile__pos">' + p.pos + '</span>' : '') +
+        '</span></button>';
+    }).join('') + '</div>';
+}
+
+function chip(i, on) {
+  var s = STRENGTHS[i];
+  return '<span class="chip' + (on ? '' : ' chip--off') + '">' + s[0] + ' <em>' + s[1] + '</em></span>';
+}
+
+function renderProfile() {
+  var facts = [];
+  if (data.height) facts.push(['GRÖSSE', data.height + '<span> cm</span>']);
+  if (data.age) facts.push(['ALTER', data.age + '<span> J.</span>']);
+  facts.push(['SPIELE', data.games]);
+
+  var editBtn = data.edit === 'own'
+    ? '<button class="btn" type="button">Profil bearbeiten</button>'
+    : data.edit === 'coach'
+      ? '<button class="btn" type="button">Im Admin bearbeiten</button>'
+      : '';
+
+  return '<div class="sheet"><span class="sheet__grip"></span>' +
+    '<div class="hero"><span class="av">MR</span><span class="hero__main">' +
+      '<span class="hero__name">Marc Rewald</span>' +
+      (data.pos ? '<span class="hero__pos">' + data.pos.toUpperCase() + '</span>'
+                : '<span class="hero__pos" style="color:var(--to-text-4)">POSITION NICHT HINTERLEGT</span>') +
+    '</span></div>' +
+
+    '<div class="facts" style="grid-template-columns:repeat(' + facts.length + ',1fr)">' +
+      facts.map(function (f) {
+        return '<div class="fact"><span class="fact__label">' + f[0] + '</span>' +
+               '<span class="fact__value">' + f[1] + '</span></div>';
+      }).join('') + '</div>' +
+
+    (data.strengths.length
+      ? '<div class="block"><span class="label">STÄRKEN</span><div class="chips">' +
+        data.strengths.map(function (i) { return chip(i, true); }).join('') + '</div></div>'
+      : '<div class="block"><span class="label">STÄRKEN</span>' +
+        '<span class="quiet">Noch keine Stärken hinterlegt.</span></div>') +
+
+    (data.stats.length
+      ? '<div class="block block--top"><span class="label">SAISON · SUMME AUS ' + data.games +
+        ' GETRACKTEN SPIELEN</span><div class="stats">' +
+        data.stats.map(function (s) {
+          return '<span class="stat"><span class="stat__v">' + s[0] + '</span>' +
+                 '<span class="stat__k">' + s[1] + '</span></span>';
+        }).join('') + '</div></div>'
+      : '<div class="block block--top"><span class="label">SAISON</span>' +
+        '<span class="quiet">Noch kein Spiel mit diesem Spieler getrackt.</span></div>') +
+
+    editBtn + '</div>';
+}
+
+function renderPicker() {
+  var on = data.strengths;
+  return '<div class="sheet"><span class="sheet__grip"></span>' +
+    '<div style="display:flex;flex-direction:column;gap:5px">' +
+      '<span class="hero__name" style="font-size:22px">Stärken</span>' +
+      '<span class="quiet">Marc Rewald · höchstens drei auswählen</span></div>' +
+    '<div class="block"><div style="display:flex;align-items:center;gap:10px">' +
+      '<span class="label" style="flex:1 1 auto">AUSGEWÄHLT</span>' +
+      '<span class="counter">' + on.length + '/3</span></div>' +
+    '<div class="chips">' + STRENGTHS.map(function (_, i) {
+      return chip(i, on.indexOf(i) > -1);
+    }).join('') + '</div></div>' +
+    '<div style="display:flex;flex-direction:column;gap:8px">' +
+      '<button class="btn btn--primary" type="button">Speichern</button>' +
+      '<button class="btn-quiet" type="button">Abbrechen</button></div>' +
+    '</div>';
+}
+
+wrap.innerHTML = data.view === 'grid' ? renderGrid()
+               : data.view === 'picker' ? renderPicker()
+               : renderProfile();
+</script>
+</body>
+</html>

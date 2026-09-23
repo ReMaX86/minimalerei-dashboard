@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
 import { DateField } from '../../components/DateTimeField';
-import { POSITION_LABELS, SKILL_ICONS, SKILL_OPTIONS, type Player, type PlayerPosition } from '../../types/database';
+import { StrengthsPicker } from '../../components/StrengthsPicker';
+import { POSITION_LABELS, type Player, type PlayerPosition } from '../../types/database';
 
 const EMPTY_DETAILS = {
   position: '' as '' | PlayerPosition,
@@ -13,6 +15,7 @@ const EMPTY_DETAILS = {
 };
 
 export function PlayersAdmin() {
+  const [searchParams] = useSearchParams();
   const [players, setPlayers] = useState<Player[] | null>(null);
   const [codes, setCodes] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +26,8 @@ export function PlayersAdmin() {
   const [detailsForm, setDetailsForm] = useState(EMPTY_DETAILS);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [savingDetails, setSavingDetails] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [savingSkills, setSavingSkills] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -48,6 +53,20 @@ export function PlayersAdmin() {
   useEffect(() => {
     load().catch(() => setError('Fehler beim Laden der Spielerliste.'));
   }, [load]);
+
+  // Sprung von der Team-Profilkarte ("Im Admin bearbeiten", Element 11) —
+  // öffnet direkt das Profil-Bearbeiten-Formular des betroffenen Spielers,
+  // statt ihn erst in der Liste suchen zu müssen. Nur einmal, damit ein
+  // späterer Reload nach dem Speichern das Formular nicht wieder aufreißt.
+  const [deepLinkHandled, setDeepLinkHandled] = useState(false);
+  useEffect(() => {
+    if (deepLinkHandled || !players) return;
+    const id = searchParams.get('player');
+    if (!id) return;
+    const p = players.find((pl) => pl.id === id);
+    if (p) openDetails(p);
+    setDeepLinkHandled(true);
+  }, [searchParams, players, deepLinkHandled]);
 
   async function addPlayer(e: FormEvent) {
     e.preventDefault();
@@ -123,11 +142,20 @@ export function PlayersAdmin() {
     });
   }
 
-  function toggleSkill(skill: string) {
-    setDetailsForm((f) => ({
-      ...f,
-      skills: f.skills.includes(skill) ? f.skills.filter((s) => s !== skill) : [...f.skills, skill]
-    }));
+  async function saveSkills(playerId: string, skills: string[]) {
+    setSavingSkills(true);
+    setError(null);
+    try {
+      const { error: updError } = await supabase.from('players').update({ skills }).eq('id', playerId);
+      if (updError) throw updError;
+      setDetailsForm((f) => ({ ...f, skills }));
+      setPickerOpen(false);
+      await load();
+    } catch {
+      setError('Stärken konnten nicht gespeichert werden.');
+    } finally {
+      setSavingSkills(false);
+    }
   }
 
   async function saveDetails(p: Player) {
@@ -290,18 +318,13 @@ export function PlayersAdmin() {
                 </label>
                 <div>
                   <p className="text-xs font-semibold text-to-text3">Stärken</p>
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    {SKILL_OPTIONS.map((skill) => (
-                      <button
-                        key={skill}
-                        type="button"
-                        onClick={() => toggleSkill(skill)}
-                        className={`pill ${detailsForm.skills.includes(skill) ? 'pill-ok' : 'pill-open'}`}
-                      >
-                        {SKILL_ICONS[skill]} {skill}
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen(true)}
+                    className="btn-secondary mt-1 w-full text-xs"
+                  >
+                    {detailsForm.skills.length > 0 ? detailsForm.skills.join(' · ') : 'Stärken auswählen'}
+                  </button>
                 </div>
                 <button
                   className="btn-primary w-full"
@@ -310,6 +333,15 @@ export function PlayersAdmin() {
                 >
                   {savingDetails ? 'Speichere…' : 'Profil speichern'}
                 </button>
+                {pickerOpen && (
+                  <StrengthsPicker
+                    playerName={p.name}
+                    initialSelected={detailsForm.skills}
+                    busy={savingSkills}
+                    onSave={(skills) => saveSkills(p.id, skills)}
+                    onCancel={() => setPickerOpen(false)}
+                  />
+                )}
               </div>
             )}
           </li>
