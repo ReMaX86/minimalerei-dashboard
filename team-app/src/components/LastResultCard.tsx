@@ -209,16 +209,16 @@ export function LastResultCard({
       ) : (
         <>
           {showOwnStats && myBoxScore && (
-            <div className="flex gap-2">
-              <div className="flex flex-1 flex-col gap-1 rounded-to-lg bg-to-surface2 px-3.5 py-3">
+            <div className="flex items-stretch gap-2">
+              <div className="flex flex-1 flex-col justify-end gap-1 rounded-to-lg bg-to-surface2 px-3.5 py-3">
                 <span className="to-label">DEINE PUNKTE</span>
                 <span className="to-number text-[26px] leading-none text-to-accent">{myBoxScore.points}</span>
               </div>
-              <div className="flex flex-1 flex-col gap-1 rounded-to-lg bg-to-surface2 px-3.5 py-3">
+              <div className="flex flex-1 flex-col justify-end gap-1 rounded-to-lg bg-to-surface2 px-3.5 py-3">
                 <span className="to-label">REBOUNDS</span>
                 <span className="to-number text-[26px] leading-none text-to-text">{myBoxScore.rebounds}</span>
               </div>
-              <div className="flex flex-1 flex-col gap-1 rounded-to-lg bg-to-surface2 px-3.5 py-3">
+              <div className="flex flex-1 flex-col justify-end gap-1 rounded-to-lg bg-to-surface2 px-3.5 py-3">
                 <span className="to-label">ASSISTS</span>
                 <span className="to-number text-[26px] leading-none text-to-text">{myBoxScore.assists}</span>
               </div>
