@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Spielplan, Ergebnisse &amp; Tabelle</title>
+<!--
+  REFERENZ-UMSETZUNG der drei Reiter unter der Spielkarte im Tab „Spiele & Kader".
+  Daten kommen von basketball-bund.net (3x täglich), der Stand steht immer sichtbar darunter.
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=plan       Reiter „Spielplan", alle kommenden Spiele nach Monat (Standard)
+    ?state=results    Reiter „Ergebnisse", Box-Score nur bei getrackten Spielen
+    ?state=table      Reiter „Tabelle"
+    ?state=stale      Tabelle mit veraltetem Stand (letzte Aktualisierung fehlgeschlagen)
+    ?state=noplan     keine kommenden Spiele
+    ?state=noresults  noch keine Ergebnisse
+    ?state=notable    Tabelle konnte noch nie geladen werden
+  Klickbar: die drei Reiter.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.14);
+  --to-vacation:#E9B949; --to-vacation-soft:rgba(233,185,73,.12);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{width:390px;margin:0 auto;padding:24px 20px;display:flex;flex-direction:column;gap:14px}
+
+/* ---------- Reiter ---------- */
+.tabs{display:flex;gap:22px;border-bottom:1px solid var(--to-hairline)}
+.tab{padding:0 0 10px;border:0;border-bottom:2px solid transparent;background:transparent;
+  color:var(--to-text-3);font-family:'Geist',sans-serif;font-size:15px;font-weight:600;cursor:pointer;
+  transition:color .15s ease,border-color .15s ease}
+.tab[aria-selected="true"]{color:var(--to-accent);border-bottom-color:var(--to-accent)}
+
+.monthlabel{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--to-text-4);
+  padding-top:4px}
+.group{display:flex;flex-direction:column;gap:8px}
+
+/* ---------- Spiel-Zeile ---------- */
+.game{display:flex;align-items:center;gap:13px;padding:13px 16px;border-radius:18px;
+  background:var(--to-surface);border:1px solid var(--to-border);width:100%;
+  text-align:left;font-family:'Geist',sans-serif;cursor:pointer}
+.game.is-next{background:rgba(200,255,46,.06);border-color:var(--to-accent-frame)}
+.game__date{width:40px;flex:none;display:flex;flex-direction:column;align-items:center}
+.game__dow{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-3)}
+.game__day{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:20px;
+  line-height:1.1;color:var(--to-text)}
+.game.is-next .game__day{color:var(--to-accent)}
+.game__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.game__opp{font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--to-text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.game__info{font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;flex:none;
+  background:var(--to-accent-soft);color:var(--to-accent);
+  font-family:'Geist Mono',monospace;font-size:9px;font-weight:600}
+
+/* ---------- Ergebnis-Karte ---------- */
+.res{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:18px;
+  background:var(--to-surface);border:1px solid var(--to-border)}
+.res__top{display:flex;align-items:center;gap:12px}
+.res__badge{width:28px;height:28px;flex:none;display:grid;place-items:center;border-radius:9px;
+  font-family:'Geist Mono',monospace;font-size:12px;font-weight:600}
+.res__badge--w{background:var(--to-accent-soft);color:var(--to-accent)}
+.res__badge--l{background:var(--to-danger-soft);color:var(--to-danger-text)}
+.res__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.res__opp{font-size:15px;font-weight:600;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.res__when{font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3)}
+.res__score{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:22px;
+  line-height:1;flex:none;font-variant-numeric:tabular-nums}
+.res__link{display:flex;align-items:center;gap:8px;min-height:40px;width:100%;padding:10px 0 0;
+  border:0;border-top:1px solid var(--to-hairline);background:transparent;color:var(--to-accent);
+  font-family:'Geist',sans-serif;font-size:13px;font-weight:600;text-align:left;cursor:pointer}
+.res__link span{flex:1 1 auto}
+.res__link svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- Tabelle ---------- */
+.table{border-radius:20px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column;padding:14px 0 12px}
+.trow{display:flex;align-items:center;min-height:38px;padding:0 12px}
+.trow--head{padding-bottom:8px;min-height:0}
+.c-rank{width:22px;font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3)}
+.c-team{width:152px;font-size:13px;font-weight:500;color:var(--to-text);padding-right:8px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-sp{width:22px;text-align:right;font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3)}
+.c-wl{width:34px;text-align:right;font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-2)}
+.c-pkt{width:26px;text-align:right;font-family:'Geist Mono',monospace;font-size:12px;font-weight:600}
+.c-pts{width:58px;text-align:right;font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3)}
+.trow--head span{font-size:9px;color:var(--to-text-4);font-family:'Geist Mono',monospace;font-weight:400}
+.trow.is-mine{background:rgba(200,255,46,.07)}
+.trow.is-mine .c-rank,.trow.is-mine .c-team,.trow.is-mine .c-pkt{color:var(--to-accent)}
+.trow.is-mine .c-team{font-weight:700}
+.source{font-size:11px;color:var(--to-text-4);padding:12px 12px 0}
+
+.note{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;font-size:13px;
+  margin:0 12px 10px}
+.note--warn{background:var(--to-vacation-soft);color:var(--to-vacation)}
+.note button{white-space:nowrap}
+.note svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+.note button{margin-left:auto;border:0;background:transparent;color:inherit;
+  font-family:'Geist',sans-serif;font-size:13px;font-weight:600;text-decoration:underline;cursor:pointer}
+
+.empty{display:flex;flex-direction:column;gap:6px;padding:26px 18px;border-radius:18px;
+  background:var(--to-surface);border:1px solid var(--to-border);text-align:center}
+.empty__title{font-size:15px;font-weight:600;color:var(--to-text-2)}
+.empty__text{font-size:13px;color:var(--to-text-3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="tabs" role="tablist">
+    <button class="tab" id="t-plan" role="tab" type="button">Spielplan</button>
+    <button class="tab" id="t-results" role="tab" type="button">Ergebnisse</button>
+    <button class="tab" id="t-table" role="tab" type="button">Tabelle</button>
+  </div>
+
+  <div id="panel"></div>
+
+</div>
+
+<script>
+var PLAN = [
+  { month: 'SEPTEMBER', games: [
+    { dow: 'FR', day: '25', opp: 'HSV Solingen-Gräfrath 2', info: '20:00 · HEIM · GOETHESTRASSE', next: true }
+  ] },
+  { month: 'OKTOBER', games: [
+    { dow: 'DO', day: '01', opp: 'Kult-Sport Wuppertal 2', info: '20:30 · AUSWÄRTS · PLATZ DER REPUBLIK' },
+    { dow: 'SA', day: '10', opp: 'Mettmann-Sport 2', info: '20:00 · AUSWÄRTS · FLURSTRASSE 10' },
+    { dow: 'FR', day: '23', opp: 'Hellas Wuppertal', info: '20:00 · HEIM · GOETHESTRASSE' }
+  ] },
+  { month: 'NOVEMBER', games: [
+    { dow: 'DO', day: '05', opp: 'Südwest Baskets Wuppertal 4', info: '19:30 · AUSWÄRTS · JOHANNISBERG 20' },
+    { dow: 'FR', day: '20', opp: 'Remscheider SV', info: '20:00 · HEIM · GOETHESTRASSE' }
+  ] }
+];
+
+var RESULTS = [
+  { opp: 'BG Monheim', when: 'SO 20.09. · AUSWÄRTS', score: '63:82', win: false, tracked: true },
+  { opp: 'Sportclub Krefeld 1905', when: 'FR 12.09. · HEIM', score: '42:118', win: false, tracked: true },
+  { opp: 'TuS Hilden', when: 'SA 06.09. · AUSWÄRTS', score: '71:64', win: true, tracked: false }
+];
+
+var TABLE = [
+  ['1', 'HSV Solingen-Gräfrath 2', '1', '1-0', '2', '100:71', false],
+  ['2', 'BG Monheim', '1', '1-0', '2', '82:63', false],
+  ['3', 'Remscheider SV', '1', '1-0', '2', '76:63', false],
+  ['4', 'TuS Hilden', '1', '1-0', '2', '67:56', false],
+  ['5', 'Hellas Wuppertal', '1', '1-0', '2', '56:49', false],
+  ['6', 'Kult-Sport Wuppertal 2', '1', '1-0', '2', '61:54', false],
+  ['7', 'Polizei SV Wuppertal', '0', '0-0', '0', '0:0', false],
+  ['8', 'Mettmann-Sport 2', '1', '0-1', '0', '54:61', false],
+  ['9', 'HSV Solingen-Gräfrath', '1', '0-1', '0', '49:56', false],
+  ['10', 'TB Wülfrath', '1', '0-1', '0', '63:82', true],
+  ['11', 'Südwest Baskets Wuppertal 4', '1', '0-1', '0', '71:100', false],
+  ['12', 'H-Town United', '2', '0-2', '0', '119:143', false]
+];
+
+var BASE = {
+  tab: 'plan',
+  plan: PLAN,
+  results: RESULTS,
+  table: TABLE,
+  stand: 'Stand 23.09. 08:00 Uhr',
+  stale: false
+};
+
+var STATES = {
+  plan:      {},
+  results:   { tab: 'results' },
+  table:     { tab: 'table' },
+  stale:     { tab: 'table', stale: true, stand: 'Stand 22.09. 20:00 Uhr' },
+  noplan:    { plan: [] },
+  noresults: { tab: 'results', results: [] },
+  notable:   { tab: 'table', table: [], stale: true, stand: null }
+};
+
+var key = new URLSearchParams(location.search).get('state') || 'plan';
+var data = Object.assign({}, BASE, STATES[key] || {});
+var tab = data.tab;
+
+var panel = document.getElementById('panel');
+var tabs = { plan: document.getElementById('t-plan'),
+             results: document.getElementById('t-results'),
+             table: document.getElementById('t-table') };
+
+function empty(title, text) {
+  return '<div class="empty"><span class="empty__title">' + title + '</span>' +
+         '<span class="empty__text">' + text + '</span></div>';
+}
+
+function renderPlan() {
+  if (!data.plan.length) {
+    return empty('Keine Spiele geplant', 'Sobald der Spielplan steht, taucht er hier auf.');
+  }
+  return '<div style="display:flex;flex-direction:column;gap:14px">' + data.plan.map(function (m) {
+    return '<div class="group"><span class="monthlabel">' + m.month + '</span>' +
+      m.games.map(function (g) {
+        return '<button class="game' + (g.next ? ' is-next' : '') + '" type="button">' +
+          '<span class="game__date"><span class="game__dow">' + g.dow + '</span>' +
+          '<span class="game__day">' + g.day + '</span></span>' +
+          '<span class="game__main"><span class="game__opp">' + g.opp + '</span>' +
+          '<span class="game__info">' + g.info + '</span></span>' +
+          (g.next ? '<span class="pill">NÄCHSTES</span>' : '') + '</button>';
+      }).join('') + '</div>';
+  }).join('') + '</div>';
+}
+
+function renderResults() {
+  if (!data.results.length) {
+    return empty('Noch keine Ergebnisse', 'Nach dem ersten Spiel steht hier das Ergebnis.');
+  }
+  return '<div style="display:flex;flex-direction:column;gap:10px">' + data.results.map(function (r) {
+    return '<div class="res"><div class="res__top">' +
+      '<span class="res__badge res__badge--' + (r.win ? 'w' : 'l') + '">' + (r.win ? 'S' : 'N') + '</span>' +
+      '<span class="res__main"><span class="res__opp">' + r.opp + '</span>' +
+      '<span class="res__when">' + r.when + '</span></span>' +
+      '<span class="res__score">' + r.score + '</span></div>' +
+      (r.tracked
+        ? '<button class="res__link" type="button"><span>Box-Score ansehen</span>' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>'
+        : '') +
+      '</div>';
+  }).join('') + '</div>';
+}
+
+function renderTable() {
+  if (!data.table.length) {
+    return empty('Tabelle nicht verfügbar', 'Die Tabelle konnte noch nicht geladen werden.');
+  }
+  var warn = data.stale
+    ? '<div class="note note--warn"><svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>' +
+      '<span>Letzte Aktualisierung fehlgeschlagen.</span><button type="button">Erneut laden</button></div>'
+    : '';
+  return '<section class="table">' + warn +
+    '<div class="trow trow--head"><span class="c-rank">#</span><span class="c-team">TEAM</span>' +
+    '<span class="c-sp">SP</span><span class="c-wl">S-N</span><span class="c-pkt">PKT</span>' +
+    '<span class="c-pts">KÖRBE</span></div>' +
+    data.table.map(function (t) {
+      return '<div class="trow' + (t[6] ? ' is-mine' : '') + '">' +
+        '<span class="c-rank">' + t[0] + '</span><span class="c-team">' + t[1] + '</span>' +
+        '<span class="c-sp">' + t[2] + '</span><span class="c-wl">' + t[3] + '</span>' +
+        '<span class="c-pkt">' + t[4] + '</span><span class="c-pts">' + t[5] + '</span></div>';
+    }).join('') +
+    '<span class="source">Quelle: basketball-bund.net · ' + (data.stand || 'noch nie geladen') + '</span>' +
+    '</section>';
+}
+
+function render() {
+  Object.keys(tabs).forEach(function (k) {
+    tabs[k].setAttribute('aria-selected', k === tab ? 'true' : 'false');
+  });
+  panel.innerHTML = tab === 'plan' ? renderPlan()
+                  : tab === 'results' ? renderResults()
+                  : renderTable();
+}
+Object.keys(tabs).forEach(function (k) {
+  tabs[k].addEventListener('click', function () { tab = k; render(); });
+});
+render();
+</script>
+</body>
+</html>

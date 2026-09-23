@@ -145,6 +145,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const ligaId = process.env.DBB_LIGA_ID ?? '54636';
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  // Element 10 "Spielplan/Ergebnisse/Tabelle": jeder Lauf trägt sich hier
+  // ein (Erfolg oder Fehler), damit der Tabellen-Reiter einen "letzte
+  // Aktualisierung fehlgeschlagen"-Hinweis zeigen kann, ohne den letzten
+  // guten Stand in league_standings selbst zu verlieren.
+  const nowIso = new Date().toISOString();
+  await supabase.from('standings_sync_status').update({ last_attempt_at: nowIso }).eq('id', 1);
+
+  async function fail(message: string) {
+    await supabase.from('standings_sync_status').update({ last_error: message }).eq('id', 1);
+  }
 
   let html: string;
   try {
@@ -152,25 +164,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; TBWTeamApp/1.0)' }
     });
     if (!response.ok) {
+      await fail(`DBB-Seite antwortete mit Status ${response.status}.`);
       res.status(502).json({ error: 'DBB-Seite nicht erreichbar.', status: response.status });
       return;
     }
     html = await response.text();
   } catch (err) {
+    await fail((err as Error).message);
     res.status(502).json({ error: 'DBB-Seite nicht erreichbar.', details: (err as Error).message });
     return;
   }
 
   const rows = parseStandings(html);
   if (rows.length === 0) {
+    await fail('Keine Zeilen aus der DBB-Seite geparst.');
     res.status(200).json({ skipped: 'no_rows_parsed' });
     return;
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
-
   const { error: deleteError } = await supabase.from('league_standings').delete().eq('liga_id', ligaId);
   if (deleteError) {
+    await fail(deleteError.message);
     res.status(500).json({ error: 'Alte Tabelle konnte nicht gelöscht werden.', details: deleteError.message });
     return;
   }
@@ -191,9 +205,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }))
   );
   if (insertError) {
+    await fail(insertError.message);
     res.status(500).json({ error: 'Tabelle konnte nicht gespeichert werden.', details: insertError.message });
     return;
   }
 
+  await supabase.from('standings_sync_status').update({ last_success_at: nowIso, last_error: null }).eq('id', 1);
   res.status(200).json({ updated: rows.length });
 }

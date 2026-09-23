@@ -133,7 +133,10 @@ function statusFor(
   return { text: 'KEINE ANTWORT', tone: 'idle' };
 }
 
-export function NextGameSquadCard({ game }: { game: Game }) {
+// `label` ist konfigurierbar, weil dieselbe Karte auch für ein beliebiges
+// Spiel aus dem Spielplan-Reiter (Element 10) geöffnet wird, nicht nur für
+// den wirklich nächsten Spieltag — "NÄCHSTER SPIELTAG" wäre dort falsch.
+export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game: Game; label?: string }) {
   const { role, isAdmin, player } = useAuth();
   const { flags } = useFeatureFlags();
   const [searchParams] = useSearchParams();
@@ -418,7 +421,7 @@ export function NextGameSquadCard({ game }: { game: Game }) {
       {/* Kopf */}
       <div className="flex flex-col gap-3.5 p-5">
         <div className="flex items-center justify-between gap-2.5">
-          <span className="to-label">NÄCHSTER SPIELTAG</span>
+          <span className="to-label">{label}</span>
           <span
             className={`to-data inline-flex h-6 shrink-0 items-center gap-1.5 rounded-to-pill px-2.5 text-[10px] font-semibold ${
               game.squad_published ? 'bg-to-accentSoft text-to-accent' : 'bg-to-dangerSoft text-to-dangerText'

@@ -24,7 +24,7 @@ export function fmtDateBadgeWithYear(iso: string): string {
   return `${weekdayBadge(iso)} ${datePart}`;
 }
 
-function weekdayBadge(iso: string): string {
+export function weekdayBadge(iso: string): string {
   const d = new Date(iso + 'T00:00:00');
   return d
     .toLocaleDateString('de-DE', { weekday: 'short' })
@@ -35,6 +35,19 @@ function weekdayBadge(iso: string): string {
 
 export function fmtTime(time: string): string {
   return time.slice(0, 5);
+}
+
+// "25" — nur der Tag, für den zweizeiligen Datumsblock in der Spielplan-
+// Zeile (Wochentag oben, große Tageszahl darunter). iso ist immer
+// 'YYYY-MM-DD', ein reiner String-Ausschnitt reicht.
+export function dayOfMonth(iso: string): string {
+  return iso.slice(8, 10);
+}
+
+// "SEPTEMBER" — Monatsname in Versalien, für die Monats-Gruppenlabel im
+// Spielplan-Reiter (Element 10).
+export function monthLabel(iso: string): string {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('de-DE', { month: 'long' }).toUpperCase();
 }
 
 // Für einen vollen Zeitstempel (timestamptz, z. B. league_standings.updated_at)

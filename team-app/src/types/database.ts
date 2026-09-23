@@ -509,6 +509,18 @@ export interface LeagueStandingRow {
   updated_at: string;
 }
 
+// Singleton-Zeile (id=1), vom Sync-Job bei jedem Lauf aktualisiert — siehe
+// Migration 0065 und api/sync-league-standings.ts. Erlaubt dem Tabellen-
+// Reiter, einen fehlgeschlagenen Sync vom bloßen "noch nicht wieder
+// gelaufen" zu unterscheiden, ohne den letzten guten Stand in
+// league_standings zu verlieren.
+export interface StandingsSyncStatus {
+  id: 1;
+  last_attempt_at: string | null;
+  last_success_at: string | null;
+  last_error: string | null;
+}
+
 export type GameResult = 'sieg' | 'niederlage' | 'unentschieden';
 
 // "us" vs. "opponent" statt "home"/"away", damit Sieg/Niederlage unabhängig
