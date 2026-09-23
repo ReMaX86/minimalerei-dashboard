@@ -47,23 +47,26 @@ body{margin:0;background:var(--to-bg);color:var(--to-text);
   box-shadow:0 14px 34px rgba(0,0,0,.55)}
 @media (min-width:430px){ .nav{left:calc(50% - 185px);right:auto;width:370px} }
 
+/* inaktiv: gleiche Spaltenbreite über die ganze Leiste; aktiv: nur so breit wie der Text */
 .tab{display:flex;align-items:center;justify-content:center;gap:0;
-  width:38px;height:44px;flex:none;border:0;border-radius:999px;background:transparent;
-  color:var(--to-text-3);text-decoration:none;position:relative;cursor:pointer;
+  flex:1 1 0;min-width:0;height:44px;padding:0;border:0;border-radius:999px;background:transparent;
+  color:var(--to-text-3);text-decoration:none;cursor:pointer;
   -webkit-tap-highlight-color:transparent;
-  transition:width .18s ease,background-color .18s ease,color .18s ease,padding .18s ease}
+  transition:flex-grow .18s ease,padding .18s ease,gap .18s ease,
+             background-color .18s ease,color .18s ease}
 .tab svg{width:19px;height:19px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;
   stroke-linecap:round;stroke-linejoin:round}
+.tab__icon{position:relative;display:flex;flex:none}
 .tab__label{max-width:0;overflow:hidden;white-space:nowrap;opacity:0;
   font-size:13px;font-weight:600;letter-spacing:-.01em;
-  transition:max-width .18s ease,opacity .14s ease,margin .18s ease}
+  transition:max-width .18s ease,opacity .14s ease}
 
-.tab[aria-current="page"]{width:auto;padding:0 14px;gap:8px;
+.tab[aria-current="page"]{flex:0 0 auto;padding:0 14px;gap:8px;
   background:var(--to-accent);color:var(--to-on-accent)}
 .tab[aria-current="page"] svg{stroke-width:2}
-.tab[aria-current="page"] .tab__label{max-width:140px;opacity:1}
+.tab[aria-current="page"] .tab__label{max-width:160px;opacity:1}
 
-.tab__dot{position:absolute;top:8px;right:6px;width:7px;height:7px;border-radius:50%;
+.tab__dot{position:absolute;top:-2px;right:-4px;width:7px;height:7px;border-radius:50%;
   background:var(--to-accent);border:2px solid #12151A}
 .tab[aria-current="page"] .tab__dot{display:none}
 
@@ -123,8 +126,8 @@ function render() {
     return '<a class="tab" href="#" data-key="' + k + '"' +
            (on ? ' aria-current="page"' : '') +
            ' aria-label="' + t.label + '">' +
-           '<svg viewBox="0 0 24 24" aria-hidden="true">' + t.icon + '</svg>' +
-           '<span class="tab__label">' + t.label + '</span>' + dot + '</a>';
+           '<span class="tab__icon"><svg viewBox="0 0 24 24" aria-hidden="true">' + t.icon + '</svg>' + dot + '</span>' +
+           '<span class="tab__label">' + t.label + '</span></a>';
   }).join('');
 }
 render();

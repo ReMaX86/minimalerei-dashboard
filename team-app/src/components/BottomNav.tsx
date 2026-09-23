@@ -119,29 +119,31 @@ export function BottomNav() {
           end={item.end}
           aria-label={item.label}
           className={({ isActive }) =>
-            `relative flex h-11 flex-none cursor-pointer items-center justify-center gap-0 rounded-full text-to-text3 no-underline transition-[width,background-color,color,padding] duration-[180ms] ease-out ${
-              isActive ? 'w-auto gap-2 bg-to-accent px-3.5 text-to-onAccent' : 'w-[38px]'
+            `flex h-11 min-w-0 cursor-pointer items-center justify-center gap-0 rounded-full p-0 text-to-text3 no-underline transition-[flex-grow,padding,gap,background-color,color] duration-[180ms] ease-out ${
+              isActive ? 'flex-none gap-2 bg-to-accent px-3.5 text-to-onAccent' : 'flex-1'
             }`
           }
         >
           {({ isActive }) => (
             <>
-              <span className={isActive ? '[&_svg]:stroke-2' : ''}>
-                <item.Icon />
+              <span className="relative flex flex-none">
+                <span className={isActive ? '[&_svg]:stroke-2' : ''}>
+                  <item.Icon />
+                </span>
+                {!isActive && NO_BADGES.has(item.key) && (
+                  <>
+                    <span className="absolute -right-1 -top-0.5 h-[7px] w-[7px] rounded-full border-2 border-to-surface bg-to-accent" />
+                    <span className="sr-only">Es liegt etwas an</span>
+                  </>
+                )}
               </span>
               <span
-                className={`overflow-hidden whitespace-nowrap text-[13px] font-semibold -tracking-[0.01em] transition-[max-width,opacity,margin] duration-[180ms] ease-out ${
-                  isActive ? 'max-w-[140px] opacity-100' : 'max-w-0 opacity-0'
+                className={`overflow-hidden whitespace-nowrap text-[13px] font-semibold -tracking-[0.01em] transition-[max-width,opacity] duration-[180ms] ease-out ${
+                  isActive ? 'max-w-[160px] opacity-100' : 'max-w-0 opacity-0'
                 }`}
               >
                 {item.label}
               </span>
-              {!isActive && NO_BADGES.has(item.key) && (
-                <>
-                  <span className="absolute right-1.5 top-2 h-[7px] w-[7px] rounded-full border-2 border-to-surface bg-to-accent" />
-                  <span className="sr-only">Es liegt etwas an</span>
-                </>
-              )}
             </>
           )}
         </NavLink>

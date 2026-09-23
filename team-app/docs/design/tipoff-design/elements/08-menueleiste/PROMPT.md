@@ -30,19 +30,27 @@ Eintrag ersatzlos, die Leiste hat dann fünf Ziele (5-spieler-ohne-admin.png).
 Symbole als Strich-SVG wie in der Vorlage (Haus, Spielfeld mit Mittellinie, zwei Personen, Trikot,
 Stoppuhr, Sonne/Zahnrad). Keine Emojis, keine gefüllten Flächen.
 
-## Aktiv und inaktiv
-- inaktiv: 38×44, nur das Symbol in --to-text-3, Strichstärke 1.9
-- aktiv: dasselbe Element wird zur Kapsel – Breite auto, 14px Innenabstand links/rechts, 8px Abstand
-  zwischen Symbol und Text, Hintergrund --to-accent, Symbol und Text in --to-on-accent,
+## Aktiv und inaktiv – die Verteilung ist der Kern
+Die Leiste ist IMMER randvoll, rechts bleibt nie Leerraum:
+
+- inaktiv: `flex: 1 1 0; min-width: 0; padding: 0` – alle inaktiven Ziele teilen sich den
+  übrigen Platz zu gleichen Teilen, das Symbol sitzt mittig in seiner Spalte.
+  Höhe 44, Symbol in --to-text-3, Strichstärke 1.9, kein Text.
+- aktiv: dasselbe Element wird zur Kapsel – `flex: 0 0 auto`, 14px Innenabstand links/rechts,
+  8px zwischen Symbol und Text, Hintergrund --to-accent, Symbol und Text in --to-on-accent,
   Text 13px/600. Gekennzeichnet über aria-current="page", NICHT über eine Extra-Klasse allein.
-- Der Wechsel wird animiert: width, background-color, color und padding über .18s ease,
-  der Text über max-width (0 → 140px) und opacity. Kein Sprung, keine Extra-Bibliothek.
+- Kein festes Raster, keine feste Breite pro Ziel – nur flex. Dadurch stimmt die Verteilung
+  auch bei fünf Zielen (Spieler) und auf jeder Bildschirmbreite.
+- Der Wechsel wird animiert: flex-grow, padding, gap, background-color und color über .18s ease,
+  der Text über max-width (0 → 160px) und opacity. Kein Sprung, keine Extra-Bibliothek.
 - Alle sechs passen nebeneinander, auch wenn „Kampfgericht" aktiv ist (Vorlage prüfen, 370px Leiste).
   Die Beschriftung wird NICHT gekürzt.
 
 ## Hinweispunkt (neu)
-Jedes inaktive Ziel kann einen volt Punkt tragen (7px, 2px Rand in der Leistenfarbe, oben rechts am
-Symbol), wenn dort etwas offen ist:
+Jedes inaktive Ziel kann einen volt Punkt tragen (7px, 2px Rand in der Leistenfarbe), wenn dort etwas
+offen ist. Der Punkt hängt am SYMBOL, nicht an der Spalte: das SVG steckt dafür in einem
+`<span class="tab__icon">` mit position: relative, der Punkt sitzt darin oben rechts (-2px/-4px).
+Sonst würde er bei breiten Spalten weit neben dem Symbol schweben.
 - Spiele: eigene Zu-/Absage für ein veröffentlichtes Kader-Spiel steht aus
 - Kampfgericht: eigener Einsatz in den nächsten 7 Tagen
 - Team, Trikots, Admin: vorerst kein Punkt
