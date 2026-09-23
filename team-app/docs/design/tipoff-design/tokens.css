@@ -30,6 +30,10 @@
   --to-vacation-frame: #4A3C12; /* Karten-Rand "Abwesenheit" während ein Zeitraum läuft */
   --to-line-muted: #3A414C;  /* gedämpfter Rand/Punkt für Platzhalter (offene Kampfgericht-Rolle,
                                  kommende Abwesenheit, dunkles Trikot-Farbfeld) im Team-Board */
+  --to-accent-wash: rgba(200, 255, 46, 0.06); /* sehr helle Volt-Flächentönung für großflächige
+                                 Bereiche (Spielerband "im Kader" auf der Spiele-Karte) — heller/
+                                 zurückhaltender als --to-accent-soft (.12), das für Chips/Badges
+                                 gedacht ist */
 
   /* Schrift */
   --to-font-display: 'Archivo', system-ui, sans-serif;   /* font-stretch 125%, 800, italic */

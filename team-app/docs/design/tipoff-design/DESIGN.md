@@ -33,6 +33,7 @@ Die Werte stehen als CSS-Variablen in `tokens.css`, die Logos und Icons in `asse
 | `--to-vacation` | `#E9B949` | Update 2026-09-22 — ausschließlich "Urlaub" auf der Training-Karte |
 | `--to-vacation-frame` | `#4A3C12` | Update 2026-09-22 — Karten-Rand "Abwesenheit", während ein Zeitraum läuft |
 | `--to-line-muted` | `#3A414C` | Update 2026-09-22 — Platzhalter-Rand/-Punkt im Team-Board (offene Rolle, kommende Abwesenheit, dunkles Trikot-Farbfeld) |
+| `--to-accent-wash` | `rgba(200,255,46,.06)` | Update 2026-09-23 — sehr helle Volt-Fläche für den Spielerband „DU BIST IM KADER" auf der Spiele-Karte, heller als `--to-accent-soft` |
 
 Regeln: Volt nie großflächig als Hintergrund in Screens (Ausnahme: App-Icon, Primär-Button, kleine Badges). Kein Weiß auf Volt.
 

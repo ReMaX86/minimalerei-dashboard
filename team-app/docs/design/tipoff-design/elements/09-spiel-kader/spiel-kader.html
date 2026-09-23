@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Spiele &amp; Kader</title>
+<!--
+  REFERENZ-UMSETZUNG der Karte „Nächster Spieltag" im Reiter „Spiele & Kader".
+  Enthält Kaderauswahl (Trainer), Zu-/Absage (Spieler), Treffpunkte und Mitfahrgelegenheit.
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=coach           Trainer, Heimspiel, Kader wird zusammengestellt (Standard)
+    ?state=coachfull       Trainer, 12 von 12 erreicht – weitere Auswahl gesperrt
+    ?state=coachpublished  Trainer, Kader veröffentlicht, eine Absage eingegangen
+    ?state=player          Spieler, Kader noch nicht veröffentlicht
+    ?state=nominated       Spieler im Kader, noch keine Rückmeldung
+    ?state=accepted        Spieler hat zugesagt
+    ?state=notinsquad      Spieler ist nicht im Kader
+    ?state=away            Auswärtsspiel mit zwei Treffpunkten und Mitfahrgelegenheit
+    ?state=awayempty       Auswärtsspiel, noch keine Fahrer eingetragen
+    ?state=meetinghome     Blatt „Treffpunkt" für ein Heimspiel
+    ?state=meetingaway     Blatt „Treffpunkt" für ein Auswärtsspiel
+    ?state=rideoffer       Blatt „Plätze anbieten"
+  Klickbar: Kader-Haken, Zu-/Absage, Einsteigen, Blätter öffnen.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.14);
+  --to-vacation:#E9B949; --to-vacation-soft:rgba(233,185,73,.12);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{width:390px;margin:0 auto;padding:24px 20px}
+
+.card{border-radius:26px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+
+/* ---------- Kopf ---------- */
+.head{display:flex;flex-direction:column;gap:14px;padding:20px}
+.head__top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.label{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--to-text-3)}
+.status{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;
+  font-family:'Geist Mono',monospace;font-size:10px;font-weight:600;white-space:nowrap}
+.status--open{background:var(--to-danger-soft);color:var(--to-danger-text)}
+.status--done{background:var(--to-accent-soft);color:var(--to-accent)}
+.status__dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+.match{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.match__names{display:flex;flex-direction:column;gap:6px;min-width:0}
+.match__opp{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:26px;letter-spacing:-.035em;line-height:1}
+.match__when{font-family:'Geist Mono',monospace;font-size:13px;color:var(--to-text-2);
+  font-variant-numeric:tabular-nums}
+.venue{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:8px;flex:none;
+  font-family:'Geist Mono',monospace;font-size:10px;font-weight:600}
+.venue--home{background:var(--to-accent-soft);color:var(--to-accent)}
+.venue--away{background:var(--to-surface-2);color:var(--to-text-2)}
+
+.rows{display:flex;flex-direction:column;gap:2px}
+.row{display:flex;align-items:center;gap:12px;min-height:40px;font-size:15px;
+  color:var(--to-text);text-decoration:none;background:transparent;border:0;padding:0;
+  width:100%;text-align:left;font-family:'Geist',sans-serif;cursor:pointer}
+.row svg{width:19px;height:19px;flex:none;fill:none;stroke:var(--to-text-3);
+  stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.row__text{flex:1 1 auto;min-width:0}
+.row__text--muted{color:var(--to-text-3)}
+.row__action{font-size:13px;font-weight:600;color:var(--to-accent);flex:none}
+.row__chev{width:16px;height:16px;flex:none;stroke:var(--to-text-4);stroke-width:2.2}
+
+.meet{display:flex;flex-direction:column;gap:6px;padding:13px 14px;border-radius:16px;
+  background:var(--to-surface-2)}
+.meet__head{display:flex;align-items:center;gap:8px}
+.meet__head .label{flex:1 1 auto}
+.meet__edit{border:0;background:transparent;padding:0;color:var(--to-accent);
+  font-family:'Geist',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
+.meet__line{display:flex;align-items:baseline;gap:10px;min-height:26px}
+.meet__what{flex:1 1 auto;font-size:14px}
+.meet__time{font-family:'Geist Mono',monospace;font-size:14px;color:var(--to-accent);
+  font-variant-numeric:tabular-nums;flex:none}
+.meet__where{font-size:12px;color:var(--to-text-3)}
+
+/* ---------- Kaderblock (Trainer) ---------- */
+.squad{display:flex;flex-direction:column;gap:12px;padding:16px 20px 20px;
+  border-top:1px solid var(--to-hairline);background:var(--to-surface-3)}
+.squad__top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.count{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:20px;
+  color:var(--to-accent);line-height:1}
+.count span{color:var(--to-text-4)}
+.slots{display:flex;gap:4px}
+.slot{flex:1 1 0;height:6px;border-radius:3px;background:var(--to-border)}
+.slot.is-on{background:var(--to-accent)}
+
+.plist{display:flex;flex-direction:column;gap:2px}
+.pl{display:flex;align-items:center;gap:11px;min-height:52px;width:100%;
+  background:transparent;border:0;padding:0;text-align:left;font-family:'Geist',sans-serif;cursor:pointer}
+.pl__ini{width:34px;height:34px;flex:none;border-radius:50%;background:var(--to-surface-2);
+  display:grid;place-items:center;font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-2)}
+.pl__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pl__name{font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--to-text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl__state{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.08em}
+.pl__tog{width:30px;height:30px;flex:none;border-radius:50%;border:1.5px solid var(--to-line);
+  display:grid;place-items:center;background:transparent}
+.pl__tog svg{width:15px;height:15px;fill:none;stroke:transparent;stroke-width:3;
+  stroke-linecap:round;stroke-linejoin:round}
+.pl.is-in .pl__tog{background:var(--to-accent);border-color:var(--to-accent)}
+.pl.is-in .pl__tog svg{stroke:var(--to-on-accent)}
+.pl.is-blocked{cursor:not-allowed}
+.pl.is-blocked .pl__name{color:var(--to-text-3)}
+.pl.is-blocked .pl__tog{border-color:var(--to-border);opacity:.45}
+.pl.is-locked .pl__tog{opacity:.45}
+
+.more{display:flex;align-items:center;gap:8px;min-height:40px;width:100%;padding:0;border:0;
+  background:transparent;color:var(--to-text-2);font-family:'Geist',sans-serif;font-size:13px;
+  text-align:left;cursor:pointer}
+.more span{flex:1 1 auto}
+.more svg{width:15px;height:15px;fill:none;stroke:var(--to-text-3);stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round}
+
+.note{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;font-size:13px}
+.note svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+.note--full{background:var(--to-accent-soft);color:var(--to-accent)}
+.note--warn{background:var(--to-danger-soft);color:var(--to-danger-text)}
+.note--quiet{background:var(--to-surface-2);color:var(--to-text-2)}
+
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:52px;
+  border:0;border-radius:14px;background:var(--to-accent);color:var(--to-on-accent);
+  font-family:'Geist',sans-serif;font-size:15px;font-weight:600;cursor:pointer}
+.btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4;
+  stroke-linecap:round;stroke-linejoin:round}
+.btn--ghost{background:transparent;border:1px solid var(--to-line);color:var(--to-text)}
+.btn--danger{background:var(--to-danger-soft);color:var(--to-danger-text);border:0}
+.btn--sm{height:46px;font-size:14px;font-weight:500}
+.btn[aria-disabled="true"]{opacity:.45}
+.btn2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ---------- Spielerband ---------- */
+.band{display:flex;flex-direction:column;gap:12px;padding:16px 20px 20px;
+  border-top:1px solid var(--to-hairline)}
+.band--in{background:rgba(200,255,46,.06)}
+.band--quiet{background:var(--to-surface-3)}
+.band__label{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.12em}
+.band__label--in{color:var(--to-accent)}
+.band__label--quiet{color:var(--to-text-3)}
+.band__text{font-size:15px;color:var(--to-text-2)}
+
+.squadlink{display:flex;align-items:center;gap:12px;min-height:60px;width:100%;padding:0 20px;
+  border:0;border-top:1px solid var(--to-hairline);background:transparent;color:var(--to-text);
+  font-family:'Geist',sans-serif;text-align:left;cursor:pointer}
+.faces{display:flex;padding-left:8px}
+.face{width:28px;height:28px;margin-left:-8px;border-radius:50%;background:var(--to-surface-2);
+  border:2px solid var(--to-surface);display:grid;place-items:center;
+  font-family:'Geist Mono',monospace;font-size:9px;color:var(--to-text-2)}
+.squadlink__text{flex:1 1 auto;font-size:14px;font-weight:600;white-space:nowrap}
+.squadlink svg{width:16px;height:16px;flex:none;fill:none;stroke:var(--to-text-4);stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- Mitfahrgelegenheit ---------- */
+.rides{display:flex;flex-direction:column;gap:12px;padding:16px 20px 20px;
+  border-top:1px solid var(--to-hairline)}
+.rides__top{display:flex;align-items:center;gap:10px}
+.rides__top .label{flex:1 1 auto}
+.ride{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:16px;
+  background:var(--to-surface-2)}
+.ride--mine{background:var(--to-accent-soft)}
+.ride__ini{width:32px;height:32px;flex:none;border-radius:50%;background:var(--to-surface);
+  display:grid;place-items:center;font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-2)}
+.ride__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ride__name{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.ride__meta{font-size:12px;color:var(--to-text-3)}
+.ride__seats{font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3);flex:none}
+.ride__btn{flex:none;height:34px;padding:0 13px;border-radius:999px;border:1px solid var(--to-line);
+  background:transparent;color:var(--to-text);font-family:'Geist',sans-serif;font-size:13px;
+  font-weight:600;cursor:pointer}
+.ride__btn.is-on{background:var(--to-accent);border-color:var(--to-accent);color:var(--to-on-accent)}
+.ride__btn.is-full{opacity:.45}
+.riders{display:flex;flex-wrap:wrap;gap:6px;padding-left:44px}
+.rider{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;
+  background:var(--to-surface);font-size:12px;color:var(--to-text-2)}
+
+/* ---------- Blätter ---------- */
+.sheet{border-radius:26px 26px 18px 18px;background:var(--to-surface);border:1px solid var(--to-border);
+  padding:20px;display:flex;flex-direction:column;gap:16px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:22px;letter-spacing:-.035em;line-height:1}
+.sheet__sub{font-size:13px;color:var(--to-text-3)}
+.field{display:flex;flex-direction:column;gap:7px}
+.field__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.input{display:flex;align-items:center;gap:10px;height:52px;padding:0 14px;border-radius:14px;
+  background:var(--to-surface-2);border:1px solid var(--to-line);
+  font-family:'Geist',sans-serif;font-size:16px;color:var(--to-text);width:100%}
+.input--empty{color:var(--to-text-3)}
+.input--time{font-family:'Geist Mono',monospace;font-variant-numeric:tabular-nums}
+.stepper{display:flex;align-items:center;gap:12px}
+.stepper__btn{width:44px;height:44px;border-radius:14px;border:1px solid var(--to-line);
+  background:transparent;color:var(--to-text);display:grid;place-items:center;cursor:pointer}
+.stepper__btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4;
+  stroke-linecap:round}
+.stepper__val{min-width:44px;text-align:center;font-family:'Archivo',sans-serif;font-stretch:62%;
+  font-weight:800;font-size:24px;line-height:1}
+.sheet__actions{display:flex;flex-direction:column;gap:8px}
+.btn-quiet{height:44px;width:100%;border:0;border-radius:14px;background:transparent;
+  color:var(--to-text-2);font-family:'Geist',sans-serif;font-size:14px;font-weight:500;cursor:pointer}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <article class="card" id="card">
+    <div class="head">
+      <div class="head__top">
+        <span class="label">NÄCHSTER SPIELTAG</span>
+        <span class="status" id="status"></span>
+      </div>
+      <div class="match">
+        <span class="match__names">
+          <span class="match__opp" id="opp">TV Ratingen</span>
+          <span class="match__when" id="when">MI 23.09. · 20:00 UHR</span>
+        </span>
+        <span class="venue" id="venue">HEIM</span>
+      </div>
+      <div class="rows">
+        <a class="row" id="maps" href="#">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"></path>
+            <circle cx="12" cy="9.5" r="2.5"></circle></svg>
+          <span class="row__text" id="address">Teststraße 5, Wülfrath</span>
+          <span class="row__action">Route</span>
+        </a>
+      </div>
+      <div class="meet" id="meet" hidden>
+        <div class="meet__head">
+          <span class="label">TREFFPUNKT</span>
+          <button class="meet__edit" id="meetedit" type="button" hidden>Ändern</button>
+        </div>
+        <div id="meetlines"></div>
+      </div>
+      <button class="row" id="meetadd" type="button" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle>
+          <path d="M12 7v5l3 2"></path></svg>
+        <span class="row__text row__text--muted">Treffpunkt hinterlegen</span>
+        <svg class="row__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </button>
+    </div>
+
+    <!-- Kaderblock: Trainer -->
+    <div class="squad" id="squad" hidden>
+      <div class="squad__top">
+        <span class="label">KADER</span>
+        <span class="count" id="count">8<span>/12</span></span>
+      </div>
+      <div class="slots" id="slots"></div>
+      <div class="note note--full" id="notefull" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+        <span>Kader ist voll. Zum Tauschen erst einen Haken entfernen.</span>
+      </div>
+      <div class="note note--warn" id="notedrop" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle>
+          <path d="M12 8v5"></path><path d="M12 16h.01"></path></svg>
+        <span>Peter Woznicki hat abgesagt – du kannst jemanden nachnominieren.</span>
+      </div>
+      <div class="plist" id="plist"></div>
+      <button class="more" type="button"><span>Alle 18 Spieler anzeigen</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+      </button>
+      <button class="btn" id="publish" type="button">Kader veröffentlichen</button>
+    </div>
+
+    <!-- Band: Spieler -->
+    <div class="band" id="band" hidden>
+      <span class="band__label" id="bandlabel"></span>
+      <span class="band__text" id="bandtext"></span>
+      <div class="btn2" id="answer" hidden>
+        <button class="btn" id="yes" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+          <span id="yeslabel">Bin dabei</span>
+        </button>
+        <button class="btn btn--ghost" id="no" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
+          Kann nicht
+        </button>
+      </div>
+    </div>
+
+    <button class="squadlink" id="squadlink" type="button" hidden>
+      <span class="faces" id="faces"></span>
+      <span class="squadlink__text">Kader ansehen</span>
+      <span class="ride__seats" id="squadcount">12 SPIELER</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+    </button>
+
+    <!-- Mitfahrgelegenheit, nur auswärts -->
+    <div class="rides" id="rides" hidden>
+      <div class="rides__top">
+        <span class="label">MITFAHRGELEGENHEIT</span>
+        <span class="ride__seats" id="seatsum"></span>
+      </div>
+      <div id="ridelist"></div>
+      <span class="band__text" id="ridesempty" hidden style="font-size:14px">Noch keine Fahrer eingetragen.</span>
+      <button class="btn btn--ghost btn--sm" id="offer" type="button">Ich biete Plätze an</button>
+    </div>
+  </article>
+
+  <!-- Blatt: Treffpunkt -->
+  <div class="sheet" id="sheetmeet" hidden>
+    <span class="sheet__grip"></span>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span class="sheet__title">Treffpunkt</span>
+      <span class="sheet__sub" id="meetsub">Heimspiel · alle treffen sich an der Halle.</span>
+    </div>
+    <div id="meetfields"></div>
+    <div class="sheet__actions">
+      <button class="btn" type="button">Treffpunkt speichern</button>
+      <button class="btn-quiet" type="button">Abbrechen</button>
+    </div>
+  </div>
+
+  <!-- Blatt: Plätze anbieten -->
+  <div class="sheet" id="sheetride" hidden>
+    <span class="sheet__grip"></span>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span class="sheet__title">Plätze anbieten</span>
+      <span class="sheet__sub">Du fährst und nimmst andere mit.</span>
+    </div>
+    <div class="field">
+      <span class="field__label">FREIE PLÄTZE</span>
+      <div class="stepper">
+        <button class="stepper__btn" type="button" aria-label="Weniger">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"></path></svg>
+        </button>
+        <span class="stepper__val">3</span>
+        <button class="stepper__btn" type="button" aria-label="Mehr">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12"></path><path d="M6 12h12"></path></svg>
+        </button>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field__label">ABFAHRT (OPTIONAL)</span>
+      <span class="input input--empty">z. B. 18:30 ab Bahnhof Wülfrath</span>
+    </div>
+    <div class="sheet__actions">
+      <button class="btn" type="button">Plätze anbieten</button>
+      <button class="btn-quiet" type="button">Abbrechen</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var PLAYERS_OPEN = [
+  { ini: 'MR', name: 'Marc Rewald',    state: 'KANN',          tone: 'ok',   in: true },
+  { ini: 'TB', name: 'Tom Brandt',     state: 'KEINE ANTWORT', tone: 'idle', in: true },
+  { ini: 'AF', name: 'Axel Flaujac',   state: 'URLAUB · 21.09. – 27.09.', tone: 'away', blocked: true },
+  { ini: 'PW', name: 'Peter Woznicki', state: 'KEINE ANTWORT', tone: 'idle', in: false }
+];
+var PLAYERS_PUBLISHED = [
+  { ini: 'MR', name: 'Marc Rewald',    state: 'ZUGESAGT',   tone: 'ok',   in: true },
+  { ini: 'TB', name: 'Tom Brandt',     state: 'ZUGESAGT',   tone: 'ok',   in: true },
+  { ini: 'PW', name: 'Peter Woznicki', state: 'ABGESAGT',   tone: 'bad',  in: false },
+  { ini: 'LS', name: 'Lena Schröder',  state: 'KEINE ANTWORT', tone: 'idle', in: false }
+];
+var RIDES = [
+  { ini: 'TB', name: 'Tom Brandt', meta: '18:30 ab Bahnhof Wülfrath', free: 1, taken: ['Marc R.', 'Lena S.'] },
+  { ini: 'JP', name: 'Jonas Pfeiffer', meta: 'Fährt direkt von der Arbeit', free: 0, taken: ['Ben K.', 'Tim N.', 'Luis H.'] }
+];
+
+var BASE = {
+  role: 'coach',
+  venue: 'home',
+  address: 'Teststraße 5, Wülfrath',
+  published: false,
+  count: 8,
+  players: PLAYERS_OPEN,
+  meeting: { hall: '19:15' },
+  nomination: null,      // 'in' | 'out'
+  answer: null,          // 'yes' | 'no'
+  rides: null,
+  sheet: null,
+  full: false,
+  dropout: false
+};
+
+var AWAY = {
+  venue: 'away',
+  address: 'Dorfstraße 17, Ratingen',
+  meeting: { carpool: '18:30', carpoolPlace: 'Parkplatz Schulzentrum', hall: '19:15' }
+};
+
+var STATES = {
+  coach:          {},
+  coachfull:      { count: 12, full: true },
+  coachpublished: { published: true, count: 12, players: PLAYERS_PUBLISHED, dropout: true },
+  player:         { role: 'player' },
+  nominated:      { role: 'player', published: true, nomination: 'in' },
+  accepted:       { role: 'player', published: true, nomination: 'in', answer: 'yes' },
+  notinsquad:     { role: 'player', published: true, nomination: 'out' },
+  away:           Object.assign({ role: 'player', published: true, nomination: 'in', answer: 'yes', rides: RIDES }, AWAY),
+  awayempty:      Object.assign({ role: 'player', published: true, nomination: 'in', answer: 'yes', rides: [] }, AWAY),
+  meetinghome:    { sheet: 'meet' },
+  meetingaway:    Object.assign({ sheet: 'meet' }, AWAY),
+  rideoffer:      Object.assign({ role: 'player', published: true, nomination: 'in', answer: 'yes', rides: RIDES, sheet: 'ride' }, AWAY)
+};
+
+var key = new URLSearchParams(location.search).get('state') || 'coach';
+var data = Object.assign({}, BASE, STATES[key] || {});
+
+var TONES = { ok: '#C8FF2E', idle: '#7C8594', bad: '#FF7A85', away: '#E9B949' };
+
+function el(id) { return document.getElementById(id); }
+
+/* --- Blätter --- */
+if (data.sheet) {
+  el('card').hidden = true;
+  if (data.sheet === 'meet') {
+    el('sheetmeet').hidden = false;
+    var away = data.venue === 'away';
+    el('meetsub').textContent = away
+      ? 'Auswärtsspiel · Fahrgemeinschaft und Halle getrennt.'
+      : 'Heimspiel · alle treffen sich an der Halle.';
+    el('meetfields').innerHTML = away
+      ? field('FAHRGEMEINSCHAFT — ZEIT', '18:30', true) +
+        field('FAHRGEMEINSCHAFT — ORT', 'Parkplatz Schulzentrum', false) +
+        field('DIREKT AN DER HALLE — ZEIT', '19:15', true)
+      : field('AN DER HALLE — ZEIT', '19:15', true);
+    el('meetfields').style.display = 'flex';
+    el('meetfields').style.flexDirection = 'column';
+    el('meetfields').style.gap = '14px';
+  } else {
+    el('sheetride').hidden = false;
+  }
+} else {
+  render();
+}
+
+function field(label, value, isTime) {
+  return '<div class="field"><span class="field__label">' + label + '</span>' +
+         '<span class="input' + (isTime ? ' input--time' : '') + '">' + value + '</span></div>';
+}
+
+function render() {
+  /* Kopf */
+  var st = el('status');
+  st.className = 'status ' + (data.published ? 'status--done' : 'status--open');
+  st.innerHTML = '<span class="status__dot"></span>' + (data.published ? 'KADER STEHT' : 'KADER AUSSTEHEND');
+
+  el('venue').className = 'venue venue--' + data.venue;
+  el('venue').textContent = data.venue === 'home' ? 'HEIM' : 'AUSWÄRTS';
+  el('address').textContent = data.address;
+  el('maps').href = 'geo:0,0?q=' + encodeURIComponent(data.address);
+
+  /* Treffpunkt */
+  if (data.meeting) {
+    var lines = '';
+    if (data.meeting.carpool) {
+      lines += '<div class="meet__line"><span class="meet__what">Fahrgemeinschaft<br>' +
+               '<span class="meet__where">' + data.meeting.carpoolPlace + '</span></span>' +
+               '<span class="meet__time">' + data.meeting.carpool + '</span></div>';
+      lines += '<div class="meet__line"><span class="meet__what">Direkt an der Halle</span>' +
+               '<span class="meet__time">' + data.meeting.hall + '</span></div>';
+    } else {
+      lines += '<div class="meet__line"><span class="meet__what">An der Halle</span>' +
+               '<span class="meet__time">' + data.meeting.hall + '</span></div>';
+    }
+    el('meetlines').innerHTML = lines;
+    el('meet').hidden = false;
+    el('meetedit').hidden = data.role !== 'coach';
+  } else if (data.role === 'coach') {
+    el('meetadd').hidden = false;
+  }
+
+  /* Trainer: Kaderblock */
+  if (data.role === 'coach') {
+    el('squad').hidden = false;
+    el('count').innerHTML = data.count + '<span>/12</span>';
+    var slots = '';
+    for (var i = 0; i < 12; i++) slots += '<span class="slot' + (i < data.count ? ' is-on' : '') + '"></span>';
+    el('slots').innerHTML = slots;
+    el('notefull').hidden = !data.full;
+    el('notedrop').hidden = !data.dropout;
+
+    el('plist').innerHTML = data.players.map(function (p) {
+      var cls = 'pl' + (p.in ? ' is-in' : '') + (p.blocked ? ' is-blocked' : '') +
+                (!p.in && data.full ? ' is-locked' : '');
+      return '<button class="' + cls + '" type="button"' +
+             (p.blocked ? ' aria-disabled="true"' : '') + '>' +
+             '<span class="pl__ini">' + p.ini + '</span>' +
+             '<span class="pl__main"><span class="pl__name">' + p.name + '</span>' +
+             '<span class="pl__state" style="color:' + TONES[p.tone] + '">' + p.state + '</span></span>' +
+             '<span class="pl__tog"><svg viewBox="0 0 24 24" aria-hidden="true">' +
+             '<path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span></button>';
+    }).join('');
+
+    el('publish').textContent = data.published ? 'Kader aktualisieren' : 'Kader veröffentlichen';
+  }
+
+  /* Spieler: Band */
+  if (data.role === 'player') {
+    var band = el('band'), lab = el('bandlabel'), txt = el('bandtext');
+    band.hidden = false;
+    if (!data.published) {
+      band.className = 'band band--quiet';
+      lab.className = 'band__label band__label--quiet';
+      lab.textContent = 'KADER';
+      txt.textContent = 'Der Kader für dieses Spiel steht noch nicht.';
+    } else if (data.nomination === 'out') {
+      band.className = 'band band--quiet';
+      lab.className = 'band__label band__label--quiet';
+      lab.textContent = 'KADER';
+      txt.textContent = 'Du bist diesmal nicht im Kader.';
+    } else {
+      band.className = 'band band--in';
+      lab.className = 'band__label band__label--in';
+      lab.textContent = 'DU BIST IM KADER';
+      el('answer').hidden = false;
+      if (data.answer === 'yes') {
+        txt.textContent = 'Du hast zugesagt.';
+        el('yeslabel').textContent = 'Dabei';
+      } else if (data.answer === 'no') {
+        txt.textContent = 'Du hast abgesagt. Der Trainer ist informiert.';
+        el('yes').classList.add('btn--ghost');
+        el('no').classList.remove('btn--ghost');
+        el('no').classList.add('btn--danger');
+      } else {
+        txt.textContent = 'Sag kurz Bescheid, ob du dabei bist.';
+        el('yes').classList.add('btn--ghost');
+      }
+    }
+    if (data.published) {
+      el('squadlink').hidden = false;
+      el('faces').innerHTML = ['MR', 'TB', 'LS', '+9']
+        .map(function (f) { return '<span class="face">' + f + '</span>'; }).join('');
+    }
+  }
+
+  /* Mitfahrgelegenheit */
+  if (data.rides !== null && data.venue === 'away') {
+    el('rides').hidden = false;
+    var free = data.rides.reduce(function (a, r) { return a + r.free; }, 0);
+    el('seatsum').textContent = free === 1 ? '1 PLATZ FREI' : free + ' PLÄTZE FREI';
+    if (!data.rides.length) {
+      el('ridesempty').hidden = false;
+      el('seatsum').textContent = '';
+    }
+    el('ridelist').innerHTML = data.rides.map(function (r) {
+      var riders = r.taken.length
+        ? '<div class="riders">' + r.taken.map(function (t) {
+            return '<span class="rider">' + t + '</span>'; }).join('') + '</div>' : '';
+      return '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">' +
+             '<div class="ride"><span class="ride__ini">' + r.ini + '</span>' +
+             '<span class="ride__main"><span class="ride__name">' + r.name + '</span>' +
+             '<span class="ride__meta">' + r.meta + '</span></span>' +
+             (r.free
+               ? '<button class="ride__btn" type="button">' + r.free + ' frei</button>'
+               : '<button class="ride__btn is-full" type="button" aria-disabled="true">Voll</button>') +
+             '</div>' + riders + '</div>';
+    }).join('');
+  }
+}
+</script>
+</body>
+</html>

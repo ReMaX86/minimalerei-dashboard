@@ -23,6 +23,7 @@ export default {
           accent: 'var(--to-accent)',
           accentHover: 'var(--to-accent-hover)',
           accentSoft: 'var(--to-accent-soft)',
+          accentWash: 'var(--to-accent-wash)',
           onAccent: 'var(--to-on-accent)',
           danger: 'var(--to-danger)',
           dangerText: 'var(--to-danger-text)',
