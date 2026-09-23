@@ -516,6 +516,7 @@ export interface LeagueStandingRow {
 // league_standings zu verlieren.
 export interface StandingsSyncStatus {
   id: 1;
+  liga_id: string;
   last_attempt_at: string | null;
   last_success_at: string | null;
   last_error: string | null;

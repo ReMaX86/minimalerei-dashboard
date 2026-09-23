@@ -862,10 +862,11 @@ enthalten), kein zusätzlicher Dienst.
 1. **Migration ausführen**: `supabase/migrations/0056_league_standings.sql` im SQL-Editor
    laufen lassen (legt die Tabelle, ihre Policies und das Feature-Flag `standings` an, standardmäßig
    ausgeschaltet).
-2. **Liga-ID prüfen**: die Zahl aus der DBB-URL (`...&liga_id=54636`) — standardmäßig fest im
-   Code hinterlegt (`54636`, die aktuelle Liga von TB Wülfrath Herren). Falls sich die Liga mal
-   ändert (Auf-/Abstieg), als Vercel-Env-Var `DBB_LIGA_ID` mit dem neuen Wert überschreiben, kein
-   Redeploy des Codes nötig.
+2. **Liga-ID prüfen**: die Zahl aus der DBB-URL (`...&liga_id=54636`). Seit Migration 0066 liegt
+   sie in `standings_sync_status.liga_id` (Default `54636`, die aktuelle Liga von TB Wülfrath
+   Herren) und ist im **Admin -> Funktionen** direkt unter dem Feature `Liga-Tabelle` editierbar —
+   siehe Nachtrag "Liga-ID admin-konfigurierbar" weiter unten. Die Vercel-Env-Var `DBB_LIGA_ID`
+   wird nur noch als Fallback gelesen, falls die Sync-Status-Zeile unerwartet fehlt.
 3. **Cron-Job anlegen** (nutzt denselben `PUSH_WEBHOOK_SECRET` wie die anderen Cron-Jobs, kein
    neues Secret nötig):
    ```sql
@@ -922,6 +923,28 @@ entfernt (die Tabelle bemisst sich jetzt an ihrem tatsächlichen Inhalt, `overfl
 umgebenden Container scrollt weiterhin bei Bedarf) plus `whitespace-nowrap` auf der
 Team-Spalte (Kopf- und Datenzellen), damit ein langer Name nie umbricht, sondern die Spalte
 zuverlässig genau auf seine Breite wächst.
+
+**Nachtrag: Liga-ID admin-konfigurierbar + manueller "Jetzt aktualisieren"-Button (Migration
+0066).** Auf Nutzeranfrage — bisher musste die Liga-ID bei Auf-/Abstieg per Vercel-Env-Var
+gesetzt werden (Redeploy-frei, aber ohne Trainer-Zugriff). Jetzt liegt sie in
+`standings_sync_status.liga_id` (Singleton-Zeile, gleiche Tabelle wie der Sync-Status aus
+Migration 0065) und ist im **Admin -> Funktionen** direkt unter dem Feature `Liga-Tabelle`
+editierbar (`StandingsSyncSettings.tsx`), per neuer RLS-Policy (`is_trainer()`, deckt echte
+Trainer UND `is_admin`-Spieler ab) auch clientseitig beschreibbar.
+
+Derselbe Screen hat außerdem einen "Jetzt aktualisieren"-Button, der `api/sync-league-
+standings.ts` direkt aufruft, statt auf den nächsten `pg_cron`-Lauf zu warten — praktisch zum
+sofortigen Testen einer neu eingetragenen Liga-ID, und der einzige Weg, wie die Staging-
+Vorschau-Umgebung (kein Cron zeigt dort hin) überhaupt jemals Daten bekommt. Die Function
+kannte bisher nur den `x-webhook-secret`-Header (für `pg_cron`) als Auth — der Button schickt
+stattdessen die echte Supabase-Session des Trainers/Admins als `Authorization: Bearer`-Header,
+serverseitig per `is_trainer()`-RPC (mit dem Anon-Key + diesem Token als Nutzer-Kontext)
+geprüft, statt das Secret ins Frontend zu geben.
+
+Zusätzlich räumt die Function jetzt bei jedem Lauf auch Zeilen einer *anderen* (z. B. vorher
+konfigurierten) Liga-ID aus `league_standings` weg — der Tabellen-Tab liest die Tabelle ohne
+eigenen `liga_id`-Filter und geht von genau einer aktiven Liga aus; ohne dieses Aufräumen wären
+nach einer Liga-ID-Änderung alte und neue Zeilen dauerhaft vermischt geblieben.
 
 ### 9. Staging-Umgebung
 

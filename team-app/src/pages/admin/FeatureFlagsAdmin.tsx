@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ErrorNote } from '../../components/ErrorNote';
 import { PushSubscribersList } from '../../components/admin/PushSubscribersList';
+import { StandingsSyncSettings } from '../../components/admin/StandingsSyncSettings';
 import { useFeatureFlags } from '../../context/FeatureFlagsContext';
 import { FEATURE_LABELS, type FeatureKey, type ReminderSettings } from '../../types/database';
 
@@ -178,6 +179,7 @@ export function FeatureFlagsAdmin() {
                 </button>
               </div>
               {key === 'push_notifications' && enabled && <PushSubscribersList />}
+              {key === 'standings' && enabled && <StandingsSyncSettings />}
             </li>
           );
         })}

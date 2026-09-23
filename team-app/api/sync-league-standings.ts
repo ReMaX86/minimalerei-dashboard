@@ -11,7 +11,8 @@ import * as cheerio from 'cheerio';
 // erreichbaren HTML-Tabellenseite.
 //
 // Aufgerufen per pg_cron (wie die anderen Erinnerungsarten), siehe README
-// "Liga-Tabelle" für die Einrichtung.
+// "Liga-Tabelle" für die Einrichtung — seit Migration 0066 zusätzlich per
+// "Jetzt aktualisieren"-Button im Adminbereich (siehe StandingsSyncSettings.tsx).
 //
 // ACHTUNG: die HTML-Struktur der DBB-Seite konnte beim Bauen dieser Funktion
 // nicht live geprüft werden (Netzwerkbeschränkung der Entwicklungsumgebung)
@@ -131,12 +132,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const webhookSecret = process.env.PUSH_WEBHOOK_SECRET;
-  if (!webhookSecret || req.headers['x-webhook-secret'] !== webhookSecret) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
-  }
-
   const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceRoleKey) {
@@ -144,8 +139,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const ligaId = process.env.DBB_LIGA_ID ?? '54636';
+  // Zwei Aufrufer: der tägliche pg_cron-Job (Webhook-Secret, wie bei den
+  // anderen api/-Functions) UND jetzt zusätzlich der "Jetzt aktualisieren"-
+  // Button im Adminbereich (echte Trainer/Admin-Session statt eines dem
+  // Client bekannten Secrets). Für Letzteres wird der mitgeschickte
+  // Supabase-Access-Token gegen die is_trainer()-RPC geprüft — dieselbe
+  // security-definer Funktion, die auch alle anderen Trainer-only RLS-
+  // Policies/RPCs im Projekt verwendet (siehe Migration 0006).
+  const webhookSecret = process.env.PUSH_WEBHOOK_SECRET;
+  const hasValidWebhookSecret = !!webhookSecret && req.headers['x-webhook-secret'] === webhookSecret;
+
+  let isAdminRequest = false;
+  if (!hasValidWebhookSecret) {
+    const authHeader = req.headers.authorization;
+    const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
+    if (authHeader?.startsWith('Bearer ') && anonKey) {
+      const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+      const { data } = await userClient.rpc('is_trainer');
+      isAdminRequest = data === true;
+    }
+  }
+
+  if (!hasValidWebhookSecret && !isAdminRequest) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
   const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  // Liga-ID kommt seit Migration 0066 aus der Datenbank (im Adminbereich
+  // editierbar) statt aus der Vercel-Env-Var DBB_LIGA_ID — die Env-Var
+  // bleibt nur als Fallback, falls die Sync-Status-Zeile unerwartet fehlt.
+  const { data: statusRow } = await supabase.from('standings_sync_status').select('liga_id').eq('id', 1).maybeSingle();
+  const ligaId = statusRow?.liga_id || process.env.DBB_LIGA_ID || '54636';
 
   // Element 10 "Spielplan/Ergebnisse/Tabelle": jeder Lauf trägt sich hier
   // ein (Erfolg oder Fehler), damit der Tabellen-Reiter einen "letzte
@@ -189,6 +215,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // Räumt Zeilen einer früher konfigurierten Liga-ID weg (die Admin-UI
+  // erlaubt jetzt, die Liga-ID zu ändern) — league_standings wird überall
+  // im Client ohne eigenen liga_id-Filter gelesen, geht also von genau
+  // einer aktiven Liga aus.
+  await supabase.from('league_standings').delete().neq('liga_id', ligaId);
+
   const { error: insertError } = await supabase.from('league_standings').insert(
     rows.map((r) => ({
       liga_id: ligaId,
@@ -211,5 +243,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   await supabase.from('standings_sync_status').update({ last_success_at: nowIso, last_error: null }).eq('id', 1);
-  res.status(200).json({ updated: rows.length });
+  res.status(200).json({ updated: rows.length, ligaId });
 }
