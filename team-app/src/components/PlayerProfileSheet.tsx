@@ -8,6 +8,15 @@ import { ageFromBirthDate } from '../lib/format';
 import { MyProfileModal } from './MyProfileModal';
 import { POSITION_LABELS, type GameStatEvent, type Player } from '../types/database';
 
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 6l12 12" />
+      <path d="M18 6L6 18" />
+    </svg>
+  );
+}
+
 function initialsOf(name: string): string {
   return name
     .split(' ')
@@ -80,7 +89,17 @@ export function PlayerProfileSheet({ player, onClose }: { player: Player; onClos
           className="flex max-h-[88vh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-t-[24px] border border-to-line bg-to-surface p-5 sm:rounded-b-[24px]"
           onClick={(e) => e.stopPropagation()}
         >
-          <span className="mx-auto h-1 w-9 rounded-full bg-to-line" />
+          <div className="relative flex items-center justify-center">
+            <span className="h-1 w-9 rounded-full bg-to-line" />
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Schließen"
+              className="absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-to-surface2 text-to-text2"
+            >
+              <CloseIcon />
+            </button>
+          </div>
 
           <div className="flex items-center gap-4">
             {player.photo_url ? (
@@ -123,10 +142,10 @@ export function PlayerProfileSheet({ player, onClose }: { player: Player; onClos
                   return (
                     <span
                       key={s}
-                      className="inline-flex h-8 items-baseline gap-1.5 rounded-to-pill border border-to-borderMatchday bg-to-accentSoft px-3.5 text-[13px] font-semibold text-to-accent"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-to-pill border border-to-borderMatchday bg-to-accentSoft px-3.5 text-[13px] font-semibold leading-none text-to-accent"
                     >
                       {head}
-                      {sub && <em className="text-[11px] font-normal not-italic text-to-text3">{sub}</em>}
+                      {sub && <em className="leading-none text-[11px] font-normal not-italic text-to-text3">{sub}</em>}
                     </span>
                   );
                 })}

@@ -64,14 +64,14 @@ export function StrengthsPicker({
                   type="button"
                   disabled={locked}
                   onClick={() => toggle(skill)}
-                  className={`inline-flex h-9 items-baseline gap-1.5 rounded-to-pill px-3.5 text-[15px] font-semibold ${
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-to-pill px-3.5 text-[15px] font-semibold leading-none ${
                     on
                       ? 'bg-to-accent text-to-onAccent'
                       : 'border border-to-line font-medium text-to-text2'
                   } ${locked ? 'opacity-45' : ''}`}
                 >
                   {head}
-                  <em className={`text-[13px] font-normal not-italic ${on ? 'text-to-onAccent/70' : 'text-to-textDisabled'}`}>{sub}</em>
+                  <em className={`leading-none text-[13px] font-normal not-italic ${on ? 'text-to-onAccent/70' : 'text-to-textDisabled'}`}>{sub}</em>
                 </button>
               );
             })}
