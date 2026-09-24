@@ -50,6 +50,12 @@ export function monthLabel(iso: string): string {
   return new Date(iso + 'T00:00:00').toLocaleDateString('de-DE', { month: 'long' }).toUpperCase();
 }
 
+// "09." — zweistelliger Monat + Punkt, unter der Tageszahl im Datumsblock
+// der Spielplan-Zeile (Admin · Spiele, Element 17).
+export function monthShort(iso: string): string {
+  return `${iso.slice(5, 7)}.`;
+}
+
 // Für einen vollen Zeitstempel (timestamptz, z. B. league_standings.updated_at)
 // — anders als fmtDateShort() (reines Datum ohne Uhrzeit-Anteil) braucht das
 // hier ein echtes Date-Objekt, damit new Date() den Zeitzonen-Versatz aus

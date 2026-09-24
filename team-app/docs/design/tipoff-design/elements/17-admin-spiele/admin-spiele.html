@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Admin · Spiele</title>
+<!--
+  REFERENZ-UMSETZUNG des Admin-Reiters „Spiele".
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=list      Spielplan, Standard (gespielte Spiele eingeklappt)
+    ?state=past      Gespielte Spiele aufgeklappt
+    ?state=detail    Detailseite eines kommenden Spiels
+    ?state=played    Detailseite eines gespielten Spiels (getrackt)
+    ?state=edit      Spiel bearbeiten
+    ?state=new       Neues Spiel anlegen
+    ?state=score     Endstand nachtragen
+    ?state=reset     Rückfrage vor „Tracking zurücksetzen"
+  Die Seite ist echt klickbar: Zeile öffnen, aufklappen, Heim/Auswärts wechseln, Viertel einblenden.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.10);
+  --to-danger-frame:#5A2027;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer}
+input,select{font-family:inherit;color:var(--to-text)}
+.wrap{width:390px;margin:0 auto;padding:22px 0 28px;display:flex;flex-direction:column;gap:14px}
+.pad{padding-left:20px;padding-right:20px}
+
+/* ---------- Reiterleiste ---------- */
+.tabswrap{position:relative}
+.tabs{display:flex;gap:6px;padding:2px 20px 8px;overflow-x:auto;flex-wrap:nowrap;
+  scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;scroll-snap-align:start;white-space:nowrap;display:inline-flex;align-items:center;
+  height:34px;padding:0 14px;border-radius:999px;background:var(--to-surface);
+  border:1px solid var(--to-border);color:var(--to-text-2);font-size:13px;font-weight:500}
+.tab[aria-current="page"]{background:var(--to-accent);border-color:var(--to-accent);
+  color:var(--to-on-accent);font-weight:600}
+.tabsfade{position:absolute;right:0;top:0;bottom:8px;width:44px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(10,12,15,0),var(--to-bg) 72%)}
+
+/* ---------- Abschnitte ---------- */
+.sec{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;
+  padding:4px 0 0;text-align:left}
+.sec__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sec__rule{flex:1 1 auto;height:1px;background:var(--to-hairline)}
+.sec__count{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;
+  font-family:inherit;font-weight:600}
+.btn--new{height:34px;padding:0 14px;border-radius:999px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:13px;flex:none}
+
+/* ---------- Spielzeile ---------- */
+.panel{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.panel--past{border-color:var(--to-hairline)}
+.row{display:flex;align-items:center;gap:12px;min-height:74px;padding:12px 16px;width:100%;
+  border:0;border-top:1px solid var(--to-surface-2);background:transparent;text-align:left}
+.row:first-child{border-top:0}
+.row--next{background:rgba(200,255,46,.04)}
+.date{width:40px;flex:none;display:flex;flex-direction:column;align-items:center;gap:1px}
+.date__dow{font-family:'Geist Mono',monospace;font-size:9px;color:var(--to-text-3)}
+.date__day{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:20px;line-height:1.05}
+.row--next .date__day{color:var(--to-accent)}
+.date__mon{font-family:'Geist Mono',monospace;font-size:8px;color:var(--to-text-4)}
+.row__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px}
+.row__top{display:flex;align-items:center;gap:7px;min-width:0}
+.row__team{font-size:14px;font-weight:600;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ha{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;flex:none;
+  font-family:'Geist Mono',monospace;font-size:8px;font-weight:600;letter-spacing:.06em;
+  background:var(--to-surface-2);color:var(--to-text-2)}
+.ha--away{background:transparent;color:var(--to-text-3);border:1px solid var(--to-line)}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;height:19px;padding:0 8px;border-radius:999px;
+  border:1px solid transparent;font-family:'Geist Mono',monospace;font-size:8px;font-weight:600;letter-spacing:.06em}
+.chip--ok{background:var(--to-surface-2);color:var(--to-text-2)}
+.chip--warn{background:var(--to-danger-soft);border-color:var(--to-danger-frame);color:var(--to-danger-text)}
+.chev{flex:none}
+
+/* gespielt */
+.row--past{min-height:66px}
+.row--past .row__team{color:var(--to-text-2)}
+.row__note{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--to-text-4)}
+.score{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none}
+.score__val{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:17px;line-height:1}
+.score__res{font-family:'Geist Mono',monospace;font-size:8px;letter-spacing:.08em}
+.is-win{color:var(--to-accent)}
+.is-loss{color:var(--to-danger-text)}
+
+/* ---------- Detailseite ---------- */
+.dhead{display:flex;align-items:center;gap:12px}
+.iconbtn{width:34px;height:34px;flex:none;border-radius:12px;background:var(--to-surface);
+  border:1px solid var(--to-border);display:grid;place-items:center}
+.dhead__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+.dhead__name{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1.1}
+.dhead__meta{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+
+.statuslist{display:flex;flex-direction:column;border-radius:16px;background:var(--to-surface);
+  border:1px solid var(--to-hairline);overflow:hidden}
+.st{display:flex;align-items:center;gap:12px;min-height:48px;padding:8px 14px;
+  border-top:1px solid var(--to-surface-2)}
+.st:first-child{border-top:0}
+.st__dot{width:7px;height:7px;border-radius:50%;background:var(--to-text-4);flex:none}
+.st__dot--ok{background:var(--to-accent)}
+.st__dot--warn{background:var(--to-danger)}
+.st__label{flex:1 1 auto;font-size:13px;color:var(--to-text-2)}
+.st__val{font-size:13px;font-weight:600;flex:none;text-align:right}
+.st__val--ok{color:var(--to-accent)}
+.st__val--warn{color:var(--to-danger-text)}
+
+.actions{display:flex;flex-direction:column;border-radius:16px;background:var(--to-surface);
+  border:1px solid var(--to-hairline);overflow:hidden}
+.act{display:flex;align-items:center;gap:12px;min-height:54px;padding:8px 14px;width:100%;
+  border:0;border-top:1px solid var(--to-surface-2);background:transparent;text-align:left}
+.act:first-child{border-top:0}
+.act__main{flex:1 1 auto;display:flex;flex-direction:column;gap:2px}
+.act__label{font-size:14px;font-weight:500}
+.act__sub{font-size:11px;color:var(--to-text-4)}
+.danger{display:flex;flex-direction:column;border-radius:16px;background:rgba(255,90,103,.05);
+  border:1px solid var(--to-danger-frame);overflow:hidden}
+.danger .act{border-top-color:rgba(90,32,39,.7)}
+.danger .act__label{color:var(--to-danger-text)}
+.danger__label{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-text-4);padding-top:2px}
+
+/* ---------- Formular ---------- */
+.group{display:flex;flex-direction:column;gap:9px}
+.group__label{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-text-4)}
+.f{display:flex;flex-direction:column;gap:6px}
+.f__label{font-size:12px;color:var(--to-text-3)}
+.field{height:48px;padding:0 14px;border-radius:14px;background:var(--to-surface);
+  border:1px solid var(--to-line);font-size:15px;width:100%;outline:none}
+.field::placeholder{color:var(--to-text-4)}
+.field:focus{border-color:var(--to-accent-frame)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:var(--to-surface-3);
+  border:1px solid var(--to-hairline)}
+.seg button{flex:1 1 0;height:38px;border:0;border-radius:10px;background:transparent;
+  color:var(--to-text-2);font-size:14px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--to-accent);color:var(--to-on-accent);font-weight:600}
+select.field{appearance:none;background-image:
+  linear-gradient(45deg,transparent 50%,#7C8594 50%),linear-gradient(135deg,#7C8594 50%,transparent 50%);
+  background-position:calc(100% - 20px) 21px,calc(100% - 14px) 21px;
+  background-size:6px 6px,6px 6px;background-repeat:no-repeat}
+.savebar{display:flex;gap:8px;padding-top:4px}
+.btn--save{flex:1 1 auto;height:48px;border-radius:999px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:15px}
+.btn--ghost{flex:0 0 auto;height:48px;padding:0 20px;border-radius:999px;background:transparent;
+  border-color:var(--to-line);color:var(--to-text-2);font-size:15px}
+.hint{font-size:11px;color:var(--to-text-4);line-height:1.5}
+
+/* ---------- Endstand ---------- */
+.scoreline{display:flex;align-items:center;gap:10px}
+.scoreline__side{flex:1 1 0;display:flex;flex-direction:column;gap:6px;align-items:center}
+.scoreline__name{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--to-text-3);
+  text-align:center}
+.bignum{width:100%;height:64px;border-radius:16px;background:var(--to-surface);border:1px solid var(--to-line);
+  text-align:center;font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:28px;
+  color:var(--to-text);outline:none}
+.scoreline__sep{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:22px;
+  color:var(--to-text-4);padding-top:18px}
+.qrow{display:grid;grid-template-columns:34px 1fr 12px 1fr;align-items:center;gap:8px}
+.qrow__label{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-4)}
+.qrow__sep{text-align:center;color:var(--to-text-4);font-size:12px}
+.qfield{height:42px;border-radius:12px;background:var(--to-surface);border:1px solid var(--to-hairline);
+  text-align:center;font-family:'Geist Mono',monospace;font-size:15px;outline:none}
+.switchrow{display:flex;align-items:center;gap:12px;min-height:54px;padding:0 14px;width:100%;
+  border-radius:16px;background:var(--to-surface);border:1px solid var(--to-hairline);
+  border-width:1px;text-align:left}
+.switchrow__main{flex:1 1 auto;display:flex;flex-direction:column;gap:2px}
+.track{width:44px;height:26px;flex:none;border-radius:999px;background:var(--to-surface-2);
+  border:1px solid var(--to-line);display:flex;align-items:center;justify-content:flex-start;padding:0 3px}
+.knob{width:18px;height:18px;border-radius:50%;background:var(--to-text-4)}
+.switchrow[aria-pressed="true"] .track{background:var(--to-accent);border-color:var(--to-accent);justify-content:flex-end}
+.switchrow[aria-pressed="true"] .knob{background:var(--to-on-accent)}
+
+/* ---------- Blatt ---------- */
+.scrim{position:fixed;inset:0;background:rgba(5,6,8,.74);display:flex;flex-direction:column;
+  justify-content:flex-end;z-index:20}
+.sheet{width:390px;margin:0 auto;background:var(--to-surface);border-top:1px solid var(--to-border);
+  border-radius:26px 26px 0 0;padding:12px 20px 22px;display:flex;flex-direction:column;gap:14px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1;color:var(--to-danger-text)}
+.sheet__sub{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.losslist{display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:16px;
+  background:rgba(255,90,103,.06);border:1px solid var(--to-danger-frame)}
+.lossitem{display:flex;align-items:flex-start;gap:9px;font-size:13px;color:var(--to-text-2);line-height:1.45}
+.lossitem b{color:var(--to-text);font-weight:600}
+.btn--danger{height:48px;border-radius:999px;background:var(--to-danger);color:#120507;font-size:15px;width:100%}
+.btn--text{height:26px;border:0;background:transparent;color:var(--to-text-3);font-size:13px;font-weight:400;width:100%}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ============ LISTE ============ -->
+  <div id="vList" style="display:flex;flex-direction:column;gap:14px">
+
+    <div class="tabswrap">
+      <div class="tabs" id="tabs"></div>
+      <span class="tabsfade"></span>
+    </div>
+
+    <div class="sec pad">
+      <span class="sec__title">Kommende Spiele</span>
+      <span class="sec__rule"></span>
+      <button class="btn btn--new" type="button">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" style="stroke-width:2.6;stroke-linecap:round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Neu
+      </button>
+    </div>
+
+    <section class="panel" id="listNext" style="margin:0 20px"></section>
+
+    <button class="sec pad" id="pastToggle" type="button" aria-expanded="false">
+      <span class="sec__title">Gespielt</span>
+      <span class="sec__rule"></span>
+      <span class="sec__count" id="pastCount">2</span>
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#7C8594" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none" aria-hidden="true"><path id="pastChev" d="M6 9l6 6 6-6"></path></svg>
+    </button>
+
+    <section class="panel panel--past" id="listPast" style="margin:0 20px" hidden></section>
+  </div>
+
+  <!-- ============ DETAILSEITE ============ -->
+  <div id="vDetail" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="dBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__name" id="dName">Kult-Sport Wuppertal 2</span>
+        <span class="dhead__meta" id="dMeta">DO 01.10. · 20:30 · AUSWÄRTS</span>
+      </span>
+    </div>
+
+    <div class="statuslist" id="dStatus"></div>
+    <div class="actions" id="dActions"></div>
+
+    <span class="danger__label" id="dDangerLabel">NICHT RÜCKGÄNGIG ZU MACHEN</span>
+    <div class="danger" id="dDanger"></div>
+  </div>
+
+  <!-- ============ FORMULAR ============ -->
+  <div id="vEdit" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="eBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__name" id="eTitle">Spiel bearbeiten</span>
+        <span class="dhead__meta" id="eSub">KULT-SPORT WUPPERTAL 2</span>
+      </span>
+    </div>
+
+    <div class="group">
+      <span class="group__label">SPIEL</span>
+      <div class="two">
+        <span class="f"><span class="f__label">Datum</span><input class="field" id="eDate" value="01.10.2026"></span>
+        <span class="f"><span class="f__label">Uhrzeit</span><input class="field" id="eTime" value="20:30"></span>
+      </div>
+      <span class="f"><span class="f__label">Gegner</span><input class="field" id="eOpp" value="Kult-Sport Wuppertal 2"></span>
+      <span class="f"><span class="f__label">Ort</span><input class="field" id="ePlace" value="Platz der Republik, 42107 Wuppertal-Elberfeld"></span>
+    </div>
+
+    <div class="group">
+      <span class="group__label">HEIM ODER AUSWÄRTS</span>
+      <div class="seg" id="eHa">
+        <button type="button" data-ha="home">Heimspiel</button>
+        <button type="button" data-ha="away">Auswärts</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <span class="group__label">TRIKOTSATZ</span>
+      <select class="field" id="eKit">
+        <option>Automatisch (Heim weiß, auswärts schwarz)</option>
+        <option>Immer weiß</option>
+        <option>Immer schwarz</option>
+      </select>
+    </div>
+
+    <div class="group">
+      <span class="group__label">TREFFPUNKT</span>
+      <div id="eHome" hidden>
+        <span class="f"><span class="f__label">Halle — Zeit</span><input class="field" id="eHallTime" placeholder="z. B. 19:00"></span>
+      </div>
+      <div id="eAway" style="display:flex;flex-direction:column;gap:10px">
+        <div class="two">
+          <span class="f"><span class="f__label">Fahrgemeinschaft — Zeit</span><input class="field" placeholder="18:45"></span>
+          <span class="f"><span class="f__label">Direkt an der Halle</span><input class="field" placeholder="19:45"></span>
+        </div>
+        <span class="f"><span class="f__label">Fahrgemeinschaft — Ort</span><input class="field" placeholder="z. B. Parkplatz Schulzentrum"></span>
+      </div>
+      <span class="hint" id="eHint">Bei Auswärtsspielen zeigt die App beide Zeiten an; bei Heimspielen nur die Halle.</span>
+    </div>
+
+    <div class="savebar">
+      <button class="btn btn--save" type="button" id="eSave">Speichern</button>
+      <button class="btn btn--ghost" type="button" id="eCancel">Abbrechen</button>
+    </div>
+  </div>
+
+  <!-- ============ ENDSTAND ============ -->
+  <div id="vScore" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="sBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__name">Endstand</span>
+        <span class="dhead__meta">DO 01.10. · KULT-SPORT WUPPERTAL 2</span>
+      </span>
+    </div>
+
+    <div class="scoreline">
+      <span class="scoreline__side">
+        <span class="scoreline__name">TB WÜLFRATH</span>
+        <input class="bignum" value="78" inputmode="numeric">
+      </span>
+      <span class="scoreline__sep">:</span>
+      <span class="scoreline__side">
+        <span class="scoreline__name">KULT-SPORT</span>
+        <input class="bignum" value="71" inputmode="numeric">
+      </span>
+    </div>
+
+    <button class="switchrow" type="button" id="qToggle" aria-pressed="false">
+      <span class="switchrow__main">
+        <span class="act__label">Viertel eintragen</span>
+        <span class="act__sub">Optional – nur wenn du sie zur Hand hast</span>
+      </span>
+      <span class="track"><span class="knob"></span></span>
+    </button>
+
+    <div class="group" id="qGroup" hidden>
+      <span class="group__label">VIERTEL</span>
+      <div style="display:flex;flex-direction:column;gap:8px" id="qRows"></div>
+    </div>
+
+    <span class="hint">Wurde das Spiel getrackt, steht der Endstand schon; ein hier eingetragener Wert
+      überschreibt ihn und die Spielerstatistiken bleiben unberührt.</span>
+
+    <div class="savebar">
+      <button class="btn btn--save" type="button" id="sSave">Speichern</button>
+      <button class="btn btn--ghost" type="button" id="sCancel">Abbrechen</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============ RÜCKFRAGE TRACKING ZURÜCKSETZEN ============ -->
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet">
+    <span class="sheet__grip"></span>
+    <span class="sheet__title">Tracking zurücksetzen?</span>
+    <span class="sheet__sub">SO 20.09. · BG MONHEIM · AUSWÄRTS</span>
+    <div class="losslist">
+      <span class="lossitem">– <span>Alle <b>Spielerstatistiken</b> dieses Spiels werden gelöscht.</span></span>
+      <span class="lossitem">– <span>Die Werte verschwinden aus der <b>Bestenliste</b> und den Profilen.</span></span>
+      <span class="lossitem">– <span>Der <b>Endstand 63:82</b> bleibt erhalten.</span></span>
+    </div>
+    <button class="btn btn--danger" type="button" id="rYes">Ja, Tracking zurücksetzen</button>
+    <button class="btn--text" type="button" id="rNo">Abbrechen</button>
+  </div>
+</div>
+
+<script>
+var STATE = new URLSearchParams(location.search).get('state') || 'list';
+
+var TABS = ['Spieler','Spiele','Kampfgericht','Training','Trikots','Betrachter','Meldungen','Funktionen'];
+
+/* meet: null = kein Treffpunkt gepflegt */
+var NEXT = [
+  { dow:'FR', day:'25', mon:'09.', team:'HSV Solingen-Gräfrath 2', home:true,  time:'20:00',
+    meet:'19:00', kit:'Weiß', next:true },
+  { dow:'DO', day:'01', mon:'10.', team:'Kult-Sport Wuppertal 2',  home:false, time:'20:30',
+    meet:null,   kit:'Automatisch' },
+  { dow:'SA', day:'10', mon:'10.', team:'Mettmann-Sport 2',        home:false, time:'20:00',
+    meet:null,   kit:'Automatisch' },
+  { dow:'SO', day:'18', mon:'10.', team:'Südwest Baskets Wuppertal 4', home:true, time:'16:00',
+    meet:'15:00', kit:'Automatisch' }
+];
+
+var PAST = [
+  { dow:'SO', day:'20', mon:'09.', team:'BG Monheim', home:false, time:'16:00',
+    score:'63:82', win:false, tracked:true },
+  { dow:'SO', day:'13', mon:'09.', team:'Sportclub Krefeld 1905', home:true, time:'16:00',
+    score:'42:118', win:false, tracked:true }
+];
+
+var view = 'list', pastOpen = false, cur = NEXT[1], curPast = false, ha = 'away', quarters = false;
+
+if (STATE === 'past')   { pastOpen = true; }
+if (STATE === 'detail') { view = 'detail'; }
+if (STATE === 'played') { view = 'detail'; cur = PAST[0]; curPast = true; }
+if (STATE === 'edit')   { view = 'edit'; }
+if (STATE === 'new')    { view = 'edit'; }
+if (STATE === 'score')  { view = 'score'; }
+if (STATE === 'reset')  { view = 'detail'; cur = PAST[0]; curPast = true; }
+
+function el(tag, cls, text){
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+var CHEV = '<svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>';
+
+function renderTabs(){
+  var host = document.getElementById('tabs');
+  host.innerHTML = '';
+  TABS.forEach(function(t, i){
+    var b = el('button','tab', t);
+    b.type = 'button';
+    if (i === 1) b.setAttribute('aria-current','page');
+    host.appendChild(b);
+  });
+}
+
+function renderList(){
+  var host = document.getElementById('listNext');
+  host.innerHTML = '';
+  NEXT.forEach(function(g){
+    var r = el('button','row' + (g.next ? ' row--next' : ''));
+    r.type = 'button';
+
+    var d = el('span','date');
+    d.appendChild(el('span','date__dow', g.dow));
+    d.appendChild(el('span','date__day', g.day));
+    d.appendChild(el('span','date__mon', g.mon));
+    r.appendChild(d);
+
+    var m = el('span','row__main');
+    var top = el('span','row__top');
+    top.appendChild(el('span','row__team', g.team));
+    top.appendChild(el('span','ha' + (g.home ? '' : ' ha--away'), g.home ? 'HEIM' : 'AUSWÄRTS'));
+    m.appendChild(top);
+    var chips = el('span','chips');
+    chips.appendChild(el('span','chip ' + (g.meet ? 'chip--ok' : 'chip--warn'),
+      g.meet ? 'TREFFPUNKT ' + g.meet : 'TREFFPUNKT FEHLT'));
+    chips.appendChild(el('span','chip chip--ok', 'TRIKOT ' + g.kit.toUpperCase()));
+    m.appendChild(chips);
+    r.appendChild(m);
+    r.insertAdjacentHTML('beforeend', CHEV);
+    r.onclick = function(){ cur = g; curPast = false; view = 'detail'; render(); };
+    host.appendChild(r);
+  });
+
+  var past = document.getElementById('listPast');
+  past.innerHTML = '';
+  past.hidden = !pastOpen;
+  document.getElementById('pastToggle').setAttribute('aria-expanded', pastOpen ? 'true' : 'false');
+  document.getElementById('pastChev').setAttribute('d', pastOpen ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6');
+  document.getElementById('pastCount').textContent = PAST.length;
+
+  PAST.forEach(function(g){
+    var r = el('button','row row--past');
+    r.type = 'button';
+    var d = el('span','date');
+    d.appendChild(el('span','date__dow', g.dow));
+    d.appendChild(el('span','date__day', g.day));
+    r.appendChild(d);
+    var m = el('span','row__main');
+    m.appendChild(el('span','row__team', g.team));
+    m.appendChild(el('span','row__note', g.tracked ? 'STATS ABGESCHLOSSEN' : 'NICHT GETRACKT'));
+    r.appendChild(m);
+    var s = el('span','score');
+    s.appendChild(el('span','score__val ' + (g.win ? 'is-win' : 'is-loss'), g.score));
+    s.appendChild(el('span','score__res ' + (g.win ? 'is-win' : 'is-loss'), g.win ? 'SIEG' : 'NIEDERLAGE'));
+    r.appendChild(s);
+    r.insertAdjacentHTML('beforeend', CHEV);
+    r.onclick = function(){ cur = g; curPast = true; view = 'detail'; render(); };
+    past.appendChild(r);
+  });
+}
+
+function stRow(label, value, kind){
+  var n = el('div','st');
+  n.appendChild(el('span','st__dot' + (kind ? ' st__dot--' + kind : '')));
+  n.appendChild(el('span','st__label', label));
+  n.appendChild(el('span','st__val' + (kind ? ' st__val--' + kind : ''), value));
+  return n;
+}
+function actRow(label, sub, fn){
+  var b = el('button','act');
+  b.type = 'button';
+  var m = el('span','act__main');
+  m.appendChild(el('span','act__label', label));
+  if (sub) m.appendChild(el('span','act__sub', sub));
+  b.appendChild(m);
+  b.insertAdjacentHTML('beforeend', CHEV);
+  if (fn) b.onclick = fn;
+  return b;
+}
+
+function renderDetail(){
+  document.getElementById('dName').textContent = cur.team;
+  document.getElementById('dMeta').textContent =
+    cur.dow + ' ' + cur.day + '.' + cur.mon + ' · ' + cur.time + ' · ' + (cur.home ? 'HEIM' : 'AUSWÄRTS');
+
+  var st = document.getElementById('dStatus');
+  st.innerHTML = '';
+  if (curPast){
+    st.appendChild(stRow('Endstand', cur.score, 'ok'));
+    st.appendChild(stRow('Tracking', cur.tracked ? 'abgeschlossen' : 'nicht getrackt', cur.tracked ? 'ok' : null));
+    st.appendChild(stRow('Trikot', 'Automatisch · schwarz'));
+  } else {
+    st.appendChild(stRow('Treffpunkt', cur.meet ? cur.meet + ' Uhr' : 'fehlt', cur.meet ? 'ok' : 'warn'));
+    st.appendChild(stRow('Trikot', cur.kit));
+    st.appendChild(stRow('Endstand', 'noch offen'));
+  }
+
+  var ac = document.getElementById('dActions');
+  ac.innerHTML = '';
+  ac.appendChild(actRow('Spiel bearbeiten', 'Datum, Uhrzeit, Gegner, Ort, Trikot, Treffpunkt',
+    function(){ view = 'edit'; render(); }));
+  if (curPast && cur.tracked){
+    ac.appendChild(actRow('Stats ansehen', 'Boxscore dieses Spiels'));
+  } else {
+    ac.appendChild(actRow('Stats tracken', 'Live-Erfassung jetzt starten'));
+  }
+  ac.appendChild(actRow('Endstand nachtragen', 'Ohne Tracking gespielt? Ergebnis eintragen',
+    function(){ view = 'score'; render(); }));
+
+  var dg = document.getElementById('dDanger');
+  dg.innerHTML = '';
+  if (curPast && cur.tracked){
+    dg.appendChild(actRow('Tracking zurücksetzen', 'Löscht alle Statistiken dieses Spiels',
+      function(){ document.getElementById('scrim').hidden = false; }));
+  }
+  var del = actRow('Spiel löschen', null);
+  dg.appendChild(del);
+}
+
+function renderEdit(){
+  var isNew = (STATE === 'new' && view === 'edit');
+  document.getElementById('eTitle').textContent = isNew ? 'Neues Spiel' : 'Spiel bearbeiten';
+  document.getElementById('eSub').textContent = isNew ? 'NOCH NICHT GESPEICHERT' : cur.team.toUpperCase();
+  if (isNew){
+    document.getElementById('eDate').value = '';
+    document.getElementById('eTime').value = '';
+    document.getElementById('eOpp').value = '';
+    document.getElementById('ePlace').value = '';
+    document.getElementById('eDate').placeholder = 'TT.MM.JJJJ';
+    document.getElementById('eTime').placeholder = '20:00';
+    document.getElementById('eOpp').placeholder = 'Gegner';
+    document.getElementById('ePlace').placeholder = 'Adresse der Halle';
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('#eHa button'), function(b){
+    b.setAttribute('aria-pressed', b.getAttribute('data-ha') === ha ? 'true' : 'false');
+  });
+  document.getElementById('eHome').hidden = (ha !== 'home');
+  document.getElementById('eAway').hidden = (ha !== 'away');
+  document.getElementById('eAway').style.display = (ha === 'away') ? 'flex' : 'none';
+}
+
+function renderScore(){
+  var host = document.getElementById('qRows');
+  if (!host.childNodes.length){
+    ['1. Viertel','2. Viertel','3. Viertel','4. Viertel'].forEach(function(q, i){
+      var r = el('div','qrow');
+      r.appendChild(el('span','qrow__label', 'Q' + (i + 1)));
+      var a = el('input','qfield'); a.inputMode = 'numeric'; a.placeholder = '–';
+      r.appendChild(a);
+      r.appendChild(el('span','qrow__sep',':'));
+      var b = el('input','qfield'); b.inputMode = 'numeric'; b.placeholder = '–';
+      r.appendChild(b);
+      host.appendChild(r);
+    });
+  }
+  document.getElementById('qToggle').setAttribute('aria-pressed', quarters ? 'true' : 'false');
+  document.getElementById('qGroup').hidden = !quarters;
+}
+
+function render(){
+  [['vList','list'],['vDetail','detail'],['vEdit','edit'],['vScore','score']].forEach(function(p){
+    var n = document.getElementById(p[0]);
+    var on = (view === p[1]);
+    n.hidden = !on;
+    n.style.display = on ? 'flex' : 'none';
+  });
+  if (view === 'list') renderList();
+  if (view === 'detail') renderDetail();
+  if (view === 'edit') renderEdit();
+  if (view === 'score') renderScore();
+  document.getElementById('scrim').hidden = (STATE !== 'reset');
+}
+
+document.getElementById('pastToggle').onclick = function(){ pastOpen = !pastOpen; render(); };
+document.getElementById('dBack').onclick = function(){ view = 'list'; render(); };
+document.getElementById('eBack').onclick = function(){ view = 'detail'; render(); };
+document.getElementById('eCancel').onclick = function(){ view = 'detail'; render(); };
+document.getElementById('eSave').onclick = function(){ view = 'detail'; render(); };
+document.getElementById('sBack').onclick = function(){ view = 'detail'; render(); };
+document.getElementById('sCancel').onclick = function(){ view = 'detail'; render(); };
+document.getElementById('sSave').onclick = function(){ view = 'detail'; render(); };
+document.getElementById('qToggle').onclick = function(){ quarters = !quarters; render(); };
+Array.prototype.forEach.call(document.querySelectorAll('#eHa button'), function(b){
+  b.onclick = function(){ ha = b.getAttribute('data-ha'); render(); };
+});
+document.getElementById('rNo').onclick = function(){ STATE = 'x'; document.getElementById('scrim').hidden = true; };
+document.getElementById('rYes').onclick = function(){
+  STATE = 'x';
+  document.getElementById('scrim').hidden = true;
+  cur.tracked = false;
+  render();
+};
+
+renderTabs();
+render();
+</script>
+</body>
+</html>

@@ -23,6 +23,7 @@ interface FieldProps {
   required?: boolean;
   min?: string;
   max?: string;
+  placeholder?: string;
 }
 
 function FieldShell({
@@ -49,13 +50,13 @@ function FieldShell({
   );
 }
 
-export function DateField({ label, value, onChange, required, min, max }: FieldProps) {
+export function DateField({ label, value, onChange, required, min, max, placeholder }: FieldProps) {
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     onChange(e.target.value);
   }
 
   return (
-    <FieldShell label={label} display={value ? fmtDateDisplay(value) : ''} placeholder="Datum wählen">
+    <FieldShell label={label} display={value ? fmtDateDisplay(value) : ''} placeholder={placeholder ?? 'Datum wählen'}>
       <input
         type="date"
         required={required}
@@ -69,13 +70,13 @@ export function DateField({ label, value, onChange, required, min, max }: FieldP
   );
 }
 
-export function TimeField({ label, value, onChange, required }: FieldProps) {
+export function TimeField({ label, value, onChange, required, placeholder }: FieldProps) {
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     onChange(e.target.value);
   }
 
   return (
-    <FieldShell label={label} display={value ? fmtTime(value) : ''} placeholder="Uhrzeit wählen">
+    <FieldShell label={label} display={value ? fmtTime(value) : ''} placeholder={placeholder ?? 'Uhrzeit wählen'}>
       <input
         type="time"
         required={required}
