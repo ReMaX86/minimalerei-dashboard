@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 const ENTRANCE_MS = 1150;
 const REDUCED_ENTRANCE_MS = 300;
-const HOLD_MS = 3000;
+const HOLD_MS = 1500;
 const FADE_MS = 200;
 
 // Kaltstart-Splash — Variante 3 "Shot Clock" aus
@@ -24,7 +24,7 @@ export function Splash({ ready, onDone }: { ready: boolean; onDone: () => void }
     return () => clearTimeout(timer);
   }, [reducedMotion]);
 
-  // Das fertige Zeichen bleibt danach noch 3s stehen, unabhängig davon, ob
+  // Das fertige Zeichen bleibt danach noch 1,5s stehen, unabhängig davon, ob
   // die Daten schon da sind — erst danach darf überhaupt ausgeblendet
   // werden.
   useEffect(() => {
