@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Trikots</title>
+<!--
+  REFERENZ-UMSETZUNG des Reiters „Trikots": Waschrotation, Übergabe, Nachfrage.
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=open       Kader veröffentlicht, vor Spielbeginn (Standard)
+    ?state=nosquad    Kader noch nicht veröffentlicht – kein Vorschlag
+    ?state=live       ab Spielbeginn, eigene Sicht: du bist dran
+    ?state=confirmed  Übernahme bestätigt
+    ?state=ask        offene Nachfrage zum letzten Spiel steht oben
+    ?state=handover   Blatt „Wer hat den Satz jetzt?"
+    ?state=decline    Blatt „Wer übernimmt das Waschen?"
+    ?state=whohas     Blatt nach „Nein" auf die Nachfrage
+  Klickbar: nichts weiter nötig – die Zustände zeigen alle Fälle.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.10);
+  --to-danger-frame:#5A2027;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{width:390px;margin:0 auto;padding:24px 20px;display:flex;flex-direction:column;gap:14px}
+.label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+
+/* ---------- Nachfrage ---------- */
+.ask{border-radius:24px;background:var(--to-danger-soft);border:1px solid var(--to-danger-frame);
+  padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.ask__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-danger-text)}
+.ask__row{display:flex;align-items:center;gap:13px}
+.av{width:40px;height:40px;flex:none;border-radius:50%;background:var(--to-surface-2);
+  display:grid;place-items:center;overflow:hidden;
+  font-family:'Geist Mono',monospace;font-size:12px;color:var(--to-text-2)}
+.av img{width:100%;height:100%;object-fit:cover}
+.ask__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.ask__q{font-size:16px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
+.ask__meta{font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3)}
+
+/* ---------- Auftragskarte ---------- */
+.job{border-radius:24px;background:var(--to-surface);border:1px solid var(--to-accent-frame);
+  overflow:hidden;display:flex;flex-direction:column}
+.job--plain{border-color:var(--to-border)}
+.job__head{display:flex;align-items:center;gap:14px;padding:18px 20px}
+.kit{width:44px;height:44px;flex:none;border-radius:14px;border:1px solid}
+.kit--white{background:#F2F4F7;border-color:#F2F4F7}
+.kit--black{background:#0A0C0F;border-color:#3A414C}
+.job__headmain{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+.job__for{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.job__title{font-size:17px;font-weight:600;letter-spacing:-.01em}
+.job__body{display:flex;flex-direction:column;gap:12px;padding:16px 20px 20px;
+  border-top:1px solid var(--to-hairline);background:var(--to-surface-3)}
+.job__body--mine{background:rgba(200,255,46,.06)}
+.job__kicker{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-accent)}
+.washer{display:flex;align-items:center;gap:13px}
+.washer .av{width:44px;height:44px;border:2px solid var(--to-accent);color:var(--to-accent);font-size:13px}
+.washer__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.washer__name{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.washer__sub{font-size:13px;color:var(--to-text-2)}
+.hint{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:14px;
+  background:var(--to-surface-2);font-size:13px;color:var(--to-text-2)}
+.hint svg{width:17px;height:17px;flex:none;fill:none;stroke:var(--to-text-3);stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round}
+.hint--done{background:var(--to-accent-soft);color:var(--to-accent)}
+.hint--done svg{stroke:currentColor}
+.quiet{font-size:14px;color:var(--to-text-3)}
+
+.btn2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:52px;
+  border:0;border-radius:14px;background:var(--to-accent);color:var(--to-on-accent);
+  font-family:'Geist',sans-serif;font-size:15px;font-weight:600;cursor:pointer}
+.btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4;
+  stroke-linecap:round;stroke-linejoin:round}
+.btn--ghost{background:transparent;border:1px solid var(--to-line);color:var(--to-text)}
+.btn--danger{background:transparent;border:1px solid var(--to-danger-frame);color:var(--to-danger-text)}
+.btn--sm{height:48px;font-size:14px}
+.coachrow{display:flex;align-items:center;gap:10px;padding-top:10px;border-top:1px solid var(--to-hairline)}
+.coachrow .label{flex:1 1 auto}
+.linkbtn{border:0;background:transparent;padding:0;color:var(--to-accent);
+  font-family:'Geist',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
+
+/* ---------- Satz-Kacheln ---------- */
+.sets{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.set{display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:20px;
+  background:var(--to-surface);border:1px solid var(--to-border)}
+.set__top{display:flex;align-items:center;gap:9px}
+.sw{width:20px;height:20px;border-radius:6px;border:1px solid}
+.set__who{display:flex;flex-direction:column;gap:3px}
+.set__name{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.set__name--none{color:var(--to-text-2)}
+.set__since{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-4)}
+.set__action{display:flex;flex-direction:column;gap:2px;align-items:flex-start;
+  border:0;background:transparent;padding:0;text-align:left;cursor:pointer}
+.set__action b{color:var(--to-accent);font-size:13px;font-weight:600}
+.set__action span{font-size:11px;color:var(--to-text-4)}
+
+/* ---------- Reihenfolge ---------- */
+.order{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column;padding-bottom:12px}
+.orow{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 16px;
+  border-top:1px solid var(--to-surface-2)}
+.orow:first-child{border-top:0}
+.orow.is-next{background:rgba(200,255,46,.07)}
+.orow__rank{width:14px;flex:none;font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3)}
+.orow.is-next .orow__rank{color:var(--to-accent)}
+.orow__main{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:8px}
+.orow__name{font-size:14px;font-weight:500;color:var(--to-text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orow.is-next .orow__name{font-weight:700;color:var(--to-accent)}
+.orow.is-out .orow__name{color:var(--to-text-3)}
+.tag{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;flex:none;
+  font-family:'Geist Mono',monospace;font-size:8px;font-weight:600}
+.tag--in{background:var(--to-accent-soft);color:var(--to-accent)}
+.tag--out{background:var(--to-surface-2);color:var(--to-text-3)}
+.orow__count{display:flex;align-items:center;gap:8px;flex:none}
+.dots{display:flex;gap:2px}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--to-border)}
+.dot.is-on{background:var(--to-accent)}
+.num{width:24px;text-align:right;font-family:'Geist Mono',monospace;font-size:12px;color:var(--to-text-2)}
+.orow.is-next .num{color:var(--to-accent)}
+.orow.is-out .num{color:var(--to-text-4)}
+
+/* ---------- Verlauf ---------- */
+.log{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column;padding-bottom:12px}
+.lrow{display:flex;gap:12px;padding:13px 16px;border-top:1px solid var(--to-surface-2)}
+.lrow:first-child{border-top:0}
+.lrow__sw{width:16px;height:16px;flex:none;border-radius:5px;border:1px solid;margin-top:2px}
+.lrow__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.lrow__top{display:flex;align-items:baseline;gap:8px}
+.lrow__to{flex:1 1 auto;min-width:0;font-size:14px;font-weight:600;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lrow__date{font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-4);flex:none}
+.lrow__sub{font-size:12px;color:var(--to-text-3);line-height:1.35}
+.lkind{display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:999px;flex:none;
+  font-family:'Geist Mono',monospace;font-size:8px;font-weight:600}
+.lkind--wash{background:var(--to-accent-soft);color:var(--to-accent)}
+.lkind--pass{background:var(--to-surface-2);color:var(--to-text-3)}
+
+/* ---------- Blätter ---------- */
+.sheet{border-radius:26px 26px 18px 18px;background:var(--to-surface);border:1px solid var(--to-border);
+  padding:20px;display:flex;flex-direction:column;gap:16px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sheet__sub{font-size:13px;color:var(--to-text-3);line-height:1.45}
+.pick{display:flex;flex-direction:column}
+.pick__row{display:flex;align-items:center;gap:12px;min-height:56px;width:100%;
+  border:0;border-bottom:1px solid var(--to-surface-2);background:transparent;
+  font-family:'Geist',sans-serif;text-align:left;cursor:pointer;padding:0}
+.pick__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pick__name{font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--to-text)}
+.pick__meta{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-4)}
+.pick__ring{width:26px;height:26px;flex:none;border-radius:50%;border:1.5px solid var(--to-line)}
+.pick__ring.is-on{background:var(--to-accent);border-color:var(--to-accent)}
+.btn-quiet{height:44px;width:100%;border:0;border-radius:14px;background:transparent;
+  color:var(--to-text-2);font-family:'Geist',sans-serif;font-size:14px;font-weight:500;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap"></div>
+
+<script>
+var ORDER = [
+  ['Axel Flaujac', 0, true],
+  ['Benaja Feuersänger', 0, true],
+  ['Daniel Tekeste', 1, true],
+  ['Eldar Zherokov', 1, true],
+  ['Marc Rewald', 2, true],
+  ['Azjargal Atarjargal', 0, false],
+  ['Florian Rinke', 1, false]
+];
+
+var LOG = [
+  ['black', 'wash', 'Peter Woznicki', '20.09.', 'Vorschlag war Axel Flaujac · Axel konnte nicht'],
+  ['white', 'pass', 'Gürkan Ertas', '18.09.', 'von Marc Rewald weitergegeben · keine Wäsche'],
+  ['white', 'wash', 'Azjargal Atarjargal', '13.09.', 'Vorschlag bestätigt'],
+  ['black', 'wash', 'Marc Rewald', '06.09.', 'Vorschlag bestätigt'],
+  ['white', 'pass', 'In der Halle abgelegt', '02.09.', 'von Daniel Tekeste abgegeben · keine Wäsche']
+];
+
+var BASE = {
+  view: 'page',
+  ask: false,          // offene Nachfrage zum letzten Spiel
+  squad: true,         // Kader veröffentlicht
+  phase: 'before',     // before | live | done
+  mine: false          // bin ich der vorgeschlagene Wäscher
+};
+
+var STATES = {
+  open:      {},
+  nosquad:   { squad: false },
+  live:      { phase: 'live', mine: true },
+  confirmed: { phase: 'done' },
+  ask:       { ask: true },
+  handover:  { view: 'handover' },
+  decline:   { view: 'decline' },
+  whohas:    { view: 'whohas' }
+};
+
+var key = new URLSearchParams(location.search).get('state') || 'open';
+var data = Object.assign({}, BASE, STATES[key] || {});
+var wrap = document.getElementById('wrap');
+
+function dots(n) {
+  var out = '';
+  for (var i = 0; i < 4; i++) out += '<span class="dot' + (i < n ? ' is-on' : '') + '"></span>';
+  return '<span class="dots">' + out + '</span>';
+}
+
+function askCard() {
+  return '<section class="ask"><span class="ask__label">BITTE NACHTRAGEN</span>' +
+    '<div class="ask__row"><span class="av">AF</span><span class="ask__main">' +
+    '<span class="ask__q">Hat Axel die Trikots mitgenommen?</span>' +
+    '<span class="ask__meta">SO 20.09. · GEGEN BG MONHEIM</span></span></div>' +
+    '<div class="btn2"><button class="btn" type="button">Ja, hat er</button>' +
+    '<button class="btn btn--danger" type="button">Nein</button></div></section>';
+}
+
+function jobCard() {
+  var head = '<div class="job__head"><span class="kit kit--white"></span>' +
+    '<span class="job__headmain"><span class="job__for">FÜR FR 25.09. BENÖTIGT</span>' +
+    '<span class="job__title">Weißes Set · Heim</span></span></div>';
+
+  if (!data.squad) {
+    return '<section class="job job--plain">' + head +
+      '<div class="job__body"><span class="quiet">Kader für dieses Spiel noch nicht veröffentlicht – ' +
+      'sobald er steht, schlägt die App den nächsten Wäscher vor.</span></div></section>';
+  }
+
+  var washer = '<div class="washer"><span class="av">AF</span><span class="washer__main">' +
+    '<span class="washer__name">Axel Flaujac</span>' +
+    '<span class="washer__sub">nimmt das Set nach dem Spiel mit</span></span></div>';
+
+  var body = '';
+  if (data.phase === 'before') {
+    body = '<span class="job__kicker">NÄCHSTER WÄSCHER</span>' + washer +
+      '<div class="hint"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle>' +
+      '<path d="M12 7v5l3 2"></path></svg>' +
+      '<span>Bestätigen ab Spielbeginn, 20:00 Uhr</span></div>' +
+      '<div class="coachrow"><span class="label">TRAINER</span>' +
+      '<button class="linkbtn" type="button">Anderen bestimmen</button></div>';
+  } else if (data.phase === 'live') {
+    body = '<span class="job__kicker">DU BIST DRAN</span>' +
+      '<span class="washer__sub">Nimmst du das weiße Set heute mit nach Hause?</span>' +
+      '<div class="btn2"><button class="btn" type="button">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>' +
+      'Nehme ich mit</button>' +
+      '<button class="btn btn--ghost" type="button">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>' +
+      'Kann nicht</button></div>';
+  } else {
+    body = '<span class="job__kicker">ERLEDIGT</span>' + washer +
+      '<div class="hint hint--done"><svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>' +
+      '<span>Übernahme bestätigt · Waschzähler steht jetzt bei 1×</span></div>';
+  }
+
+  return '<section class="job">' + head +
+    '<div class="job__body' + (data.phase === 'live' ? ' job__body--mine' : '') + '">' + body + '</div></section>';
+}
+
+function setsCards() {
+  var mk = function (tone, label, name, none, since, action, sub) {
+    return '<div class="set"><span class="set__top">' +
+      '<span class="sw sw--' + tone + '" style="' +
+        (tone === 'white' ? 'background:#F2F4F7;border-color:#F2F4F7' : 'background:#0A0C0F;border-color:#3A414C') +
+      '"></span><span class="label">' + label + '</span></span>' +
+      '<span class="set__who"><span class="set__name' + (none ? ' set__name--none' : '') + '">' + name + '</span>' +
+      '<span class="set__since">' + since + '</span></span>' +
+      '<button class="set__action" type="button"><b>' + action + '</b><span>' + sub + '</span></button></div>';
+  };
+  return '<div class="sets">' +
+    mk('black', 'SCHWARZ · AUSWÄRTS', 'Marc Rewald', false, 'SEIT 22.09.',
+       'Jemandem geben', 'zählt nicht als Wäsche') +
+    mk('white', 'WEISS · HEIM', 'In der Halle', true, 'ABGEGEBEN 20.09.',
+       'Ich hab ihn', 'zählt nicht als Wäsche') +
+    '</div>';
+}
+
+function orderList() {
+  return '<section class="order">' + ORDER.map(function (p, i) {
+    var inSquad = p[2];
+    var next = i === 0;
+    return '<div class="orow' + (next ? ' is-next' : '') + (inSquad ? '' : ' is-out') + '">' +
+      '<span class="orow__rank">' + (inSquad ? (i + 1) : '—') + '</span>' +
+      '<span class="orow__main"><span class="orow__name">' + p[0] + '</span>' +
+      '<span class="tag tag--' + (inSquad ? 'in' : 'out') + '">' +
+        (inSquad ? 'IM KADER' : 'NICHT IM KADER') + '</span></span>' +
+      '<span class="orow__count">' + dots(p[1]) +
+      '<span class="num">' + p[1] + '×</span></span></div>';
+  }).join('') + '</section>';
+}
+
+function logList() {
+  return '<section class="log">' + LOG.map(function (l) {
+    var sw = l[0] === 'white'
+      ? 'background:#F2F4F7;border-color:#F2F4F7'
+      : 'background:#0A0C0F;border-color:#3A414C';
+    var kind = l[1] === 'wash'
+      ? '<span class="lkind lkind--wash">WÄSCHE</span>'
+      : '<span class="lkind lkind--pass">ÜBERGABE</span>';
+    return '<div class="lrow"><span class="lrow__sw" style="' + sw + '"></span>' +
+      '<span class="lrow__main"><span class="lrow__top">' + kind +
+      '<span class="lrow__to">' + l[2] + '</span>' +
+      '<span class="lrow__date">' + l[3] + '</span></span>' +
+      '<span class="lrow__sub">' + l[4] + '</span></span></div>';
+  }).join('') +
+  '<button class="pick__row" type="button" style="min-height:44px;padding:8px 16px 0;' +
+  'border-bottom:0;border-top:1px solid var(--to-surface-2);margin-top:6px;color:var(--to-text-2);' +
+  'font-size:13px">Ganzen Verlauf anzeigen</button></section>';
+}
+
+function page() {
+  return (data.ask ? askCard() : '') +
+    jobCard() +
+    '<span class="label">WO SIND DIE SÄTZE GERADE</span>' + setsCards() +
+    '<span class="label">REIHENFOLGE</span>' + orderList() +
+    '<span class="label">VERLAUF</span>' + logList();
+}
+
+function pickSheet(title, sub, rows, cta, first) {
+  return '<div class="sheet"><span class="sheet__grip"></span>' +
+    '<div style="display:flex;flex-direction:column;gap:5px">' +
+    '<span class="sheet__title">' + title + '</span>' +
+    '<span class="sheet__sub">' + sub + '</span></div>' +
+    '<div class="pick">' + rows.map(function (r, i) {
+      return '<button class="pick__row" type="button">' +
+        '<span class="av">' + r[0] + '</span>' +
+        '<span class="pick__main"><span class="pick__name">' + r[1] +
+        (i === first ? ' <span class="tag tag--in">VORSCHLAG</span>' : '') + '</span>' +
+        (r[2] ? '<span class="pick__meta">' + r[2] + '</span>' : '') + '</span>' +
+        '<span class="pick__ring' + (i === first ? ' is-on' : '') + '"></span></button>';
+    }).join('') + '</div>' +
+    '<div style="display:flex;flex-direction:column;gap:8px">' +
+    '<button class="btn" type="button">' + cta + '</button>' +
+    '<button class="btn-quiet" type="button">Abbrechen</button></div></div>';
+}
+
+if (data.view === 'handover') {
+  wrap.innerHTML = pickSheet('Wer hat den Satz jetzt?',
+    'Nur wer ihn gerade zu Hause oder dabei hat. Der Waschzähler ändert sich dadurch NICHT – ' +
+    'gewaschen hat weiterhin, wer ihn mitgenommen hat.',
+    [['GE', 'Gürkan Ertas', 'TRAINER'], ['DT', 'Daniel Tekeste', ''], ['BF', 'Benaja Feuersänger', ''],
+     ['—', 'In der Halle abgelegt', 'NIEMAND']], 'Weitergeben', 0);
+} else if (data.view === 'decline') {
+  wrap.innerHTML = pickSheet('Wer übernimmt das Waschen?',
+    'Vorschläge in der Reihenfolge: im Kader, wenigste Wäschen, alphabetisch. ' +
+    'Der Waschzähler zählt bei der Person hoch.',
+    [['BF', 'Benaja Feuersänger', '0× GEWASCHEN'], ['DT', 'Daniel Tekeste', '1× GEWASCHEN'],
+     ['EZ', 'Eldar Zherokov', '1× GEWASCHEN'], ['MR', 'Marc Rewald', '2× GEWASCHEN']],
+    'Weitergeben', 0);
+} else if (data.view === 'whohas') {
+  wrap.innerHTML = pickSheet('Wer hat das Set dann?',
+    'Axel hat es nicht mitgenommen. Sag kurz, wo es gelandet ist – der Waschzähler zählt nur bei dem hoch, ' +
+    'der wirklich wäscht.',
+    [['—', 'Liegt noch in der Halle', 'NIEMAND'], ['GE', 'Gürkan Ertas', 'TRAINER'],
+     ['DT', 'Daniel Tekeste', ''], ['MR', 'Marc Rewald', 'DU']], 'Speichern', 0);
+} else {
+  wrap.innerHTML = page();
+}
+</script>
+</body>
+</html>

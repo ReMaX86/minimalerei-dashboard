@@ -252,7 +252,19 @@ export interface TrikotTransferLogRow {
   id: string;
   set_id: TrikotSetId;
   from_player_id: string | null;
-  to_player_id: string;
+  // Migration 0067: nullable — "In der Halle abgelegt" statt an eine Person.
+  to_player_id: string | null;
+  created_at: string;
+}
+
+// Migration 0067 — hält fest, dass die "Bitte nachtragen"-Nachfrage zu
+// einem Spiel+Satz beantwortet wurde (Antwort "Nein", per
+// resolve_trikot_ask_no()). Trägt anders als eine bestätigte Übernahme
+// KEINEN Waschzähler nach, siehe trikots.ts.
+export interface TrikotAskResolutionRow {
+  id: string;
+  game_id: string;
+  set_id: TrikotSetId;
   created_at: string;
 }
 
