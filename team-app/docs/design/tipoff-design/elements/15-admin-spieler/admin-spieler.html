@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Admin · Spieler</title>
+<!--
+  REFERENZ-UMSETZUNG des Admin-Reiters „Spieler".
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=list        Liste, Standard
+    ?state=copied      Code direkt aus der Liste kopiert („KOPIERT")
+    ?state=created     Blatt nach dem Anlegen: Code steht bereit
+    ?state=detail      Detailseite eines Spielers
+    ?state=coach       Detailseite mit Trainerrechten + Captain
+    ?state=inactive    Detailseite eines deaktivierten Spielers
+    ?state=profile     „Profil bearbeiten"
+  Die Seite ist echt klickbar: Zeile öffnen, Code kopieren, Rolle wechseln, Schalter kippen, zurück.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.10);
+  --to-danger-frame:#5A2027;
+  --to-vacation:#E9B949; --to-vacation-soft:rgba(233,185,73,.12);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer}
+.wrap{width:390px;margin:0 auto;padding:22px 0 28px;display:flex;flex-direction:column;gap:14px}
+.pad{padding-left:20px;padding-right:20px}
+
+/* ---------- Kopf + Reiterleiste ---------- */
+.head{display:flex;align-items:center;gap:12px}
+.head__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:26px;letter-spacing:-.035em;line-height:1;flex:1 1 auto}
+.badge{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;
+  background:var(--to-accent-soft);border:1px solid var(--to-accent-frame);color:var(--to-accent);
+  font-family:'Geist Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.08em}
+
+.tabswrap{position:relative}
+.tabs{display:flex;gap:6px;padding:2px 20px 8px;overflow-x:auto;flex-wrap:nowrap;
+  scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;scroll-snap-align:start;white-space:nowrap;display:inline-flex;align-items:center;
+  height:34px;padding:0 14px;border-radius:999px;background:var(--to-surface);
+  border:1px solid var(--to-border);color:var(--to-text-2);font-size:13px;font-weight:500}
+.tab[aria-current="page"]{background:var(--to-accent);border-color:var(--to-accent);
+  color:var(--to-on-accent);font-weight:600}
+.tabsfade{position:absolute;right:0;top:0;bottom:8px;width:44px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(10,12,15,0),var(--to-bg) 72%)}
+
+/* ---------- Anlegen ---------- */
+.create{border-radius:20px;background:var(--to-surface);border:1px solid var(--to-border);
+  padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.create__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.create__row{display:flex;gap:8px}
+.field{flex:1 1 auto;min-width:0;height:44px;padding:0 14px;border-radius:14px;background:#0F1216;
+  border:1px solid var(--to-line);color:var(--to-text);font-family:inherit;font-size:14px}
+.field::placeholder{color:var(--to-text-4)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;
+  font-family:inherit;font-weight:600}
+.btn--add{height:44px;padding:0 18px;border-radius:14px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:14px;flex:none}
+.create__hint{font-size:11px;color:var(--to-text-4);line-height:1.45}
+
+/* ---------- Suche ---------- */
+.searchrow{display:flex;align-items:center;gap:10px}
+.search{flex:1 1 auto;display:flex;align-items:center;gap:9px;height:40px;padding:0 13px;
+  border-radius:999px;background:var(--to-surface);border:1px solid var(--to-border)}
+.search input{flex:1 1 auto;min-width:0;border:0;background:transparent;color:var(--to-text);
+  font-family:inherit;font-size:13px;outline:none}
+.search input::placeholder{color:var(--to-text-4)}
+.searchrow__count{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;
+  color:var(--to-text-4);white-space:nowrap}
+
+/* ---------- Liste ---------- */
+.panel{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:10px;min-height:60px;padding:10px 14px;
+  border-top:1px solid var(--to-surface-2)}
+.row:first-child{border-top:0}
+.row__open{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:11px;border:0;
+  background:transparent;padding:0;text-align:left}
+.av{width:34px;height:34px;flex:none;border-radius:50%;background:var(--to-surface-2);
+  display:grid;place-items:center;font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-2)}
+.av--coach{background:var(--to-accent-soft);border:1px solid var(--to-accent-frame);color:var(--to-accent)}
+.row__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px}
+.row__name{font-size:14px;font-weight:600;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tags{display:flex;gap:5px;flex-wrap:wrap}
+.tag{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;
+  border:1px solid transparent;font-family:'Geist Mono',monospace;font-size:8px;font-weight:600;letter-spacing:.06em}
+.tag--coach{background:var(--to-accent-soft);border-color:var(--to-accent-frame);color:var(--to-accent)}
+.tag--cap{background:var(--to-surface-2);color:var(--to-text)}
+.tag--cocap{border-color:var(--to-line);color:var(--to-text-2)}
+.tag--u18{background:var(--to-vacation-soft);border-color:rgba(233,185,73,.32);color:var(--to-vacation)}
+.tag--off{border-color:var(--to-line);color:var(--to-text-4)}
+.code{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 10px;border-radius:999px;
+  background:var(--to-surface-2);border:0;flex:none;
+  font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-2);letter-spacing:.04em}
+.code--done{background:rgba(200,255,46,.16);color:var(--to-accent)}
+.chev{flex:none}
+.sechead{display:flex;align-items:center;gap:12px;padding-top:2px}
+.sechead__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4)}
+.sechead__rule{flex:1 1 auto;height:1px;background:var(--to-hairline)}
+.panel--off{background:#0F1216;border-style:dashed;opacity:.78}
+.panel--off .row{min-height:52px}
+.panel--off .row__name{font-size:13px;color:var(--to-text-3);font-weight:500}
+.btn--small{height:26px;padding:0 11px;border-radius:999px;border-color:var(--to-line);
+  background:transparent;color:var(--to-text-2);font-size:12px}
+
+/* ---------- Detailseite ---------- */
+.dhead{display:flex;align-items:center;gap:12px}
+.iconbtn{width:34px;height:34px;flex:none;border-radius:12px;background:var(--to-surface);
+  border:1px solid var(--to-border);display:grid;place-items:center}
+.dhead__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.dhead__name{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:22px;letter-spacing:-.035em;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dhead__meta{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.dhead .av{width:42px;height:42px;font-size:13px}
+
+.codecard{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;
+  background:var(--to-surface-3);border:1px solid var(--to-hairline)}
+.codecard__main{flex:1 1 auto;display:flex;flex-direction:column;gap:3px}
+.codecard__label{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-text-3)}
+.codecard__code{font-family:'Geist Mono',monospace;font-size:18px;font-weight:600;letter-spacing:.1em}
+.btn--copy{height:36px;padding:0 14px;border-radius:999px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:13px;flex:none}
+.btn--copy.is-done{background:rgba(200,255,46,.16);color:var(--to-accent)}
+.coderow{display:flex;align-items:center;gap:10px;padding:0 2px}
+.coderow__age{flex:1 1 auto;font-size:12px;color:var(--to-text-3)}
+.btn--link{border:0;background:transparent;font-size:13px;font-weight:600;color:var(--to-accent);padding:0}
+.btn--link.is-danger{color:var(--to-danger-text)}
+
+.group{display:flex;flex-direction:column;gap:9px}
+.group__label{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-text-4)}
+.seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:var(--to-surface-3);
+  border:1px solid var(--to-hairline)}
+.seg button{flex:1 1 0;min-width:0;height:34px;border:0;border-radius:10px;background:transparent;
+  color:var(--to-text-2);font-size:13px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--to-accent);color:var(--to-on-accent);font-weight:600}
+
+.switches{display:flex;flex-direction:column;border-radius:16px;background:var(--to-surface);
+  border:1px solid var(--to-hairline);overflow:hidden}
+.sw{display:flex;align-items:center;gap:12px;min-height:58px;padding:10px 14px;border:0;
+  border-top:1px solid var(--to-surface-2);background:transparent;text-align:left}
+.sw:first-child{border-top:0}
+.sw__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.sw__label{font-size:14px;font-weight:500}
+.sw__sub{font-size:11px;color:var(--to-text-4);line-height:1.4}
+.track{width:44px;height:26px;flex:none;border-radius:999px;background:var(--to-surface-2);
+  border:1px solid var(--to-line);display:flex;align-items:center;justify-content:flex-start;padding:0 3px}
+.knob{width:18px;height:18px;border-radius:50%;background:var(--to-text-4)}
+.sw[aria-pressed="true"] .track{background:var(--to-accent);border-color:var(--to-accent);justify-content:flex-end}
+.sw[aria-pressed="true"] .knob{background:var(--to-on-accent)}
+.sw--warn[aria-pressed="true"] .track{background:rgba(233,185,73,.22);border-color:rgba(233,185,73,.5)}
+.sw--warn[aria-pressed="true"] .knob{background:var(--to-vacation)}
+
+.linkrow{display:flex;align-items:center;gap:12px;min-height:56px;padding:0 14px;width:100%;
+  border-radius:16px;background:var(--to-surface);border:1px solid var(--to-hairline);text-align:left}
+.linkrow__main{flex:1 1 auto;display:flex;flex-direction:column;gap:3px}
+.linkrow__label{font-size:14px;font-weight:500}
+.linkrow__sub{font-size:11px;color:var(--to-text-4)}
+.note{border-radius:16px;background:var(--to-danger-soft);border:1px solid var(--to-danger-frame);
+  padding:13px 15px;display:flex;flex-direction:column;gap:5px}
+.note__label{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-danger-text)}
+.note__text{font-size:12px;color:var(--to-text-2);line-height:1.5}
+
+/* ---------- Profil bearbeiten ---------- */
+.formrow{display:flex;align-items:center;gap:12px;min-height:54px;padding:0 14px;
+  border-top:1px solid var(--to-surface-2)}
+.formrow:first-child{border-top:0}
+.formrow__label{flex:1 1 auto;font-size:14px;color:var(--to-text-2)}
+.formrow__val{font-size:14px;font-weight:500;flex:none}
+.formrow__val--empty{color:var(--to-text-4);font-weight:400}
+.photo{display:flex;align-items:center;gap:14px;padding:14px}
+.photo__img{width:58px;height:58px;flex:none;border-radius:50%;background:var(--to-surface-2);
+  display:grid;place-items:center;font-family:'Geist Mono',monospace;font-size:16px;color:var(--to-text-3)}
+.photo__main{flex:1 1 auto;display:flex;flex-direction:column;gap:4px}
+.photo__title{font-size:14px;font-weight:600}
+.photo__sub{font-size:11px;color:var(--to-text-4);line-height:1.4}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{display:inline-flex;align-items:center;height:34px;padding:0 13px;border-radius:999px;
+  background:transparent;border:1px solid var(--to-line);color:var(--to-text-2);font-size:13px}
+.chip[aria-pressed="true"]{background:var(--to-accent-soft);border-color:var(--to-accent-frame);
+  color:var(--to-accent);font-weight:600}
+.savebar{display:flex;gap:8px}
+.btn--save{flex:1 1 auto;height:46px;border-radius:999px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:15px}
+.btn--ghost{flex:0 0 auto;height:46px;padding:0 18px;border-radius:999px;background:transparent;
+  border-color:var(--to-line);color:var(--to-text-2);font-size:15px}
+
+/* ---------- Blatt ---------- */
+.scrim{position:fixed;inset:0;background:rgba(5,6,8,.74);display:flex;flex-direction:column;
+  justify-content:flex-end;z-index:20}
+.sheet{width:390px;margin:0 auto;background:var(--to-surface);border-top:1px solid var(--to-border);
+  border-radius:26px 26px 0 0;padding:12px 20px 22px;display:flex;flex-direction:column;gap:14px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sheet__sub{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.bigcode{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 16px;
+  border-radius:18px;background:var(--to-surface-3);border:1px solid var(--to-accent-frame)}
+.bigcode__label{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-text-3)}
+.bigcode__val{font-family:'Geist Mono',monospace;font-size:30px;font-weight:700;letter-spacing:.16em;
+  color:var(--to-accent)}
+.sheet__note{font-size:12px;color:var(--to-text-4);line-height:1.5;text-align:center}
+.btn--primary{height:46px;border-radius:999px;background:var(--to-accent);color:var(--to-on-accent);font-size:15px;width:100%}
+.btn--text{height:24px;border:0;background:transparent;color:var(--to-text-3);font-size:13px;font-weight:400;width:100%}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ============ LISTE ============ -->
+  <div id="viewList" style="display:flex;flex-direction:column;gap:14px">
+
+    <div class="head pad">
+      <span class="head__title">Admin</span>
+      <span class="badge">TRAINER</span>
+    </div>
+
+    <div class="tabswrap">
+      <div class="tabs" id="tabs"></div>
+      <span class="tabsfade"></span>
+    </div>
+
+    <div class="create pad" style="margin:0 20px;padding:14px 16px">
+      <span class="create__label">NEUEN SPIELER ANLEGEN</span>
+      <div class="create__row">
+        <input class="field" id="newName" placeholder="Name des Spielers" autocomplete="off">
+        <button class="btn btn--add" id="addBtn" type="button">Anlegen</button>
+      </div>
+      <span class="create__hint">Der Anmeldecode wird sofort erzeugt und kann danach kopiert werden.</span>
+    </div>
+
+    <div class="searchrow pad">
+      <span class="search">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2;stroke-linecap:round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4 4"></path></svg>
+        <input id="q" placeholder="Spieler suchen" autocomplete="off">
+      </span>
+      <span class="searchrow__count" id="count">18 AKTIV</span>
+    </div>
+
+    <section class="panel" id="listActive" style="margin:0 20px"></section>
+
+    <div class="sechead pad">
+      <span class="sechead__label" id="offLabel">INAKTIV · 2</span>
+      <span class="sechead__rule"></span>
+    </div>
+
+    <section class="panel panel--off" id="listOff" style="margin:0 20px"></section>
+  </div>
+
+  <!-- ============ DETAILSEITE ============ -->
+  <div id="viewDetail" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="backBtn" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__name" id="dName">Axel Flaujac</span>
+        <span class="dhead__meta" id="dMeta">CAPTAIN · AKTIV</span>
+      </span>
+      <span class="av" id="dAv">AF</span>
+    </div>
+
+    <div class="note" id="dNote" hidden>
+      <span class="note__label">DEAKTIVIERT</span>
+      <span class="note__text">Erscheint nicht mehr in Kader, Trikotliste und Kampfgericht. Statistiken und
+        Einsätze bleiben gespeichert.</span>
+    </div>
+
+    <div class="codecard">
+      <span class="codecard__main">
+        <span class="codecard__label">ANMELDECODE</span>
+        <span class="codecard__code" id="dCode">AXE63</span>
+      </span>
+      <button class="btn btn--copy" type="button" id="dCopy">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" style="stroke-width:2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path id="dCopyPath" d=""></path></svg>
+        <span id="dCopyLabel">Kopieren</span>
+      </button>
+    </div>
+    <div class="coderow">
+      <span class="coderow__age" id="dAge">Code wurde am 04.09. erzeugt</span>
+      <button class="btn--link" type="button" id="dNew">Neuen Code erzeugen</button>
+    </div>
+
+    <div class="group">
+      <span class="group__label">ROLLE IM TEAM</span>
+      <div class="seg" id="dSeg">
+        <button type="button" data-role="Spieler">Spieler</button>
+        <button type="button" data-role="Co-Captain">Co-Captain</button>
+        <button type="button" data-role="Captain">Captain</button>
+      </div>
+    </div>
+
+    <div class="switches">
+      <button class="sw" type="button" id="swCoach" aria-pressed="false">
+        <span class="sw__main">
+          <span class="sw__label">Trainerrechte</span>
+          <span class="sw__sub">Sieht den Adminbereich und kann Kader veröffentlichen</span>
+        </span>
+        <span class="track"><span class="knob"></span></span>
+      </button>
+      <button class="sw" type="button" id="swActive" aria-pressed="true">
+        <span class="sw__main">
+          <span class="sw__label">Aktiv im Team</span>
+          <span class="sw__sub">Aus: verschwindet aus Kader, Trikotliste und Kampfgericht</span>
+        </span>
+        <span class="track"><span class="knob"></span></span>
+      </button>
+      <button class="sw sw--warn" type="button" id="swU18" aria-pressed="false">
+        <span class="sw__main">
+          <span class="sw__label">Vom Kampfgericht befreit</span>
+          <span class="sw__sub">Spielt bereits in der U18 und wird dort eingeteilt</span>
+        </span>
+        <span class="track"><span class="knob"></span></span>
+      </button>
+    </div>
+
+    <button class="linkrow" type="button" id="toProfile">
+      <span class="linkrow__main">
+        <span class="linkrow__label">Profil bearbeiten</span>
+        <span class="linkrow__sub">Bild, Größe, Geburtsdatum, Position, Stärken</span>
+      </span>
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+    </button>
+  </div>
+
+  <!-- ============ PROFIL BEARBEITEN ============ -->
+  <div id="viewProfile" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="pBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__name">Profil</span>
+        <span class="dhead__meta" id="pMeta">AXEL FLAUJAC</span>
+      </span>
+    </div>
+
+    <section class="panel">
+      <div class="photo">
+        <span class="photo__img" id="pAv">AF</span>
+        <span class="photo__main">
+          <span class="photo__title">Profilbild</span>
+          <span class="photo__sub">Der Spieler kann es selbst ändern – du kannst es ersetzen oder entfernen.</span>
+        </span>
+        <button class="btn btn--small" type="button">Ändern</button>
+      </div>
+    </section>
+
+    <div class="group">
+      <span class="group__label">PFLEGT AUCH DER SPIELER SELBST</span>
+      <section class="panel">
+        <div class="formrow"><span class="formrow__label">Größe</span><span class="formrow__val">1,92 m</span>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></div>
+        <div class="formrow"><span class="formrow__label">Geburtsdatum</span><span class="formrow__val">14.03.1997</span>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></div>
+      </section>
+    </div>
+
+    <div class="group">
+      <span class="group__label">POSITION · NUR TRAINER</span>
+      <div class="chips" id="pPos"></div>
+    </div>
+
+    <div class="group">
+      <span class="group__label">STÄRKEN · NUR TRAINER · KEINE PFLICHT</span>
+      <div class="chips" id="pStrength"></div>
+    </div>
+
+    <div class="savebar">
+      <button class="btn btn--save" type="button" id="pSave">Speichern</button>
+      <button class="btn btn--ghost" type="button" id="pCancel">Abbrechen</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============ BLATT NACH DEM ANLEGEN ============ -->
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet">
+    <span class="sheet__grip"></span>
+    <span class="sheet__title">Spieler angelegt</span>
+    <span class="sheet__sub" id="cName">BENAIA TESFAMARIAM</span>
+    <div class="bigcode">
+      <span class="bigcode__label">ANMELDECODE</span>
+      <span class="bigcode__val" id="cCode">BEN21</span>
+    </div>
+    <span class="sheet__note">Schick den Code an den Spieler – damit meldet er sich das erste Mal an.</span>
+    <button class="btn btn--primary" type="button" id="cCopy">Code kopieren</button>
+    <button class="btn--text" type="button" id="cClose">Fertig</button>
+  </div>
+</div>
+
+<script>
+var STATE = new URLSearchParams(location.search).get('state') || 'list';
+
+var TABS = ['Spieler','Spiele','Kampfgericht','Training','Trikots','Betrachter','Meldungen','Funktionen'];
+
+var PLAYERS = [
+  { ini:'AF', name:'Axel Flaujac',        code:'AXE63', role:'Captain',    coach:false, active:true,  u18:false, age:'Code wurde am 04.09. erzeugt' },
+  { ini:'AA', name:'Azjargal Atarjargal', code:'AZJ59', role:'Spieler',    coach:false, active:true,  u18:true,  age:'Code wurde am 12.08. erzeugt' },
+  { ini:'BT', name:'Benaia Tesfamariam',  code:'BEN21', role:'Spieler',    coach:false, active:true,  u18:false, age:'Code wurde am 19.08. erzeugt' },
+  { ini:'DT', name:'Daniel Tekeste',      code:'DAN08', role:'Co-Captain', coach:false, active:true,  u18:false, age:'Code wurde am 02.09. erzeugt' },
+  { ini:'GE', name:'Gürkan Ertas',        code:'GUE33', role:'Spieler',    coach:false, active:true,  u18:false, age:'Code wurde am 28.07. erzeugt' },
+  { ini:'JM', name:'Jens Mertens',        code:'JEN18', role:'Spieler',    coach:false, active:true,  u18:false, age:'Code wurde am 30.08. erzeugt' },
+  { ini:'MR', name:'Marc Rewald',         code:'MAR77', role:'Captain',    coach:true,  active:true,  u18:false, age:'Code wurde am 22.07. erzeugt' },
+  { ini:'PW', name:'Peter Woznicki',      code:'PET40', role:'Spieler',    coach:false, active:true,  u18:false, age:'Code wurde am 11.08. erzeugt' },
+  { ini:'FW', name:'Finn Weidemann',      code:'FIN52', role:'Spieler',    coach:false, active:false, u18:false, age:'Code wurde am 06.05. erzeugt' },
+  { ini:'LK', name:'Lukas Körner',        code:'LUK09', role:'Spieler',    coach:false, active:false, u18:false, age:'Code wurde am 19.04. erzeugt' }
+];
+
+var POSITIONS = ['Point Guard','Shooting Guard','Small Forward','Power Forward','Center'];
+var STRENGTHS = [
+  '3-Point (Sniper)','Rebound (Glas-Cleaner)','Blocks (Blockmaschine)','Verteidigung (Defense Monster)',
+  'Passspiel (Playmaker)','Ballhandling (Crossover-King)','Athletik (Highflyer)','Freiwurf (Mr. Automatik)',
+  'Fastbreak (Turbo)','Motor (Energizer)','Post-Play (Tank)'
+];
+
+var COPY = 'M9 9h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2zM5 15V6a1 1 0 0 1 1-1h9';
+var CHECK = 'M5 13l4 4L19 7';
+
+var view = 'list';
+var idx = 0;
+var copiedRow = null;
+var copiedDetail = false;
+var sel = { pos:'Small Forward', str:['3-Point (Sniper)','Verteidigung (Defense Monster)'] };
+
+if (STATE === 'detail')   { view = 'detail'; idx = 0; }
+if (STATE === 'coach')    { view = 'detail'; idx = 6; }
+if (STATE === 'inactive') { view = 'detail'; idx = 8; }
+if (STATE === 'profile')  { view = 'profile'; idx = 0; }
+if (STATE === 'copied')   { copiedRow = 3; }
+
+function el(tag, cls, text){
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+function icon(path, stroke, size){
+  return '<svg viewBox="0 0 24 24" width="' + (size||13) + '" height="' + (size||13) + '" fill="none" stroke="' +
+    stroke + '" style="stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="' +
+    path + '"></path></svg>';
+}
+
+function tagsFor(p){
+  var t = [];
+  if (p.coach) t.push(['TRAINER','tag--coach']);
+  if (p.role === 'Captain') t.push(['CAPTAIN','tag--cap']);
+  if (p.role === 'Co-Captain') t.push(['CO-CAPTAIN','tag--cocap']);
+  if (p.u18) t.push(['U18 BEFREIT','tag--u18']);
+  return t;
+}
+
+function renderTabs(){
+  var host = document.getElementById('tabs');
+  host.innerHTML = '';
+  TABS.forEach(function(t, i){
+    var b = el('button','tab', t);
+    b.type = 'button';
+    if (i === 0) b.setAttribute('aria-current','page');
+    host.appendChild(b);
+  });
+}
+
+function renderList(){
+  var q = (document.getElementById('q').value || '').toLowerCase();
+  var act = document.getElementById('listActive');
+  var off = document.getElementById('listOff');
+  act.innerHTML = ''; off.innerHTML = '';
+
+  PLAYERS.forEach(function(p, i){
+    if (q && p.name.toLowerCase().indexOf(q) === -1) return;
+    var row = el('div','row');
+
+    var open = el('button','row__open');
+    open.type = 'button';
+    open.appendChild(el('span','av' + (p.coach ? ' av--coach' : ''), p.ini));
+    var main = el('span','row__main');
+    main.appendChild(el('span','row__name', p.name));
+    var tags = el('span','tags');
+    tagsFor(p).forEach(function(t){ tags.appendChild(el('span','tag ' + t[1], t[0])); });
+    if (!p.active) tags.appendChild(el('span','tag tag--off','INAKTIV'));
+    main.appendChild(tags);
+    open.appendChild(main);
+    open.onclick = function(){ idx = i; view = 'detail'; copiedDetail = false; render(); };
+    row.appendChild(open);
+
+    if (p.active){
+      var done = (copiedRow === i);
+      var code = el('button','code' + (done ? ' code--done' : ''));
+      code.type = 'button';
+      code.appendChild(el('span', null, done ? 'KOPIERT' : p.code));
+      code.insertAdjacentHTML('beforeend', icon(done ? CHECK : COPY, '#C8FF2E'));
+      code.onclick = function(){ copiedRow = (copiedRow === i ? null : i); render(); };
+      row.appendChild(code);
+      row.insertAdjacentHTML('beforeend',
+        '<svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>');
+      act.appendChild(row);
+    } else {
+      var on = el('button','btn btn--small','Aktivieren');
+      on.type = 'button';
+      on.onclick = function(){ p.active = true; render(); };
+      row.appendChild(on);
+      off.appendChild(row);
+    }
+  });
+
+  var nActive = PLAYERS.filter(function(p){ return p.active; }).length;
+  var nOff = PLAYERS.length - nActive;
+  document.getElementById('count').textContent = nActive + ' AKTIV';
+  document.getElementById('offLabel').textContent = 'INAKTIV · ' + nOff;
+  document.querySelector('.sechead').hidden = (nOff === 0);
+  off.hidden = (nOff === 0);
+}
+
+function renderDetail(){
+  var p = PLAYERS[idx];
+  document.getElementById('dName').textContent = p.name;
+  document.getElementById('dMeta').textContent =
+    (p.coach ? 'TRAINER · ' : '') + p.role.toUpperCase() + (p.active ? ' · AKTIV' : ' · INAKTIV');
+  var av = document.getElementById('dAv');
+  av.textContent = p.ini;
+  av.className = 'av' + (p.coach ? ' av--coach' : '');
+  document.getElementById('dNote').hidden = p.active;
+  document.getElementById('dCode').textContent = p.code;
+  document.getElementById('dAge').textContent = p.age;
+
+  var btn = document.getElementById('dCopy');
+  btn.classList.toggle('is-done', copiedDetail);
+  document.getElementById('dCopyPath').setAttribute('d', copiedDetail ? CHECK : COPY);
+  document.getElementById('dCopyLabel').textContent = copiedDetail ? 'Kopiert' : 'Kopieren';
+
+  Array.prototype.forEach.call(document.querySelectorAll('#dSeg button'), function(b){
+    b.setAttribute('aria-pressed', b.getAttribute('data-role') === p.role ? 'true' : 'false');
+  });
+  document.getElementById('swCoach').setAttribute('aria-pressed', p.coach ? 'true' : 'false');
+  document.getElementById('swActive').setAttribute('aria-pressed', p.active ? 'true' : 'false');
+  document.getElementById('swU18').setAttribute('aria-pressed', p.u18 ? 'true' : 'false');
+}
+
+function renderProfile(){
+  var p = PLAYERS[idx];
+  document.getElementById('pMeta').textContent = p.name.toUpperCase();
+  document.getElementById('pAv').textContent = p.ini;
+
+  var pos = document.getElementById('pPos');
+  pos.innerHTML = '';
+  POSITIONS.forEach(function(x){
+    var b = el('button','chip', x);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', sel.pos === x ? 'true' : 'false');
+    b.onclick = function(){ sel.pos = (sel.pos === x ? null : x); render(); };
+    pos.appendChild(b);
+  });
+
+  var str = document.getElementById('pStrength');
+  str.innerHTML = '';
+  STRENGTHS.forEach(function(x){
+    var on = sel.str.indexOf(x) !== -1;
+    var b = el('button','chip', x);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.onclick = function(){
+      if (on) { sel.str = sel.str.filter(function(y){ return y !== x; }); }
+      else { sel.str = sel.str.concat([x]); }
+      render();
+    };
+    str.appendChild(b);
+  });
+}
+
+function render(){
+  ['viewList','viewDetail','viewProfile'].forEach(function(id){
+    var n = document.getElementById(id);
+    var on = (id === 'viewList' && view === 'list') ||
+             (id === 'viewDetail' && view === 'detail') ||
+             (id === 'viewProfile' && view === 'profile');
+    n.hidden = !on;
+    n.style.display = on ? 'flex' : 'none';
+  });
+  if (view === 'list') renderList();
+  if (view === 'detail') renderDetail();
+  if (view === 'profile') renderProfile();
+  document.getElementById('scrim').hidden = (STATE !== 'created');
+}
+
+/* Ereignisse */
+document.getElementById('q').addEventListener('input', renderList);
+document.getElementById('backBtn').onclick = function(){ view = 'list'; render(); };
+document.getElementById('toProfile').onclick = function(){ view = 'profile'; render(); };
+document.getElementById('pBack').onclick = function(){ view = 'detail'; render(); };
+document.getElementById('pCancel').onclick = function(){ view = 'detail'; render(); };
+document.getElementById('pSave').onclick = function(){ view = 'detail'; render(); };
+document.getElementById('dCopy').onclick = function(){ copiedDetail = !copiedDetail; render(); };
+document.getElementById('dNew').onclick = function(){
+  var p = PLAYERS[idx];
+  p.code = p.name.slice(0,3).toUpperCase().replace(/[^A-Z]/g,'X') + (10 + Math.floor(Math.random()*89));
+  p.age = 'Code wurde heute erzeugt';
+  copiedDetail = false;
+  render();
+};
+Array.prototype.forEach.call(document.querySelectorAll('#dSeg button'), function(b){
+  b.onclick = function(){ PLAYERS[idx].role = b.getAttribute('data-role'); render(); };
+});
+document.getElementById('swCoach').onclick = function(){ PLAYERS[idx].coach = !PLAYERS[idx].coach; render(); };
+document.getElementById('swActive').onclick = function(){ PLAYERS[idx].active = !PLAYERS[idx].active; render(); };
+document.getElementById('swU18').onclick = function(){ PLAYERS[idx].u18 = !PLAYERS[idx].u18; render(); };
+document.getElementById('cClose').onclick = function(){ STATE = 'list'; render(); };
+document.getElementById('cCopy').onclick = function(){ document.getElementById('cCopy').textContent = 'Kopiert'; };
+document.getElementById('addBtn').onclick = function(){
+  var v = document.getElementById('newName').value.trim();
+  if (!v) return;
+  document.getElementById('cName').textContent = v.toUpperCase();
+  document.getElementById('cCode').textContent =
+    v.slice(0,3).toUpperCase().replace(/[^A-ZÄÖÜ]/g,'X') + (10 + Math.floor(Math.random()*89));
+  STATE = 'created';
+  render();
+};
+
+renderTabs();
+render();
+</script>
+</body>
+</html>

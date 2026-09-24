@@ -42,18 +42,28 @@ export function Admin() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1 overflow-x-auto rounded-xl bg-to-surface2 p-1">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
-              tab === t.id ? 'bg-to-accent text-to-onAccent shadow-sm' : 'text-to-text3'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="relative -mx-5">
+        <div
+          className="flex gap-1.5 overflow-x-auto px-5 pb-2 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ scrollSnapType: 'x proximity' }}
+        >
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              aria-current={tab === t.id ? 'page' : undefined}
+              className={`h-[34px] shrink-0 whitespace-nowrap rounded-to-pill border px-3.5 text-[13px] transition ${
+                tab === t.id
+                  ? 'border-to-accent bg-to-accent font-semibold text-to-onAccent'
+                  : 'border-to-border bg-to-surface font-medium text-to-text2'
+              }`}
+              style={{ scrollSnapAlign: 'start' }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <span className="pointer-events-none absolute inset-y-0 right-0 w-11 bg-gradient-to-r from-transparent to-to-bg" />
       </div>
 
       {tab === 'players' && <PlayersAdmin />}
