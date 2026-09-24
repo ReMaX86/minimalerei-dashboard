@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Ladeanimation</title>
+<!--
+  REFERENZ-UMSETZUNG der Ladeanimation „Dribbling".
+  Reines SVG + CSS, keine Bibliothek, keine Bild- oder Videodatei.
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=page    Reiterwechsel: Animation mittig im Inhaltsbereich (Standard)
+    ?state=card    Eine einzelne Karte lädt nach
+    ?state=inline  Kleine Ausgabe in einer Zeile / in einem Knopf
+    ?state=sizes   Alle drei Größen nebeneinander, zum Abmessen
+    ?state=delay   Demonstration der 200-ms-Regel (Knopf löst kurzes/langes Laden aus)
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer}
+.wrap{width:390px;margin:0 auto;padding:22px 20px 28px;display:flex;flex-direction:column;gap:14px}
+
+/* =======================================================================
+   DIE LADEANIMATION – das ist der Teil, der in die App wandert
+   ======================================================================= */
+.tipoff-loader{display:inline-grid;place-items:center;line-height:0}
+.tipoff-loader svg{width:100%;height:100%;overflow:visible;display:block}
+.tipoff-loader .tl-ball{fill:var(--to-accent)}
+.tipoff-loader .tl-seam{fill:none;stroke:var(--to-on-accent);stroke-width:2.6;stroke-linecap:round}
+.tipoff-loader .tl-shadow{fill:var(--to-accent);opacity:.16}
+
+/* Sprung: 620 ms hin, 620 ms zurück = 1240 ms pro Runde */
+.tipoff-loader .tl-move{animation:tl-move 620ms cubic-bezier(.45,0,.55,1) infinite alternate}
+/* Stauchung genau im Aufprall */
+.tipoff-loader .tl-squash{animation:tl-squash 1240ms linear infinite;transform-origin:50px 62px}
+/* Eigendrehung, damit der Ball nicht wie eine Scheibe wirkt */
+.tipoff-loader .tl-spin{animation:tl-spin 1240ms linear infinite;transform-origin:50px 40px}
+.tipoff-loader .tl-shadow{animation:tl-shadow 620ms cubic-bezier(.45,0,.55,1) infinite alternate;
+  transform-origin:50px 86px}
+
+@keyframes tl-move{from{transform:translateY(-22px)}to{transform:translateY(22px)}}
+@keyframes tl-squash{
+  0%,38%{transform:scale(1,1)}
+  47%{transform:scale(1.14,.86)}
+  56%,100%{transform:scale(1,1)}
+}
+@keyframes tl-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes tl-shadow{from{transform:scale(.62);opacity:.08}to{transform:scale(1);opacity:.2}}
+
+/* Barrierefreiheit: keine Bewegung, aber sichtbares Lebenszeichen */
+@media (prefers-reduced-motion: reduce){
+  .tipoff-loader .tl-move,.tipoff-loader .tl-squash,.tipoff-loader .tl-spin{animation:none}
+  .tipoff-loader .tl-shadow{animation:none;opacity:.14}
+  .tipoff-loader svg{animation:tl-fade 1600ms ease-in-out infinite alternate}
+}
+@keyframes tl-fade{from{opacity:.45}to{opacity:1}}
+
+/* Drei Größen */
+.tipoff-loader--page{width:64px;height:64px}
+.tipoff-loader--card{width:40px;height:40px}
+.tipoff-loader--inline{width:22px;height:22px}
+/* Bei 22px sind vier Nähte Matsch: nur das Kreuz, dafür kräftiger, und ohne Schatten */
+.tipoff-loader--inline .tl-curve{display:none}
+.tipoff-loader--inline .tl-seam{stroke-width:4.4}
+.tipoff-loader--inline .tl-shadow{display:none}
+
+/* Standardbausteine drumherum */
+.tl-block{display:flex;flex-direction:column;align-items:center;gap:12px}
+.tl-label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--to-text-4)}
+/* =================== Ende des Bausteins =================== */
+
+/* ---------- Umgebung nur für diese Referenz ---------- */
+.head{display:flex;align-items:center;gap:12px}
+.head__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:24px;letter-spacing:-.035em;line-height:1;flex:1 1 auto}
+.badge{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;
+  background:var(--to-surface-2);color:var(--to-text-3);
+  font-family:'Geist Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.08em}
+.tabs{display:flex;gap:6px;overflow:hidden}
+.tab{flex:0 0 auto;display:inline-flex;align-items:center;height:34px;padding:0 14px;border-radius:999px;
+  background:var(--to-surface);border:1px solid var(--to-border);color:var(--to-text-2);font-size:13px}
+.tab[aria-current="page"]{background:var(--to-accent);border-color:var(--to-accent);
+  color:var(--to-on-accent);font-weight:600}
+.stagebox{min-height:340px;display:grid;place-items:center;border-radius:22px;
+  background:var(--to-surface-3);border:1px dashed var(--to-hairline)}
+.note{font-size:12px;color:var(--to-text-4);line-height:1.55}
+
+.card{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.card__head{display:flex;align-items:center;gap:12px;padding:16px 18px}
+.card__title{flex:1 1 auto;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.card__meta{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4)}
+.card__body{min-height:150px;display:grid;place-items:center;gap:10px;
+  border-top:1px solid var(--to-hairline);background:var(--to-surface-3)}
+.skel{display:flex;flex-direction:column;gap:9px;width:100%;padding:16px 18px}
+.skel i{display:block;height:11px;border-radius:6px;background:var(--to-surface-2)}
+.skel i:nth-child(2){width:72%}
+.skel i:nth-child(3){width:48%}
+
+.row{display:flex;align-items:center;gap:12px;min-height:56px;padding:0 16px;
+  border-radius:16px;background:var(--to-surface);border:1px solid var(--to-hairline)}
+.row__main{flex:1 1 auto;display:flex;flex-direction:column;gap:3px}
+.row__label{font-size:14px;font-weight:500}
+.row__sub{font-size:11px;color:var(--to-text-4)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;height:46px;padding:0 20px;
+  border:0;border-radius:999px;background:var(--to-accent);color:var(--to-on-accent);
+  font-size:15px;font-weight:600}
+.btn--busy{background:var(--to-accent-soft);color:var(--to-accent)}
+.btn--ghost{background:transparent;border:1px solid var(--to-line);color:var(--to-text-2)}
+
+.sizes{display:flex;align-items:flex-end;justify-content:space-around;gap:16px;padding:26px 18px;
+  border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border)}
+.size{display:flex;flex-direction:column;align-items:center;gap:10px}
+.size span{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-text-4)}
+.sec{display:flex;align-items:center;gap:12px;padding-top:4px}
+.sec__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:18px;letter-spacing:-.035em;line-height:1}
+.sec__rule{flex:1 1 auto;height:1px;background:var(--to-hairline)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="head">
+    <span class="head__title" id="title">Spiele &amp; Kader</span>
+    <span class="badge" id="badge">LÄDT</span>
+  </div>
+
+  <div class="tabs" id="tabs" hidden>
+    <span class="tab">Start</span>
+    <span class="tab" aria-current="page">Spiele</span>
+    <span class="tab">Team</span>
+    <span class="tab">Trikots</span>
+  </div>
+
+  <!-- 1 · Reiterwechsel -->
+  <div id="vPage" style="display:flex;flex-direction:column;gap:14px">
+    <div class="stagebox">
+      <div class="tl-block">
+        <span class="tipoff-loader tipoff-loader--page" role="status" aria-live="polite" aria-label="Lädt"></span>
+        <span class="tl-label">LÄDT</span>
+      </div>
+    </div>
+    <p class="note">Mitte des Inhaltsbereichs, zwischen Kopf und Menüleiste. Die Zeile „LÄDT" ist optional –
+      weglassen, wenn der Bereich klein ist.</p>
+  </div>
+
+  <!-- 2 · Karte lädt nach -->
+  <div id="vCard" style="display:none;flex-direction:column;gap:14px" hidden>
+    <section class="card">
+      <div class="card__head">
+        <span class="card__title">Tabelle</span>
+        <span class="card__meta">DBB</span>
+      </div>
+      <div class="card__body">
+        <span class="tipoff-loader tipoff-loader--card" role="status" aria-live="polite" aria-label="Lädt"></span>
+      </div>
+    </section>
+    <section class="card">
+      <div class="card__head">
+        <span class="card__title">Letzte Ergebnisse</span>
+        <span class="tipoff-loader tipoff-loader--inline" role="status" aria-label="Lädt"></span>
+      </div>
+      <div class="skel"><i></i><i></i><i></i></div>
+    </section>
+    <p class="note">Lädt nur ein Teil der Seite nach, bleibt der Rest stehen. Entweder die 40er-Ausgabe im
+      leeren Kartenkörper oder die 22er neben der Überschrift plus graue Platzhalterbalken.</p>
+  </div>
+
+  <!-- 3 · Zeile und Knopf -->
+  <div id="vInline" style="display:none;flex-direction:column;gap:14px" hidden>
+    <div class="row">
+      <span class="tipoff-loader tipoff-loader--inline" role="status" aria-label="Lädt"></span>
+      <span class="row__main">
+        <span class="row__label">Kader wird veröffentlicht</span>
+        <span class="row__sub">Das Team bekommt gleich eine Nachricht</span>
+      </span>
+    </div>
+    <button class="btn btn--busy" type="button">
+      <span class="tipoff-loader tipoff-loader--inline" aria-hidden="true"></span>Wird gespeichert
+    </button>
+    <button class="btn btn--ghost" type="button">
+      <span class="tipoff-loader tipoff-loader--inline" aria-hidden="true"></span>Daten werden geholt
+    </button>
+    <p class="note">Im Knopf ersetzt die Animation nie die Beschriftung, sie steht davor. Der Knopf bleibt
+      in seiner Breite stehen und wird nur gedämpft (--to-accent-soft), damit die Seite nicht springt.</p>
+  </div>
+
+  <!-- 4 · Größen -->
+  <div id="vSizes" style="display:none;flex-direction:column;gap:14px" hidden>
+    <div class="sizes">
+      <span class="size"><span class="tipoff-loader tipoff-loader--page" aria-hidden="true"></span><span>64 · SEITE</span></span>
+      <span class="size"><span class="tipoff-loader tipoff-loader--card" aria-hidden="true"></span><span>40 · KARTE</span></span>
+      <span class="size"><span class="tipoff-loader tipoff-loader--inline" aria-hidden="true"></span><span>22 · ZEILE</span></span>
+    </div>
+    <p class="note">Nur diese drei Größen. Der Ball behält in jeder Größe dieselbe Sprunghöhe im Verhältnis
+      (44 % der Fläche) und dieselbe Dauer – dadurch wirkt er überall gleich schnell.</p>
+  </div>
+
+  <!-- 5 · 200-ms-Regel -->
+  <div id="vDelay" style="display:none;flex-direction:column;gap:14px" hidden>
+    <div class="sec"><span class="sec__title">Die 200-ms-Regel</span><span class="sec__rule"></span></div>
+    <div class="stagebox" id="delayStage" style="min-height:220px">
+      <span class="note" id="delayText" style="text-align:center;padding:0 24px">Noch nichts geladen.<br>
+        Probier beide Knöpfe – nur beim langen Laden erscheint die Animation.</span>
+    </div>
+    <button class="btn" type="button" id="fast">Kurz laden (120 ms)</button>
+    <button class="btn btn--ghost" type="button" id="slow">Lange laden (1,2 s)</button>
+    <p class="note">Die Animation wird erst nach 200 ms eingeblendet. Ist der Reiterwechsel schneller,
+      sieht man gar nichts – ruhiger als ein Aufblitzen. Und ist sie einmal sichtbar, bleibt sie
+      mindestens 400 ms stehen, damit sie nicht zuckt.</p>
+  </div>
+
+</div>
+
+<script>
+/* ---- Der Baustein: einmal bauen, überall einhängen ---- */
+var LOADER_SVG =
+  '<svg viewBox="0 0 100 100" aria-hidden="true">' +
+    '<ellipse class="tl-shadow" cx="50" cy="86" rx="20" ry="5"></ellipse>' +
+    '<g class="tl-move"><g class="tl-squash"><g class="tl-spin">' +
+      '<circle class="tl-ball" cx="50" cy="40" r="19"></circle>' +
+      '<path class="tl-seam" d="M31 40h38"></path>' +
+      '<path class="tl-seam" d="M50 21v38"></path>' +
+      '<path class="tl-seam tl-curve" d="M37 27c7 8 7 18 0 26"></path>' +
+      '<path class="tl-seam tl-curve" d="M63 27c-7 8-7 18 0 26"></path>' +
+    '</g></g></g>' +
+  '</svg>';
+
+Array.prototype.forEach.call(document.querySelectorAll('.tipoff-loader'), function(n){
+  n.innerHTML = LOADER_SVG;
+});
+
+/* ---- Referenz-Zustände ---- */
+var STATE = new URLSearchParams(location.search).get('state') || 'page';
+var VIEWS = { page:'vPage', card:'vCard', inline:'vInline', sizes:'vSizes', delay:'vDelay' };
+var TITLES = { page:'Spiele & Kader', card:'Spielplan & Tabelle', inline:'Kader', sizes:'Ladeanimation', delay:'Ladeanimation' };
+
+Object.keys(VIEWS).forEach(function(k){
+  var n = document.getElementById(VIEWS[k]);
+  var on = (k === STATE);
+  n.hidden = !on;
+  n.style.display = on ? 'flex' : 'none';
+});
+document.getElementById('title').textContent = TITLES[STATE] || 'TipOff';
+document.getElementById('badge').hidden = (STATE !== 'page');
+document.getElementById('tabs').hidden = (STATE !== 'page');
+
+/* ---- 200-ms-Regel zum Ausprobieren ---- */
+var stage = document.getElementById('delayStage');
+var showTimer = null, shownAt = 0;
+function startLoad(ms){
+  clearTimeout(showTimer);
+  stage.innerHTML = '<span class="note" style="text-align:center;padding:0 24px">Lädt …</span>';
+  var visible = false;
+  showTimer = setTimeout(function(){
+    visible = true; shownAt = Date.now();
+    stage.innerHTML = '<div class="tl-block"><span class="tipoff-loader tipoff-loader--page"></span>' +
+      '<span class="tl-label">LÄDT</span></div>';
+    stage.querySelector('.tipoff-loader').innerHTML = LOADER_SVG;
+  }, 200);
+  setTimeout(function(){
+    var finish = function(){
+      clearTimeout(showTimer);
+      stage.innerHTML = '<span class="note" style="text-align:center;padding:0 24px">Fertig geladen.</span>';
+    };
+    if (!visible) { finish(); return; }
+    var rest = Math.max(0, 400 - (Date.now() - shownAt));
+    setTimeout(finish, rest);
+  }, ms);
+}
+if (document.getElementById('fast')){
+  document.getElementById('fast').onclick = function(){ startLoad(120); };
+  document.getElementById('slow').onclick = function(){ startLoad(1200); };
+}
+</script>
+</body>
+</html>

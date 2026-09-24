@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
+import { useTipoffLoader } from '../hooks/useTipoffLoader';
 import { TrikotPickSheet, type PickOption } from '../components/TrikotPickSheet';
 import { fmtDateBadge, fmtDateShort, fmtTime, hasKickedOff } from '../lib/format';
 import { latestTransferFrom, pendingWasherFor } from '../lib/trikots';
@@ -194,8 +195,11 @@ export function Trikots() {
     load().catch(() => setError('Fehler beim Laden der Trikot-Daten.'));
   }, [load]);
 
+  const showLoader = useTipoffLoader(!state);
+
   if (error) return <ErrorNote message={error} />;
-  if (!state) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner />;
+  if (!state) return null;
 
   const gameStarted = !!state.nextGame && hasKickedOff(state.nextGame.game_date, state.nextGame.game_time);
 

@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useFeatureFlags } from '../../context/FeatureFlagsContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
+import { useTipoffLoader } from '../../hooks/useTipoffLoader';
 import { MeetingPointFields, EMPTY_MEETING_POINT } from '../../components/MeetingPointFields';
 import { DateField, TimeField } from '../../components/DateTimeField';
 import { fmtDate, fmtTime } from '../../lib/format';
@@ -164,8 +165,11 @@ export function GamesAdmin() {
     }
   }
 
+  const showLoader = useTipoffLoader(!games);
+
   if (error) return <ErrorNote message={error} />;
-  if (!games) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner />;
+  if (!games) return null;
 
   return (
     <div className="space-y-4">

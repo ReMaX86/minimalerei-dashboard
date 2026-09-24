@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { useFeatureFlags } from './context/FeatureFlagsContext';
 import { LoadingSpinner } from './components/LoadingSpinner';
+import { useTipoffLoader } from './hooks/useTipoffLoader';
 import { Splash } from './components/Splash';
 import { BottomNav } from './components/BottomNav';
 import { Header } from './components/Header';
@@ -51,6 +52,7 @@ export default function App() {
     }
   });
   const dataReady = role !== 'loading' && !flagsLoading;
+  const showLoader = useTipoffLoader(!dataReady);
   const dismissSplash = useCallback(() => {
     try {
       sessionStorage.setItem(SPLASH_SESSION_KEY, '1');
@@ -87,6 +89,7 @@ export default function App() {
     }
 
     if (role === 'loading') {
+      if (!showLoader) return null;
       return (
         <div className="flex min-h-screen items-center justify-center">
           <LoadingSpinner />
@@ -103,6 +106,7 @@ export default function App() {
     // to load first, otherwise a direct link/refresh on such a route would
     // redirect away before we actually know whether it should be visible.
     if (flagsLoading) {
+      if (!showLoader) return null;
       return (
         <div className="flex min-h-screen items-center justify-center">
           <LoadingSpinner />

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { LoadingSpinner } from './LoadingSpinner';
 import { ErrorNote } from './ErrorNote';
+import { useTipoffLoader } from '../hooks/useTipoffLoader';
 import { daysUntil, fmtDateBadge, fmtTime, shortPlayerName } from '../lib/format';
 import { cancelledOccurrencesUntil, nextTrainingOccurrences, type TrainingOccurrence } from '../lib/trainingSchedule';
 import {
@@ -219,8 +220,11 @@ export function TrainingCard({ refreshKey, onChange }: { refreshKey?: number; on
     }
   }
 
+  const showLoader = useTipoffLoader(!state);
+
   if (error) return <ErrorNote message={error} />;
-  if (!state) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner size="card" />;
+  if (!state) return null;
 
   const shown = state.occurrences; // inkl. abgesagter Termine, siehe cancelledOccurrencesUntil()
   const realShown = shown.filter((o) => !o.cancelled);

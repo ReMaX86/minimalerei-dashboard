@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
+import { useTipoffLoader } from '../../hooks/useTipoffLoader';
 import { DateField, TimeField } from '../../components/DateTimeField';
 import { fmtDate, fmtDateShort, fmtTime } from '../../lib/format';
 import { weekdayIndex, WEEKDAY_ORDER } from '../../lib/weekdays';
@@ -306,8 +307,12 @@ export function TrainingsAdmin() {
     }
   }
 
+  const showLoader = useTipoffLoader(!trainings);
+  const showOverridesLoader = useTipoffLoader(overrides === null || sessions === null);
+
   if (error) return <ErrorNote message={error} />;
-  if (!trainings) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner />;
+  if (!trainings) return null;
 
   const upcomingOccurrences = overrides
     ? (() => {
@@ -486,9 +491,9 @@ export function TrainingsAdmin() {
         )}
       </div>
       {overrideError && <ErrorNote message={overrideError} />}
-      {overrides === null || sessions === null ? (
-        <LoadingSpinner />
-      ) : (
+      {showOverridesLoader ? (
+        <LoadingSpinner size="card" />
+      ) : overrides === null || sessions === null ? null : (
         <>
           {showOverrideForm && (
             <form onSubmit={addOverride} className="card space-y-2">

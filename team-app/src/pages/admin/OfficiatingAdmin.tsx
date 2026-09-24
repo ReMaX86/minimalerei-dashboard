@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
+import { useTipoffLoader } from '../../hooks/useTipoffLoader';
 import { DateField, TimeField } from '../../components/DateTimeField';
 import { fmtDate, fmtTime } from '../../lib/format';
 import {
@@ -188,8 +189,11 @@ export function OfficiatingAdmin() {
     }
   }
 
+  const showLoader = useTipoffLoader(!games);
+
   if (error) return <ErrorNote message={error} />;
-  if (!games) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner />;
+  if (!games) return null;
 
   return (
     <div className="space-y-4">

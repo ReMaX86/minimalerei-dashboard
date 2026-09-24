@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
+import { useTipoffLoader } from '../../hooks/useTipoffLoader';
 import { fmtDateShort } from '../../lib/format';
 import { POSITION_LABELS, SKILL_OPTIONS, type Player, type PlayerPosition } from '../../types/database';
 
@@ -211,8 +212,11 @@ export function PlayersAdmin() {
 
   const selected = useMemo(() => players?.find((p) => p.id === selectedId) ?? null, [players, selectedId]);
 
+  const showLoader = useTipoffLoader(!players);
+
   if (error) return <ErrorNote message={error} />;
-  if (!players) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner />;
+  if (!players) return null;
 
   async function addPlayer() {
     if (!name.trim()) return;

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { computeBoxScore, type PlayerBoxScore } from '../lib/gameStats';
 import { LoadingSpinner } from './LoadingSpinner';
 import { ErrorNote } from './ErrorNote';
+import { useTipoffLoader } from '../hooks/useTipoffLoader';
 import type { GameStatEvent, Player } from '../types/database';
 
 function initialsOf(name: string): string {
@@ -107,8 +108,11 @@ export function BestenlisteBoard() {
     return { totalTrackedGames, gamesByPlayer, boxByPlayer, tracked, untracked };
   }, [players, events]);
 
+  const showLoader = useTipoffLoader(!computed);
+
   if (error) return <ErrorNote message={error} />;
-  if (!computed) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner size="card" />;
+  if (!computed) return null;
 
   const { totalTrackedGames, boxByPlayer, tracked, untracked } = computed;
   const category = CATEGORIES.find((c) => c.key === cat)!;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
+import { useTipoffLoader } from '../../hooks/useTipoffLoader';
 import { fmtDateShort } from '../../lib/format';
 import type { Player, TrikotSet } from '../../types/database';
 
@@ -47,8 +48,11 @@ export function TrikotsAdmin() {
     }
   }
 
+  const showLoader = useTipoffLoader(!sets);
+
   if (error) return <ErrorNote message={error} />;
-  if (!sets) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner />;
+  if (!sets) return null;
 
   return (
     <div className="space-y-4">

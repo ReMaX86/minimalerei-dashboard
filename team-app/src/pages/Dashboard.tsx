@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
+import { useTipoffLoader } from '../hooks/useTipoffLoader';
 import { TrainingCard } from '../components/TrainingCard';
 import { AbsenceCard } from '../components/AbsenceCard';
 import { TeamBoard } from '../components/TeamBoard';
@@ -695,8 +696,11 @@ export function Dashboard() {
     };
   }, [nextGameIsLive, refreshLiveScore]);
 
+  const showLoader = useTipoffLoader(!data);
+
   if (error) return <div className="card text-sm text-to-dangerText">{error}</div>;
-  if (!data) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner />;
+  if (!data) return null;
 
   return (
     <div className="space-y-4">

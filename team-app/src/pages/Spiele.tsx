@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
+import { useTipoffLoader } from '../hooks/useTipoffLoader';
 import { NextGameSquadCard } from '../components/NextGameSquadCard';
 import { SpielplanTabelle } from '../components/SpielplanTabelle';
 import type { Game } from '../types/database';
@@ -32,8 +33,11 @@ export function Spiele() {
     load().catch(() => setError('Fehler beim Laden der Spiele.'));
   }, [load]);
 
+  const showLoader = useTipoffLoader(nextGame === undefined);
+
   if (error) return <ErrorNote message={error} />;
-  if (nextGame === undefined) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner />;
+  if (nextGame === undefined) return null;
 
   return (
     <div className="space-y-4">

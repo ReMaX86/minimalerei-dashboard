@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
+import { useTipoffLoader } from '../../hooks/useTipoffLoader';
 import type { Viewer } from '../../types/database';
 
 export function ViewersAdmin() {
@@ -84,8 +85,11 @@ export function ViewersAdmin() {
     }
   }
 
+  const showLoader = useTipoffLoader(!viewers);
+
   if (error) return <ErrorNote message={error} />;
-  if (!viewers) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner />;
+  if (!viewers) return null;
 
   return (
     <div className="space-y-4">

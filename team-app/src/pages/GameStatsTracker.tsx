@@ -6,6 +6,7 @@ import { Avatar } from '../components/Avatar';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { useScrollResetOnChange } from '../hooks/useScrollResetOnChange';
+import { useTipoffLoader } from '../hooks/useTipoffLoader';
 import {
   computeBoxScore,
   computePlusMinus,
@@ -187,6 +188,7 @@ export function GameStatsTracker() {
   const [manualNumbersEdit, setManualNumbersEdit] = useState(false);
   const [numbersDismissed, setNumbersDismissed] = useState(false);
   const [lockState, setLockState] = useState<LockState>({ kind: 'loading' });
+  const showLockLoader = useTipoffLoader(lockState.kind === 'loading');
   const [error, setError] = useState<string | null>(null);
   // Erst Aktion, dann Spieler: pendingAction ist gesetzt, sobald eine
   // Aktion angetippt wurde, und wartet auf den zugehörigen Spieler.
@@ -644,7 +646,7 @@ export function GameStatsTracker() {
           </div>
         )}
 
-        {lockState.kind === 'loading' && <LoadingSpinner />}
+        {showLockLoader && <LoadingSpinner label />}
 
         {lockState.kind === 'blocked' && (
           <div className="card space-y-3 text-center">

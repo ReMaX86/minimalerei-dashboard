@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../LoadingSpinner';
+import { useTipoffLoader } from '../../hooks/useTipoffLoader';
 import { fmtDate } from '../../lib/format';
 
 interface Subscriber {
@@ -77,8 +78,11 @@ export function PushSubscribersList() {
     };
   }, []);
 
+  const showLoader = useTipoffLoader(!subscribers);
+
   if (error) return <p className="text-xs text-to-dangerText">{error}</p>;
-  if (!subscribers) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner size="card" />;
+  if (!subscribers) return null;
 
   return (
     <div className="space-y-2 border-t border-to-divider pt-3">

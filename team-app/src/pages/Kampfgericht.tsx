@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
+import { useTipoffLoader } from '../hooks/useTipoffLoader';
 import { fmtDate, fmtDateBadge, fmtDateShort, fmtTime, isFuture, seasonLabel } from '../lib/format';
 import {
   OFFICIATING_TASK_LABELS,
@@ -169,8 +170,11 @@ export function Kampfgericht() {
     return counts;
   }, [state]);
 
+  const showLoader = useTipoffLoader(!state);
+
   if (error) return <ErrorNote message={error} />;
-  if (!state) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner />;
+  if (!state) return null;
 
   // Nur Termine, bei denen unser Verein mindestens eine Position stellt
   // (= mindestens eine echte Zeile in officiating_tasks existiert) — Spiele

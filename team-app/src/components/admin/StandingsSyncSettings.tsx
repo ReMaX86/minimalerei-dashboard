@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../LoadingSpinner';
+import { useTipoffLoader } from '../../hooks/useTipoffLoader';
 import type { StandingsSyncStatus } from '../../types/database';
 
 // Element "DBB-Liga-ID konfigurierbar" (Migration 0066, auf Nutzeranfrage):
@@ -80,8 +81,11 @@ export function StandingsSyncSettings() {
     }
   }
 
+  const showLoader = useTipoffLoader(!status);
+
   if (loadError) return <p className="text-xs text-to-dangerText">{loadError}</p>;
-  if (!status) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner size="card" />;
+  if (!status) return null;
 
   return (
     <div className="space-y-3 border-t border-to-divider pt-3">

@@ -156,10 +156,11 @@
     @apply border-to-accent;
   }
 
-  /* Tipoff-Zeichen (Ring + Punkt) — Kaltstart-Splash und Ladeanzeige.
+  /* Tipoff-Zeichen (Ring + Punkt) — nur noch der Kaltstart-Splash.
      Vorlage: docs/design/tipoff-design/elements/02-logo-animation/
-     (Variante 3 "Shot Clock"), eingebaut in Splash.tsx / LoadingSpinner.tsx.
-     Reines SVG + CSS, Farben ausschließlich aus unseren Tokens. */
+     (Variante 3 "Shot Clock"), eingebaut in Splash.tsx. Reines SVG + CSS,
+     Farben ausschließlich aus unseren Tokens. Die Ladeanzeige (LoadingSpinner.tsx)
+     nutzt seit Element 16 den eigenen "Dribbling"-Baustein weiter unten. */
   .to-mark-ring {
     fill: none;
     stroke: var(--to-accent);
@@ -168,20 +169,6 @@
   }
   .to-mark-dot {
     fill: var(--to-accent);
-  }
-  /* Ladeanzeige — nur der Ring, sanft pulsierend, ohne die volle
-     Splash-Animation (siehe LoadingSpinner.tsx). */
-  .to-mark-ring-pulse {
-    animation: to-mark-pulse 1400ms ease-in-out infinite;
-  }
-  @keyframes to-mark-pulse {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.45;
-    }
   }
 
   /* Splash-Einstieg: der Ring zeichnet sich wie eine ablaufende Wurfuhr,
@@ -292,12 +279,165 @@
   @media (prefers-reduced-motion: reduce) {
     .to-splash-ring,
     .to-splash-dot,
-    .to-splash-wordmark,
-    .to-mark-ring-pulse {
+    .to-splash-wordmark {
       animation: none !important;
       opacity: 1;
       transform: none;
       stroke-dashoffset: 0;
     }
   }
+
+  /* =======================================================================
+     DIE LADEANIMATION – Element 16 "Ladeanimation", Vorlage:
+     docs/design/tipoff-design/elements/16-ladeanimation/. Wörtlich aus der
+     Referenz übernommen (nicht nachgebaut), eingebaut über TipoffLoader.tsx /
+     LoadingSpinner.tsx. Ersetzt das bisherige .to-mark-ring-pulse überall.
+     ======================================================================= */
+  .tipoff-loader {
+    display: inline-grid;
+    place-items: center;
+    line-height: 0;
+  }
+  .tipoff-loader svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    display: block;
+  }
+  .tipoff-loader .tl-ball {
+    fill: var(--to-accent);
+  }
+  .tipoff-loader .tl-seam {
+    fill: none;
+    stroke: var(--to-on-accent);
+    stroke-width: 2.6;
+    stroke-linecap: round;
+  }
+  .tipoff-loader .tl-shadow {
+    fill: var(--to-accent);
+    opacity: 0.16;
+  }
+
+  /* Sprung: 620 ms hin, 620 ms zurück = 1240 ms pro Runde */
+  .tipoff-loader .tl-move {
+    animation: tl-move 620ms cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+  }
+  /* Stauchung genau im Aufprall */
+  .tipoff-loader .tl-squash {
+    animation: tl-squash 1240ms linear infinite;
+    transform-origin: 50px 62px;
+  }
+  /* Eigendrehung, damit der Ball nicht wie eine Scheibe wirkt */
+  .tipoff-loader .tl-spin {
+    animation: tl-spin 1240ms linear infinite;
+    transform-origin: 50px 40px;
+  }
+  .tipoff-loader .tl-shadow {
+    animation: tl-shadow 620ms cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+    transform-origin: 50px 86px;
+  }
+
+  @keyframes tl-move {
+    from {
+      transform: translateY(-22px);
+    }
+    to {
+      transform: translateY(22px);
+    }
+  }
+  @keyframes tl-squash {
+    0%,
+    38% {
+      transform: scale(1, 1);
+    }
+    47% {
+      transform: scale(1.14, 0.86);
+    }
+    56%,
+    100% {
+      transform: scale(1, 1);
+    }
+  }
+  @keyframes tl-spin {
+    from {
+      transform: rotate(0);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes tl-shadow {
+    from {
+      transform: scale(0.62);
+      opacity: 0.08;
+    }
+    to {
+      transform: scale(1);
+      opacity: 0.2;
+    }
+  }
+
+  /* Barrierefreiheit: keine Bewegung, aber sichtbares Lebenszeichen */
+  @media (prefers-reduced-motion: reduce) {
+    .tipoff-loader .tl-move,
+    .tipoff-loader .tl-squash,
+    .tipoff-loader .tl-spin {
+      animation: none;
+    }
+    .tipoff-loader .tl-shadow {
+      animation: none;
+      opacity: 0.14;
+    }
+    .tipoff-loader svg {
+      animation: tl-fade 1600ms ease-in-out infinite alternate;
+    }
+  }
+  @keyframes tl-fade {
+    from {
+      opacity: 0.45;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Drei Größen */
+  .tipoff-loader--page {
+    width: 64px;
+    height: 64px;
+  }
+  .tipoff-loader--card {
+    width: 40px;
+    height: 40px;
+  }
+  .tipoff-loader--inline {
+    width: 22px;
+    height: 22px;
+  }
+  /* Bei 22px sind die gebogenen Nähte Matsch: nur das Kreuz, dafür kräftiger,
+     und ohne Schatten */
+  .tipoff-loader--inline .tl-curve {
+    display: none;
+  }
+  .tipoff-loader--inline .tl-seam {
+    stroke-width: 4.4;
+  }
+  .tipoff-loader--inline .tl-shadow {
+    display: none;
+  }
+
+  /* Standardbausteine drumherum */
+  .tl-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .tl-label {
+    font-family: var(--to-font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--to-text-3);
+  }
+  /* =================== Ende des Bausteins =================== */
 }

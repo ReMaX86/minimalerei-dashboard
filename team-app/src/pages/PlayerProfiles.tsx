@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
+import { useTipoffLoader } from '../hooks/useTipoffLoader';
 import { PlayerProfileSheet } from '../components/PlayerProfileSheet';
 import { BestenlisteBoard } from '../components/BestenlisteBoard';
 import { type Player, type PlayerPosition } from '../types/database';
@@ -56,8 +57,11 @@ export function PlayerProfiles() {
     load().catch(() => setError('Fehler beim Laden der Spielerprofile.'));
   }, [load]);
 
+  const showLoader = useTipoffLoader(!players);
+
   if (error) return <ErrorNote message={error} />;
-  if (!players) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner />;
+  if (!players) return null;
 
   return (
     <div className="flex flex-col gap-3.5">

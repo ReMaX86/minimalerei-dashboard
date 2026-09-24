@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from './LoadingSpinner';
 import { ErrorNote } from './ErrorNote';
+import { useTipoffLoader } from '../hooks/useTipoffLoader';
 import { fmtDateShort } from '../lib/format';
 import { trainingsInDateRange } from '../lib/trainingSchedule';
 import type { PlayerAbsence, Training, TrainingOverride } from '../types/database';
@@ -155,9 +156,12 @@ export function AbsenceCard({ onChange }: { onChange?: () => void } = {}) {
     load().catch(() => setError('Fehler beim Laden deiner Abwesenheiten.'));
   }, [load]);
 
+  const showLoader = useTipoffLoader(!!player && !state);
+
   if (!player) return null;
   if (error) return <ErrorNote message={error} />;
-  if (!state) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner size="card" />;
+  if (!state) return null;
 
   const today = localTodayIso();
   // Überlappungen sind ausgeschlossen (siehe save()), daher reicht reines

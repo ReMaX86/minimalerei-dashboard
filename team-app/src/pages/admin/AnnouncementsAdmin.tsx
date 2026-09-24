@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorNote } from '../../components/ErrorNote';
+import { useTipoffLoader } from '../../hooks/useTipoffLoader';
 import type { Announcement } from '../../types/database';
 
 export function AnnouncementsAdmin() {
@@ -77,8 +78,11 @@ export function AnnouncementsAdmin() {
     }
   }
 
+  const showLoader = useTipoffLoader(!items);
+
   if (error) return <ErrorNote message={error} />;
-  if (!items) return <LoadingSpinner />;
+  if (showLoader) return <LoadingSpinner />;
+  if (!items) return null;
 
   return (
     <div className="space-y-4">
