@@ -114,6 +114,14 @@ export function daysUntil(iso: string, today: Date = new Date()): number {
   return Math.round((target.getTime() - from.getTime()) / 86_400_000);
 }
 
+// "25/26" — Basketball-Saison läuft grob September bis Juni, ein neues
+// Saisonjahr beginnt deshalb mit Juli (Monatsindex 6), nicht am 1. Januar.
+export function seasonLabel(now: Date = new Date()): string {
+  const startYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const short = (y: number) => String(y).slice(-2);
+  return `${short(startYear)}/${short(startYear + 1)}`;
+}
+
 export function ageFromBirthDate(iso: string): number {
   const birth = new Date(iso + 'T00:00:00');
   const today = new Date();

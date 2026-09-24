@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Kampfgericht</title>
+<!--
+  REFERENZ-UMSETZUNG des Reiters „Kampfgericht" (Vereinsübersicht).
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=player   Spielersicht, Standard
+    ?state=confirm  Spieler tippt auf „Übernehmen" – Rückfrage
+    ?state=taken    direkt nach dem Übernehmen (Chip „Du", Zähler +1)
+    ?state=coach    Trainersicht – jede Rolle ist änderbar (Stift)
+    ?state=assign   Trainerblatt „Wer übernimmt?"
+    ?state=past     „Vergangene Termine" aufgeklappt
+    ?state=empty    keine kommenden Termine
+  Die Seite ist zusätzlich echt klickbar: Übernehmen, Aufklappen, Blatt öffnen/schließen.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.10);
+  --to-danger-frame:#5A2027;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer}
+.wrap{width:390px;margin:0 auto;padding:24px 20px 28px;display:flex;flex-direction:column;gap:14px}
+
+/* ---------- Kopf ---------- */
+.head{display:flex;align-items:flex-end;gap:12px}
+.head__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:26px;letter-spacing:-.035em;line-height:1;flex:1 1 auto}
+.head__meta{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4)}
+
+/* ---------- Kennzahlen ---------- */
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{display:flex;flex-direction:column;gap:8px;padding:16px;border-radius:20px;
+  background:var(--to-surface);border:1px solid var(--to-border)}
+.tile--open{border-color:var(--to-danger-frame)}
+.tile__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.tile__row{display:flex;align-items:baseline;gap:6px}
+.tile__num{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:30px;line-height:1;
+  color:var(--to-accent);font-variant-numeric:tabular-nums}
+.tile__num--open{color:var(--to-danger-text)}
+.tile__unit{font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3)}
+
+/* ---------- Abschnittsüberschrift ---------- */
+.sec{display:flex;align-items:center;gap:12px;padding-top:6px;width:100%;
+  background:none;border:0;padding-left:0;padding-right:0;text-align:left}
+.sec__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sec__rule{flex:1 1 auto;height:1px;background:var(--to-hairline)}
+.sec__count{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4)}
+
+/* ---------- Terminkarte ---------- */
+.card{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column;padding-bottom:8px}
+.card--open{border-color:var(--to-danger-frame)}
+.card--mine{border-color:var(--to-accent-frame)}
+.card__head{display:flex;align-items:flex-start;gap:12px;padding:16px 18px 12px}
+.card__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+.card__team{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.card__meta{font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card__opp{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-4);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;
+  font-family:'Geist Mono',monospace;font-size:9px;font-weight:600;flex:none;letter-spacing:.04em}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill--ok{background:var(--to-accent-soft);color:var(--to-accent)}
+.pill--open{background:rgba(255,90,103,.14);color:var(--to-danger-text)}
+
+.role{display:flex;align-items:center;gap:12px;min-height:46px;padding:0 18px;
+  border-top:1px solid var(--to-surface-2)}
+.role__label{flex:1 1 auto;font-size:14px;color:var(--to-text)}
+.role__label--muted{color:var(--to-text-4)}
+.role__label--soft{color:var(--to-text-2)}
+.chip{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:999px;
+  border:1px solid transparent;background:transparent;font-size:13px;flex:none}
+.chip--filled{background:var(--to-surface-2);border-color:var(--to-surface-2);color:var(--to-text);font-weight:500}
+.chip--me{background:var(--to-accent-soft);border-color:var(--to-accent-frame);color:var(--to-accent);font-weight:600}
+.chip--open{border-color:var(--to-danger-frame);color:var(--to-danger-text);font-weight:600}
+.chip--other{color:var(--to-text-4);font-weight:500;cursor:default}
+.chip__pen{width:12px;height:12px;flex:none;opacity:.55}
+
+/* ---------- Vergangene Termine ---------- */
+.pastwrap{display:flex;flex-direction:column;gap:10px}
+.card--past{border-color:var(--to-hairline);padding-bottom:6px;opacity:.9}
+.card--past .card__head{padding:14px 18px 10px}
+.card--past .card__team{font-size:15px;color:var(--to-text-2)}
+.card--past .card__meta{font-size:10px;color:var(--to-text-4)}
+.card--past .card__opp{font-size:9px}
+.pill--done{background:var(--to-surface-2);color:var(--to-text-3)}
+.pill--done::before{display:none}
+.prole{display:flex;align-items:center;gap:12px;min-height:38px;padding:0 18px;
+  border-top:1px solid var(--to-surface-3)}
+.prole__label{flex:1 1 auto;font-size:13px;color:var(--to-text-3)}
+.prole__name{font-size:13px;font-weight:500;color:var(--to-text-2);flex:none}
+.prole__name--me{color:var(--to-accent);font-weight:600}
+
+/* ---------- Einsätze pro Spieler ---------- */
+.panel{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.panel__head{display:flex;align-items:center;gap:12px;padding:12px 18px}
+.panel__head span{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.panel__head span:first-child{flex:1 1 auto}
+.panel__head span:last-child{color:var(--to-text-4)}
+.trow{display:flex;align-items:center;gap:12px;min-height:42px;padding:0 18px;
+  border-top:1px solid var(--to-surface-2)}
+.trow--me{background:rgba(200,255,46,.05)}
+.trow__name{flex:1 1 auto;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow--me .trow__name{color:var(--to-accent);font-weight:600}
+.count{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:24px;padding:0 9px;
+  border-radius:999px;background:var(--to-surface-2);color:var(--to-text-2);
+  font-family:'Geist Mono',monospace;font-size:11px;font-weight:600;flex:none;font-variant-numeric:tabular-nums}
+.count--zero{background:transparent;color:var(--to-text-4)}
+.more{display:flex;align-items:center;justify-content:center;min-height:44px;width:100%;
+  border:0;border-top:1px solid var(--to-surface-2);background:transparent;
+  font-size:13px;font-weight:600;color:var(--to-accent)}
+
+/* ---------- Letzte Änderungen ---------- */
+.lrow{display:flex;flex-direction:column;gap:4px;padding:13px 18px;border-top:1px solid var(--to-surface-2)}
+.lrow:first-child{border-top:0}
+.lrow__top{display:flex;align-items:baseline;gap:10px}
+.lrow__title{flex:1 1 auto;min-width:0;font-size:14px;font-weight:600;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lrow__date{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-4);flex:none}
+.lrow__sub{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-3);line-height:1.5}
+
+/* ---------- Leerzustand ---------- */
+.empty{border-radius:22px;background:var(--to-surface);border:1px dashed var(--to-line);
+  padding:26px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.empty__title{font-size:15px;font-weight:600}
+.empty__sub{font-size:13px;color:var(--to-text-3);line-height:1.45}
+
+/* ---------- Blatt ---------- */
+.scrim{position:fixed;inset:0;background:rgba(5,6,8,.74);display:flex;flex-direction:column;
+  justify-content:flex-end;z-index:20}
+.sheet{width:390px;margin:0 auto;background:var(--to-surface);border-top:1px solid var(--to-border);
+  border-radius:26px 26px 0 0;padding:12px 20px 22px;display:flex;flex-direction:column;gap:14px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__head{display:flex;flex-direction:column;gap:5px}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sheet__sub{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.picker{display:flex;flex-direction:column;border-radius:18px;background:#0F1216;
+  border:1px solid var(--to-hairline);overflow:hidden;max-height:300px;overflow-y:auto}
+.prow{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 14px;width:100%;
+  border:0;border-top:1px solid var(--to-surface-2);background:transparent;text-align:left}
+.prow:first-child{border-top:0}
+.prow--me{background:rgba(200,255,46,.06)}
+.av{width:30px;height:30px;flex:none;border-radius:50%;background:var(--to-surface-2);
+  display:grid;place-items:center;font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3)}
+.prow--me .av{background:var(--to-accent-soft);border:1px solid var(--to-accent-frame);color:var(--to-accent)}
+.prow__name{flex:1 1 auto;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow--me .prow__name{color:var(--to-accent);font-weight:600}
+.prow__count{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-3);flex:none}
+.btn{display:flex;align-items:center;justify-content:center;height:46px;border-radius:999px;
+  border:1px solid transparent;font-size:15px;font-weight:600;width:100%}
+.btn--primary{background:var(--to-accent);color:var(--to-on-accent)}
+.btn--ghost{background:transparent;border-color:var(--to-line);color:var(--to-text-2)}
+.btn--text{height:24px;border:0;background:transparent;color:var(--to-text-3);font-size:13px;font-weight:400}
+.confirm__facts{display:flex;flex-direction:column;gap:6px;padding:14px 16px;border-radius:16px;
+  background:var(--to-surface-3);border:1px solid var(--to-hairline)}
+.confirm__role{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.confirm__meta{font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3)}
+.confirm__note{font-size:12px;color:var(--to-text-4);line-height:1.45}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="head">
+    <span class="head__title">Kampfgericht</span>
+    <span class="head__meta">SAISON 25/26</span>
+  </div>
+
+  <div class="stats">
+    <div class="tile">
+      <span class="tile__label">DEINE EINSÄTZE</span>
+      <span class="tile__row"><span class="tile__num" id="statMine">2</span><span class="tile__unit">DIESE SAISON</span></span>
+    </div>
+    <div class="tile" id="tileOpen">
+      <span class="tile__label">NOCH OFFEN</span>
+      <span class="tile__row"><span class="tile__num tile__num--open" id="statOpen">7</span><span class="tile__unit">POSITIONEN</span></span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <span class="sec__title">Kommende Termine</span>
+    <span class="sec__rule"></span>
+  </div>
+
+  <div id="upcoming" style="display:flex;flex-direction:column;gap:14px"></div>
+
+  <div class="empty" id="emptyBox" hidden>
+    <span class="empty__title">Keine Termine offen</span>
+    <span class="empty__sub">Für die nächsten Wochen muss unser Verein kein Kampfgericht stellen.<br>Neue Termine pflegt der Trainer im Adminbereich.</span>
+  </div>
+
+  <button class="sec" id="pastToggle" type="button" aria-expanded="false">
+    <span class="sec__title">Vergangene Termine</span>
+    <span class="sec__rule"></span>
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#7C8594" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none" aria-hidden="true"><path id="pastChev" d="M6 9l6 6 6-6"></path></svg>
+  </button>
+
+  <div class="pastwrap" id="pastWrap" hidden></div>
+
+  <div class="sec">
+    <span class="sec__title">Einsätze pro Spieler</span>
+    <span class="sec__rule"></span>
+  </div>
+
+  <section class="panel">
+    <div class="panel__head"><span>GANZE SAISON</span><span>EINSÄTZE</span></div>
+    <div id="tally"></div>
+    <button class="more" type="button">Alle Spieler anzeigen</button>
+  </section>
+
+  <div class="sec">
+    <span class="sec__title">Letzte Änderungen</span>
+    <span class="sec__rule"></span>
+  </div>
+
+  <section class="panel" id="log"></section>
+
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script>
+var PARAMS = new URLSearchParams(location.search);
+var STATE = PARAMS.get('state') || 'player';
+
+var ME = 'Marc Rewald';
+
+/* Nur Termine, bei denen unser Verein mindestens eine Position stellt.
+   role.by === null  → offen
+   role.by === '-'   → stellt ein anderes Team, für uns nicht relevant */
+var GAMES = [
+  { id:'g1', team:'TBW Herren 1', meta:'FR 25.09. · 20:00', opp:'GEGEN SOLINGEN 2', roles:[
+      {key:'g1a', label:'24-Sek.-Uhr', by:'-'},
+      {key:'g1b', label:'Anschreiben', by:'Daniel Tekeste'},
+      {key:'g1c', label:'Zeit & Punkte', by:'-'} ]},
+  { id:'g2', team:'TBW U18', meta:'SO 27.09. · 17:00', opp:'GEGEN METTMANN', roles:[
+      {key:'g2a', label:'24-Sek.-Uhr', by:'-'},
+      {key:'g2b', label:'Anschreiben', by:null},
+      {key:'g2c', label:'Zeit & Punkte', by:'-'} ]},
+  { id:'g3', team:'TBW U14-1', meta:'SA 10.10. · 15:00', opp:'GEGEN HILDEN', roles:[
+      {key:'g3a', label:'24-Sek.-Uhr', by:null},
+      {key:'g3b', label:'Anschreiben', by:'Jens Mertens'},
+      {key:'g3c', label:'Zeit & Punkte', by:null} ]},
+  { id:'g4', team:'TBW Herren 1', meta:'SO 11.10. · 18:00', opp:'GEGEN VELBERT', roles:[
+      {key:'g4a', label:'24-Sek.-Uhr', by:'-'},
+      {key:'g4b', label:'Anschreiben', by:'Peter Woznicki'},
+      {key:'g4c', label:'Zeit & Punkte', by:ME} ]}
+];
+
+var PAST = [
+  { team:'TBW U16', meta:'SO 14.09. · 12:00', opp:'GEGEN RATINGEN', roles:[
+      {label:'Anschreiben', by:'Sven Hasenpusch'}, {label:'Zeit & Punkte', by:ME} ]},
+  { team:'TBW Herren 1', meta:'FR 05.09. · 20:00', opp:'GEGEN BG MONHEIM', roles:[
+      {label:'24-Sek.-Uhr', by:'Peter Woznicki'}, {label:'Anschreiben', by:'Gürkan Ertas'} ]}
+];
+
+var TALLY = [
+  ['Peter Woznicki',3], [ME,2], ['Daniel Tekeste',1], ['Gürkan Ertas',1],
+  ['Sven Hasenpusch',1], ['Jens Mertens',1]
+];
+
+var LOG = [
+  ['Anschreiben · TBW U16','21.09.','offen → Sven Hasenpusch · geändert von Sven Hasenpusch'],
+  ['Zeit & Punkte · TBW U16','19.09.','offen → Marc Rewald · geändert von Marc Rewald'],
+  ['24-Sek.-Uhr · TBW Herren 1','16.09.','Finn Weidemann → Peter Woznicki · geändert von Trainer'],
+  ['Anschreiben · TBW U14-1','12.09.','Jens Mertens eingetragen · geändert von Trainer']
+];
+
+/* Auswahlliste für den Trainer: alphabetisch, „Du" zuoberst */
+var TEAM = [
+  ['Axel Flaujac',0], ['Daniel Tekeste',1], ['Finn Weidemann',0], ['Gürkan Ertas',1],
+  ['Jens Mertens',1], ['Peter Woznicki',3], ['Sven Hasenpusch',1]
+];
+
+/* offene Positionen bei Terminen anderer Mannschaften, die hier nicht einzeln gelistet sind */
+var OPEN_ELSEWHERE = 4;
+
+var coach = (STATE === 'coach' || STATE === 'assign');
+var pastOpen = (STATE === 'past');
+var empty = (STATE === 'empty');
+var sheetMode = null;
+var sheetKey = null;
+
+if (STATE === 'taken') { setRole('g3a', ME); }
+if (STATE === 'confirm') { sheetMode = 'confirm'; sheetKey = 'g3a'; }
+if (STATE === 'assign') { sheetMode = 'assign'; sheetKey = 'g1b'; }
+
+function findRole(key){
+  for (var i=0;i<GAMES.length;i++){
+    for (var j=0;j<GAMES[i].roles.length;j++){
+      if (GAMES[i].roles[j].key === key) return { game:GAMES[i], role:GAMES[i].roles[j] };
+    }
+  }
+  return null;
+}
+function setRole(key, name){ var f = findRole(key); if (f) f.role.by = name; }
+
+function el(tag, cls, text){
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+function initials(name){
+  return name.split(' ').map(function(p){ return p.charAt(0); }).join('').slice(0,2).toUpperCase();
+}
+
+var PEN = '<svg class="chip__pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"></path></svg>';
+
+function renderCards(){
+  var host = document.getElementById('upcoming');
+  host.innerHTML = '';
+  document.getElementById('emptyBox').hidden = !empty;
+  if (empty) return;
+
+  GAMES.forEach(function(g){
+    var open = g.roles.filter(function(r){ return r.by === null; }).length;
+    var mine = g.roles.some(function(r){ return r.by === ME; });
+    var card = el('section', 'card' + (open ? ' card--open' : (mine ? ' card--mine' : '')));
+
+    var head = el('div','card__head');
+    var main = el('div','card__main');
+    main.appendChild(el('span','card__team', g.team));
+    main.appendChild(el('span','card__meta', g.meta));
+    main.appendChild(el('span','card__opp', g.opp));
+    head.appendChild(main);
+    var pill = el('span','pill ' + (open ? 'pill--open' : 'pill--ok'),
+      open ? (open === 1 ? '1 OFFEN' : open + ' OFFEN') : 'KOMPLETT');
+    head.appendChild(pill);
+    card.appendChild(head);
+
+    g.roles.forEach(function(r){
+      var row = el('div','role');
+      var other = (r.by === '-');
+      var isOpen = (r.by === null);
+      var isMe = (r.by === ME);
+      row.appendChild(el('span','role__label' + (other ? ' role__label--muted' : (isOpen || isMe ? '' : ' role__label--soft')), r.label));
+
+      var chip;
+      if (other){
+        chip = el('span','chip chip--other','anderes Team');
+      } else if (isOpen){
+        chip = el('button','chip chip--open','Übernehmen');
+        chip.type = 'button';
+        chip.onclick = function(){ openSheet(coach ? 'assign' : 'confirm', r.key); };
+      } else {
+        chip = el(coach ? 'button' : 'span','chip ' + (isMe ? 'chip--me' : 'chip--filled'), isMe ? 'Du' : r.by);
+        if (coach){
+          chip.type = 'button';
+          chip.insertAdjacentHTML('beforeend', PEN);
+          chip.onclick = function(){ openSheet('assign', r.key); };
+        }
+      }
+      row.appendChild(chip);
+      card.appendChild(row);
+    });
+
+    host.appendChild(card);
+  });
+}
+
+function renderPast(){
+  var host = document.getElementById('pastWrap');
+  host.innerHTML = '';
+  host.hidden = !pastOpen;
+  document.getElementById('pastToggle').setAttribute('aria-expanded', pastOpen ? 'true' : 'false');
+  document.getElementById('pastChev').setAttribute('d', pastOpen ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6');
+  if (!pastOpen) return;
+
+  PAST.forEach(function(p){
+    var card = el('section','card card--past');
+    var head = el('div','card__head');
+    var main = el('div','card__main');
+    main.appendChild(el('span','card__team', p.team));
+    main.appendChild(el('span','card__meta', p.meta));
+    main.appendChild(el('span','card__opp', p.opp));
+    head.appendChild(main);
+    head.appendChild(el('span','pill pill--done','KOMPLETT'));
+    card.appendChild(head);
+    p.roles.forEach(function(r){
+      var row = el('div','prole');
+      row.appendChild(el('span','prole__label', r.label));
+      row.appendChild(el('span','prole__name' + (r.by === ME ? ' prole__name--me' : ''), r.by === ME ? 'Du' : r.by));
+      card.appendChild(row);
+    });
+    host.appendChild(card);
+  });
+}
+
+function renderTally(){
+  var host = document.getElementById('tally');
+  host.innerHTML = '';
+  var mineCount = countMine();
+  TALLY.forEach(function(t){
+    var isMe = (t[0] === ME);
+    var n = isMe ? mineCount : t[1];
+    var row = el('div','trow' + (isMe ? ' trow--me' : ''));
+    row.appendChild(el('span','trow__name', t[0]));
+    row.appendChild(el('span','count' + (n === 0 ? ' count--zero' : ''), n + '×'));
+    host.appendChild(row);
+  });
+}
+
+function renderLog(){
+  var host = document.getElementById('log');
+  host.innerHTML = '';
+  LOG.forEach(function(l){
+    var row = el('div','lrow');
+    var top = el('div','lrow__top');
+    top.appendChild(el('span','lrow__title', l[0]));
+    top.appendChild(el('span','lrow__date', l[1]));
+    row.appendChild(top);
+    row.appendChild(el('span','lrow__sub', l[2]));
+    host.appendChild(row);
+  });
+}
+
+/* Stand laut Datenbank (absolvierte + bereits eingeteilte Einsätze) */
+var BASE_MINE = 2;
+var INITIAL_ME = 1; /* davon liegt einer in den kommenden Terminen (g4c) */
+function countMine(){
+  var n = 0;
+  GAMES.forEach(function(g){ g.roles.forEach(function(r){ if (r.by === ME) n++; }); });
+  return BASE_MINE + (n - INITIAL_ME);
+}
+
+function renderStats(){
+  var open = 0;
+  GAMES.forEach(function(g){ g.roles.forEach(function(r){ if (r.by === null) open++; }); });
+  open = empty ? 0 : open + OPEN_ELSEWHERE;
+  document.getElementById('statOpen').textContent = open;
+  document.getElementById('statMine').textContent = countMine();
+  var tile = document.getElementById('tileOpen');
+  tile.classList.toggle('tile--open', open > 0);
+  document.getElementById('statOpen').classList.toggle('tile__num--open', open > 0);
+}
+
+/* ---------- Blatt ---------- */
+function openSheet(mode, key){ sheetMode = mode; sheetKey = key; render(); }
+function closeSheet(){ sheetMode = null; sheetKey = null; render(); }
+
+function renderSheet(){
+  var scrim = document.getElementById('scrim');
+  var host = document.getElementById('sheet');
+  scrim.hidden = !sheetMode;
+  host.innerHTML = '';
+  if (!sheetMode) return;
+
+  var f = findRole(sheetKey);
+  host.appendChild(el('span','sheet__grip'));
+
+  if (sheetMode === 'confirm'){
+    var h = el('div','sheet__head');
+    h.appendChild(el('span','sheet__title','Position übernehmen?'));
+    h.appendChild(el('span','sheet__sub','DU TRÄGST DICH VERBINDLICH EIN'));
+    host.appendChild(h);
+
+    var facts = el('div','confirm__facts');
+    facts.appendChild(el('span','confirm__role', f.role.label));
+    facts.appendChild(el('span','confirm__meta', f.game.team));
+    facts.appendChild(el('span','confirm__meta', f.game.meta + ' · ' + f.game.opp.replace('GEGEN ','gegen ')));
+    host.appendChild(facts);
+    host.appendChild(el('span','confirm__note','Danach stehst du bei diesem Termin als verantwortlich drin.'));
+
+    var ok = el('button','btn btn--primary','Ja, ich übernehme');
+    ok.type = 'button';
+    ok.onclick = function(){ setRole(sheetKey, ME); closeSheet(); };
+    host.appendChild(ok);
+    var no = el('button','btn btn--text','Abbrechen');
+    no.type = 'button'; no.onclick = closeSheet;
+    host.appendChild(no);
+    return;
+  }
+
+  var head = el('div','sheet__head');
+  head.appendChild(el('span','sheet__title','Wer übernimmt?'));
+  head.appendChild(el('span','sheet__sub', (f.role.label + ' · ' + f.game.team + ' · ' + f.game.meta).toUpperCase()));
+  host.appendChild(head);
+
+  var picker = el('div','picker');
+
+  var meRow = el('button','prow prow--me');
+  meRow.type = 'button';
+  meRow.appendChild(el('span','av', initials(ME)));
+  meRow.appendChild(el('span','prow__name','Du (' + ME + ')'));
+  meRow.appendChild(el('span','prow__count', countMine() + '×'));
+  meRow.onclick = function(){ setRole(sheetKey, ME); closeSheet(); };
+  picker.appendChild(meRow);
+
+  TEAM.forEach(function(t){
+    var row = el('button','prow');
+    row.type = 'button';
+    row.appendChild(el('span','av', initials(t[0])));
+    row.appendChild(el('span','prow__name', t[0]));
+    row.appendChild(el('span','prow__count', t[1] + '×'));
+    row.onclick = function(){ setRole(sheetKey, t[0]); closeSheet(); };
+    picker.appendChild(row);
+  });
+  host.appendChild(picker);
+
+  var free = el('button','btn btn--ghost','Position frei lassen');
+  free.type = 'button';
+  free.onclick = function(){ setRole(sheetKey, null); closeSheet(); };
+  host.appendChild(free);
+
+  var cancel = el('button','btn btn--text','Abbrechen');
+  cancel.type = 'button'; cancel.onclick = closeSheet;
+  host.appendChild(cancel);
+}
+
+function render(){
+  renderCards();
+  renderPast();
+  renderTally();
+  renderLog();
+  renderStats();
+  renderSheet();
+}
+
+document.getElementById('pastToggle').onclick = function(){ pastOpen = !pastOpen; render(); };
+document.getElementById('scrim').onclick = function(e){ if (e.target === this) closeSheet(); };
+
+render();
+</script>
+</body>
+</html>
