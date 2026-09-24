@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { PlayerProfileSheet } from '../components/PlayerProfileSheet';
+import { BestenlisteBoard } from '../components/BestenlisteBoard';
 import { type Player, type PlayerPosition } from '../types/database';
 
 function initialsOf(name: string): string {
@@ -108,6 +109,8 @@ export function PlayerProfiles() {
           })}
         </div>
       )}
+
+      <BestenlisteBoard />
 
       {selected && <PlayerProfileSheet player={selected} onClose={() => setSelected(null)} />}
     </div>

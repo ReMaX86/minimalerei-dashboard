@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Teamstatistik</title>
+<!--
+  REFERENZ-UMSETZUNG der Bestenliste unter dem Kader im Reiter „Team".
+  Kategorie-Pillen in EINER Zeile, seitlich scrollbar. Werte immer als Summe der Saison.
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=points    Punkte (Standard)
+    ?state=rebounds  Rebounds
+    ?state=blocks    Blöcke – letzte Kategorie, Pillenzeile ist mitgescrollt
+    ?state=all       Liste aufgeklappt, inkl. Spieler ohne getracktes Spiel
+    ?state=empty     noch nichts getrackt
+  Klickbar: die Pillen, „Alle Spieler anzeigen".
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{width:390px;margin:0 auto;padding:24px 0;display:flex;flex-direction:column;gap:14px}
+.pad{padding-left:20px;padding-right:20px}
+
+.sectionhead{display:flex;align-items:center;gap:12px}
+.sectionhead__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sectionhead__rule{flex:1 1 auto;height:1px;background:var(--to-hairline)}
+.sectionhead__meta{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4)}
+
+/* ---------- Kategorie-Pillen: eine Zeile, seitlich scrollbar ---------- */
+.cats{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;
+  flex-wrap:nowrap;                     /* NIE umbrechen */
+  scroll-snap-type:x proximity;
+  -webkit-overflow-scrolling:touch;
+  padding:2px 20px;                     /* Rand links/rechts am Bildschirm */
+  scrollbar-width:none;-ms-overflow-style:none}
+.cats::-webkit-scrollbar{display:none}
+.cat{flex:0 0 auto;scroll-snap-align:start;
+  display:inline-flex;align-items:center;height:34px;padding:0 14px;border-radius:999px;
+  background:transparent;border:1px solid var(--to-line);color:var(--to-text-2);
+  font-family:'Geist',sans-serif;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;
+  transition:background-color .15s ease,color .15s ease,border-color .15s ease}
+.cat[aria-selected="true"]{background:var(--to-accent);border-color:var(--to-accent);
+  color:var(--to-on-accent)}
+
+/* ---------- Liste ---------- */
+.board{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column;padding:6px 0 0}
+.row{display:flex;align-items:center;gap:12px;min-height:54px;padding:0 16px}
+.row.is-me{background:rgba(200,255,46,.06)}
+.row__rank{width:16px;flex:none;font-family:'Geist Mono',monospace;font-size:12px;color:var(--to-text-3)}
+.row.is-first .row__rank{color:var(--to-accent)}
+.row__av{width:34px;height:34px;flex:none;border-radius:50%;background:var(--to-surface-2);
+  display:grid;place-items:center;overflow:hidden;
+  font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-2)}
+.row__av img{width:100%;height:100%;object-fit:cover}
+.row__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px}
+.row__name{font-size:14px;font-weight:600;letter-spacing:-.01em;color:var(--to-text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row.is-me .row__name{color:var(--to-accent)}
+.row__track{height:6px;border-radius:3px;background:var(--to-surface-2);display:flex}
+.row__bar{height:6px;border-radius:3px;background:#3A414C;transition:width .2s ease}
+.row.is-first .row__bar{background:var(--to-accent)}
+.row.is-me .row__bar{background:var(--to-text-3)}
+.row.is-first.is-me .row__bar{background:var(--to-accent)}
+.row__val{display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none}
+.row__num{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:19px;line-height:1;
+  font-variant-numeric:tabular-nums}
+.row.is-first .row__num{color:var(--to-accent)}
+.row__games{font-family:'Geist Mono',monospace;font-size:9px;color:var(--to-text-4)}
+.row--zero .row__name,.row--zero .row__num{color:var(--to-text-3)}
+
+.more{display:flex;align-items:center;gap:8px;min-height:44px;width:100%;padding:8px 16px 0;
+  margin-top:6px;border:0;border-top:1px solid var(--to-surface-2);background:transparent;
+  color:var(--to-text-2);font-family:'Geist',sans-serif;font-size:13px;text-align:left;cursor:pointer;
+  margin-bottom:12px}
+.more span{flex:1 1 auto}
+.more svg{width:15px;height:15px;fill:none;stroke:var(--to-text-3);stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .18s ease}
+.more[aria-expanded="true"] svg{transform:rotate(180deg)}
+
+.foot{font-size:11px;color:var(--to-text-4)}
+.empty{display:flex;flex-direction:column;gap:6px;padding:26px 18px;border-radius:20px;
+  background:var(--to-surface);border:1px solid var(--to-border);text-align:center}
+.empty__title{font-size:15px;font-weight:600;color:var(--to-text-2)}
+.empty__text{font-size:13px;color:var(--to-text-3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="sectionhead pad">
+    <span class="sectionhead__title">Bestenliste</span>
+    <span class="sectionhead__rule"></span>
+    <span class="sectionhead__meta">SAISON</span>
+  </div>
+
+  <div class="cats" id="cats" role="tablist" aria-label="Kategorie"></div>
+
+  <div class="pad" id="panel"></div>
+  <span class="foot pad" id="foot"></span>
+
+</div>
+
+<script>
+var CATS = [
+  { key: 'pts', label: 'Punkte' },
+  { key: 'reb', label: 'Rebounds' },
+  { key: 'ast', label: 'Assists' },
+  { key: 'stl', label: 'Steals' },
+  { key: 'blk', label: 'Blöcke' }
+];
+
+var DATA = {
+  pts: [['JM','Jens Mühlenbeck',72,4],['MR','Marc Rewald',56,4],['DT','Daniel Tekeste',44,4],
+        ['AF','Axel Flaujac',36,3],['GE','Gürkan Ertas',28,4],['PW','Peter Woznicki',16,2],
+        ['EZ','Eldar Zherokov',12,3],['JB','Joscha Bohris',9,2]],
+  reb: [['JM','Jens Mühlenbeck',41,4],['PW','Peter Woznicki',28,2],['AF','Axel Flaujac',22,3],
+        ['MR','Marc Rewald',13,4],['GE','Gürkan Ertas',11,4],['DT','Daniel Tekeste',9,4],
+        ['EZ','Eldar Zherokov',6,3],['JB','Joscha Bohris',4,2]],
+  ast: [['DT','Daniel Tekeste',31,4],['MR','Marc Rewald',24,4],['JB','Joscha Bohris',12,2],
+        ['EZ','Eldar Zherokov',10,3],['GE','Gürkan Ertas',8,4],['JM','Jens Mühlenbeck',6,4],
+        ['AF','Axel Flaujac',5,3],['PW','Peter Woznicki',1,2]],
+  stl: [['GE','Gürkan Ertas',14,4],['DT','Daniel Tekeste',12,4],['MR','Marc Rewald',9,4],
+        ['EZ','Eldar Zherokov',7,3],['AF','Axel Flaujac',6,3],['JB','Joscha Bohris',4,2],
+        ['JM','Jens Mühlenbeck',3,4],['PW','Peter Woznicki',2,2]],
+  blk: [['JM','Jens Mühlenbeck',11,4],['PW','Peter Woznicki',7,2],['AF','Axel Flaujac',3,3],
+        ['GE','Gürkan Ertas',2,4],['MR','Marc Rewald',1,4],['DT','Daniel Tekeste',1,4],
+        ['EZ','Eldar Zherokov',0,3],['JB','Joscha Bohris',0,2]]
+};
+
+var UNTRACKED = [['FR','Florian Rinke'],['FW','Finn Weidemann'],['BF','Benaja Feuersänger'],['FP','Fin Petereit']];
+var ME = 'MR';
+var GAMES = 4;
+
+var BASE = { cat: 'pts', open: false, scroll: 0, tracked: true };
+var STATES = {
+  points:   {},
+  rebounds: { cat: 'reb' },
+  blocks:   { cat: 'blk', scroll: 999 },
+  all:      { open: true },
+  empty:    { tracked: false }
+};
+
+var key = new URLSearchParams(location.search).get('state') || 'points';
+var data = Object.assign({}, BASE, STATES[key] || {});
+var cat = data.cat, open = data.open;
+
+var cats = document.getElementById('cats');
+var panel = document.getElementById('panel');
+var foot = document.getElementById('foot');
+
+function renderCats() {
+  cats.innerHTML = CATS.map(function (c) {
+    return '<button class="cat" role="tab" type="button" data-key="' + c.key + '"' +
+           (c.key === cat ? ' aria-selected="true"' : ' aria-selected="false"') + '>' +
+           c.label + '</button>';
+  }).join('');
+}
+
+function renderList() {
+  if (!data.tracked) {
+    panel.innerHTML = '<div class="empty"><span class="empty__title">Noch keine Statistik</span>' +
+      '<span class="empty__text">Sobald ein Spiel über die App getrackt wurde, steht hier die Bestenliste.</span></div>';
+    foot.textContent = '';
+    return;
+  }
+  var list = DATA[cat];
+  var max = list[0][2] || 1;
+  var shown = open ? list : list.slice(0, 6);
+
+  var rows = shown.map(function (r, i) {
+    var cls = 'row' + (i === 0 ? ' is-first' : '') + (r[0] === ME ? ' is-me' : '');
+    return '<div class="' + cls + '">' +
+      '<span class="row__rank">' + (i + 1) + '</span>' +
+      '<span class="row__av">' + r[0] + '</span>' +
+      '<span class="row__main"><span class="row__name">' + r[1] + '</span>' +
+      '<span class="row__track"><span class="row__bar" style="width:' +
+        Math.max(2, Math.round(r[2] / max * 100)) + '%"></span></span></span>' +
+      '<span class="row__val"><span class="row__num">' + r[2] + '</span>' +
+      '<span class="row__games">' + r[3] + ' SP</span></span></div>';
+  }).join('');
+
+  var extra = open ? UNTRACKED.map(function (u, i) {
+    return '<div class="row row--zero"><span class="row__rank">' + (list.length + i + 1) + '</span>' +
+      '<span class="row__av">' + u[0] + '</span>' +
+      '<span class="row__main"><span class="row__name">' + u[1] + '</span>' +
+      '<span class="row__track"><span class="row__bar" style="width:0"></span></span></span>' +
+      '<span class="row__val"><span class="row__num">—</span>' +
+      '<span class="row__games">0 SP</span></span></div>';
+  }).join('') : '';
+
+  panel.innerHTML = '<div class="board">' + rows + extra +
+    '<button class="more" id="more" type="button" aria-expanded="' + (open ? 'true' : 'false') + '">' +
+    '<span>' + (open ? 'Weniger anzeigen' : 'Alle 12 Spieler anzeigen') + '</span>' +
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button></div>';
+
+  foot.textContent = 'Summe aus ' + GAMES + ' getrackten Spielen · kleine Zahl = Spiele des Spielers';
+
+  document.getElementById('more').addEventListener('click', function () {
+    open = !open; renderList();
+  });
+}
+
+cats.addEventListener('click', function (e) {
+  var b = e.target.closest('.cat');
+  if (!b) return;
+  cat = b.getAttribute('data-key');
+  renderCats();
+  renderList();
+  // aktive Pille in den sichtbaren Bereich holen
+  var active = cats.querySelector('[aria-selected="true"]');
+  if (active && active.scrollIntoView) {
+    active.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }
+});
+
+renderCats();
+renderList();
+if (data.scroll) cats.scrollLeft = data.scroll;
+</script>
+</body>
+</html>
