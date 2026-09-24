@@ -119,8 +119,8 @@ export function BottomNav() {
           end={item.end}
           aria-label={item.label}
           className={({ isActive }) =>
-            `flex h-11 min-w-0 cursor-pointer items-center justify-center gap-0 rounded-full p-0 text-to-text3 no-underline transition-[flex-grow,padding,gap,background-color,color] duration-[180ms] ease-out ${
-              isActive ? 'flex-none gap-2 bg-to-accent px-3.5 text-to-onAccent' : 'flex-1'
+            `flex h-11 min-w-0 cursor-pointer items-center justify-center gap-0 rounded-full p-0 no-underline transition-[flex-grow,padding,gap,background-color,color] duration-[180ms] ease-out ${
+              isActive ? 'flex-none gap-2 bg-to-accent px-3.5 text-to-onAccent' : 'flex-1 text-to-text3'
             }`
           }
         >
