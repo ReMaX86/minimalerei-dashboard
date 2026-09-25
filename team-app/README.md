@@ -2651,6 +2651,24 @@ hier die getroffenen Entscheidungen samt Begründung:
   `tbw-*`-Farben, plus die hervorgehobene "Team"-Zeile (`bg-to-surface2`, `text-to-accent`,
   dickerer oberer Rand). Läuft unverändert an allen drei Stellen (Kompakt-Vollbild, Seitenleiste
   im Querformat, Nur-Ansicht bei abgeschlossenem Spiel).
+- **`NextGameSquadCard.tsx` (Reiter „Spiele & Kader"): drei Kleinigkeiten/Bugfixes.**
+  (1) Der Kaderblock (Trainer) ist jetzt standardmäßig eingeklappt — Kopfzeile mit
+  „KADER n/12" + Fortschrittsbalken bleiben als Kurzübersicht sichtbar (ebenso die
+  Voll/Abgesagt-Hinweise), die Spielerliste und der Veröffentlichen-Knopf öffnen sich erst per
+  Klick auf die Kopfzeile (`kaderOpen`-State, Default `false`). (2) **Bugfix Treffpunkt:** nach
+  dem Speichern blieb die Karte bei „Treffpunkt hinterlegen" stehen, weil `game` nur ein Prop
+  ist, das der Elternscreen (`Spiele.tsx`/`SpielplanTabelle.tsx`) einmalig lädt — ein Schreiben
+  auf `games` in dieser Komponente hat diesen Prop nie aktualisiert. Jetzt merged ein lokaler
+  `gameOverride`-State (`g = { ...game, ...gameOverride }`) die selbst geschriebenen Felder
+  sofort optimistisch rein, betrifft Treffpunkt UND Veröffentlichen-Status gleichermaßen. (3)
+  **Bugfix Kader veröffentlichen/zurücknehmen:** der einzelne Knopf hat bisher `squad_published`
+  einfach umgeschaltet — ein Klick auf „Kader aktualisieren" (während bereits veröffentlicht)
+  hat den Kader dadurch versehentlich wieder zurückgenommen, obwohl die Beschriftung nach einer
+  harmlosen Bestätigung aussah. Jetzt zwei getrennte Aktionen: der primäre Knopf
+  veröffentlicht immer (`Kader veröffentlichen`/`Kader aktualisieren` je nach Status, beides
+  schreibt `squad_published: true`), eine zweite, sekundär gestylte Schaltfläche „Kader
+  zurücknehmen (nicht veröffentlicht)" erscheint nur nach dem Veröffentlichen und schreibt
+  explizit `false`.
 
 ## Projektstruktur
 

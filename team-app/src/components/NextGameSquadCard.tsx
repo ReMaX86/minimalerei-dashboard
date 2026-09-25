@@ -154,8 +154,17 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
   const [rideSeats, setRideSeats] = useState(3);
   const [rideNote, setRideNote] = useState('');
   const [ridesBusyKey, setRidesBusyKey] = useState<string | null>(null);
+  const [kaderOpen, setKaderOpen] = useState(false);
 
-  const showCarpool = flags.carpool && !game.is_home && role !== 'viewer';
+  // `game` kommt als Prop vom Elternteil (Spiele.tsx/SpielplanTabelle.tsx)
+  // und wird dort nur einmal geladen — schreiben wir selbst in die
+  // games-Zeile (Treffpunkt, Veröffentlichen), bliebe die Anzeige sonst auf
+  // dem alten Stand, bis die Elternseite neu lädt. gameOverride merged die
+  // Felder, die wir hier selbst ändern, lokal optimistisch rein.
+  const [gameOverride, setGameOverride] = useState<Partial<Game>>({});
+  const g: Game = { ...game, ...gameOverride };
+
+  const showCarpool = flags.carpool && !g.is_home && role !== 'viewer';
 
   const load = useCallback(async () => {
     setError(null);
@@ -191,11 +200,11 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
 
   useEffect(() => {
     setMeetingForm({
-      meeting_time_hall: game.meeting_time_hall?.slice(0, 5) ?? '',
-      meeting_time_carpool: game.meeting_time_carpool?.slice(0, 5) ?? '',
-      meeting_point_carpool: game.meeting_point_carpool ?? ''
+      meeting_time_hall: g.meeting_time_hall?.slice(0, 5) ?? '',
+      meeting_time_carpool: g.meeting_time_carpool?.slice(0, 5) ?? '',
+      meeting_point_carpool: g.meeting_point_carpool ?? ''
     });
-  }, [game.id, game.meeting_time_hall, game.meeting_time_carpool, game.meeting_point_carpool]);
+  }, [g.id, g.meeting_time_hall, g.meeting_time_carpool, g.meeting_point_carpool]);
 
   useEffect(() => {
     if (searchParams.get('kader') !== '1') return;
@@ -207,9 +216,9 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
   // ein-/ausklappbar, daher gilt eine offene Absage-Meldung als gesehen,
   // sobald der Trainer diese Karte einmal sieht.
   useEffect(() => {
-    if (!isAdmin || !game.squad_decline_pending) return;
-    supabase.from('games').update({ squad_decline_pending: false }).eq('id', game.id);
-  }, [isAdmin, game.id, game.squad_decline_pending]);
+    if (!isAdmin || !g.squad_decline_pending) return;
+    supabase.from('games').update({ squad_decline_pending: false }).eq('id', g.id);
+  }, [isAdmin, g.id, g.squad_decline_pending]);
 
   if (error) return <p className="card text-sm text-to-dangerText">{error}</p>;
   if (!state) return <div className="card h-[260px] animate-pulse !p-0" />;
@@ -229,7 +238,7 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
     .map((s) => playersById[s.player_id]?.name)
     .filter((n): n is string => !!n);
 
-  const points = meetingPoints(game);
+  const points = meetingPoints(g);
   const isPlayerOnly = role === 'player' && !isAdmin;
 
   async function toggle(playerId: string) {
@@ -276,15 +285,14 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
     setSavingMeeting(true);
     setError(null);
     try {
-      const { error: updError } = await supabase
-        .from('games')
-        .update({
-          meeting_time_hall: meetingForm.meeting_time_hall || null,
-          meeting_time_carpool: game.is_home ? null : meetingForm.meeting_time_carpool || null,
-          meeting_point_carpool: game.is_home ? null : meetingForm.meeting_point_carpool.trim() || null
-        })
-        .eq('id', game.id);
+      const update = {
+        meeting_time_hall: meetingForm.meeting_time_hall || null,
+        meeting_time_carpool: g.is_home ? null : meetingForm.meeting_time_carpool || null,
+        meeting_point_carpool: g.is_home ? null : meetingForm.meeting_point_carpool.trim() || null
+      };
+      const { error: updError } = await supabase.from('games').update(update).eq('id', g.id);
       if (updError) throw updError;
+      setGameOverride((prev) => ({ ...prev, ...update }));
       setMeetingSheetOpen(false);
       await load();
     } catch {
@@ -294,15 +302,18 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
     }
   }
 
-  async function togglePublish() {
+  // Ein einziger Toggle-Knopf für "veröffentlichen" und "zurücknehmen" hätte
+  // aus Versehen den Kader unpublizieren können, wenn man ihn nach dem
+  // Veröffentlichen erneut antippt (Beschriftung "Kader aktualisieren" sah
+  // nach einer harmlosen Bestätigung aus, toggelte aber tatsächlich um) —
+  // deshalb jetzt zwei getrennte, eindeutige Aktionen.
+  async function setSquadPublished(published: boolean) {
     setPublishing(true);
     setError(null);
     try {
-      const { error: updError } = await supabase
-        .from('games')
-        .update({ squad_published: !game.squad_published })
-        .eq('id', game.id);
+      const { error: updError } = await supabase.from('games').update({ squad_published: published }).eq('id', g.id);
       if (updError) throw updError;
+      setGameOverride((prev) => ({ ...prev, squad_published: published }));
       await load();
     } catch {
       setError('Status konnte nicht geändert werden.');
@@ -424,33 +435,33 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
           <span className="to-label">{label}</span>
           <span
             className={`to-data inline-flex h-6 shrink-0 items-center gap-1.5 rounded-to-pill px-2.5 text-[10px] font-semibold ${
-              game.squad_published ? 'bg-to-accentSoft text-to-accent' : 'bg-to-dangerSoft text-to-dangerText'
+              g.squad_published ? 'bg-to-accentSoft text-to-accent' : 'bg-to-dangerSoft text-to-dangerText'
             }`}
           >
             <span className="h-1.5 w-1.5 rounded-full bg-current" />
-            {game.squad_published ? 'KADER STEHT' : 'KADER AUSSTEHEND'}
+            {g.squad_published ? 'KADER STEHT' : 'KADER AUSSTEHEND'}
           </span>
         </div>
 
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-1.5">
-            <p className="to-display-lg truncate text-to-text">{game.opponent}</p>
+            <p className="to-display-lg truncate text-to-text">{g.opponent}</p>
             <p className="to-data text-[13px] text-to-text2">
-              {fmtDateBadge(game.game_date)} · {fmtTime(game.game_time)} UHR
+              {fmtDateBadge(g.game_date)} · {fmtTime(g.game_time)} UHR
             </p>
           </div>
           <span
             className={`to-data inline-flex h-6 shrink-0 items-center rounded-to-sm px-2.5 text-[10px] font-semibold ${
-              game.is_home ? 'bg-to-accentSoft text-to-accent' : 'bg-to-surface2 text-to-text2'
+              g.is_home ? 'bg-to-accentSoft text-to-accent' : 'bg-to-surface2 text-to-text2'
             }`}
           >
-            {game.is_home ? 'HEIM' : 'AUSWÄRTS'}
+            {g.is_home ? 'HEIM' : 'AUSWÄRTS'}
           </span>
         </div>
 
-        <a href={mapsUrl(game.location)} target="_blank" rel="noopener noreferrer" className="flex min-h-10 items-center gap-3">
+        <a href={mapsUrl(g.location)} target="_blank" rel="noopener noreferrer" className="flex min-h-10 items-center gap-3">
           <PinIcon />
-          <span className="flex-1 truncate text-[15px] text-to-text">{game.location}</span>
+          <span className="flex-1 truncate text-[15px] text-to-text">{g.location}</span>
           <span className="inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-to-accent">
             Route
             <RouteIcon />
@@ -493,16 +504,22 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
         )}
       </div>
 
-      {/* Kaderblock — Trainer */}
+      {/* Kaderblock — Trainer, standardmäßig eingeklappt (nur die
+          Kurzübersicht + Warnhinweise sind auf Anhieb sichtbar) */}
       {isAdmin && (
         <div className="flex flex-col gap-3 border-t border-to-divider bg-to-surface2 px-5 pb-5 pt-4">
-          <div className="flex items-baseline justify-between gap-2.5">
-            <span className="to-label">KADER</span>
+          <button
+            type="button"
+            onClick={() => setKaderOpen((v) => !v)}
+            className="flex items-baseline justify-between gap-2.5"
+          >
+            <span className="to-label flex-1 text-left">KADER</span>
             <span className="to-number text-[20px] leading-none text-to-accent">
               {selectedCount}
               <span className="text-to-textDisabled">/{MAX_SQUAD_SIZE}</span>
             </span>
-          </div>
+            <ChevronDownIcon open={kaderOpen} />
+          </button>
           <div className="to-segment-track">
             {Array.from({ length: MAX_SQUAD_SIZE }).map((_, i) => (
               <span key={i} className={`to-segment ${i < selectedCount ? 'to-segment-filled' : ''}`} />
@@ -515,76 +532,78 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
               <span>Kader ist voll. Zum Tauschen erst einen Haken entfernen.</span>
             </div>
           )}
-          {game.squad_published && declinedNames.length > 0 && (
+          {g.squad_published && declinedNames.length > 0 && (
             <div className="flex items-center gap-2.5 rounded-to-lg bg-to-dangerSoft px-3.5 py-3 text-[13px] text-to-dangerText">
               <WarnIcon />
               <span>{declinedNames.join(', ')} {declinedNames.length === 1 ? 'hat' : 'haben'} abgesagt – du kannst jemanden nachnominieren.</span>
             </div>
           )}
 
-          <ul className="flex flex-col">
-            {visiblePlayers.map((p) => {
-              const row = squadByPlayer[p.id];
-              const selected = !!row?.is_selected;
-              const absence = absenceByPlayer[p.id];
-              const blocked = !selected && !!absence;
-              const locked = !selected && atCap;
-              const status = statusFor(row, game.squad_published, absence);
-              const isMe = player?.id === p.id;
-              return (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    disabled={blocked || locked || togglingId === p.id}
-                    aria-disabled={blocked}
-                    onClick={() => toggle(p.id)}
-                    className="flex min-h-[52px] w-full items-center gap-2.5 text-left disabled:cursor-not-allowed"
-                  >
-                    <span className="to-data flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-to-surface text-[11px] text-to-text2">
-                      {initialsOf(p.name)}
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className={`truncate text-[15px] font-semibold -tracking-[0.01em] ${blocked ? 'text-to-text3' : 'text-to-text'}`}>
-                        {p.name}
-                        {isMe && ' (Du)'}
-                      </span>
-                      <span className={`to-data text-[10px] tracking-[0.08em] ${TONE_CLASS[status.tone]}`}>{status.text}</span>
-                    </span>
-                    <span
-                      className={`flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border-[1.5px] ${
-                        selected ? 'border-to-accent bg-to-accent' : 'border-to-line bg-transparent'
-                      } ${blocked || locked ? 'opacity-45' : ''}`}
+          {kaderOpen && (
+            <ul className="flex flex-col">
+              {visiblePlayers.map((p) => {
+                const row = squadByPlayer[p.id];
+                const selected = !!row?.is_selected;
+                const absence = absenceByPlayer[p.id];
+                const blocked = !selected && !!absence;
+                const locked = !selected && atCap;
+                const status = statusFor(row, g.squad_published, absence);
+                const isMe = player?.id === p.id;
+                return (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      disabled={blocked || locked || togglingId === p.id}
+                      aria-disabled={blocked}
+                      onClick={() => toggle(p.id)}
+                      className="flex min-h-[52px] w-full items-center gap-2.5 text-left disabled:cursor-not-allowed"
                     >
-                      {selected && <CheckIcon className="text-to-onAccent" />}
-                    </span>
-                  </button>
-                  {isMe && selected && myConfirmation === 'pending' && (
-                    <div className="mb-2 flex items-center gap-2 pl-[44px]">
-                      <span className="text-xs text-to-text3">Kannst du selbst?</span>
-                      <button
-                        type="button"
-                        disabled={responding}
-                        onClick={() => respond(true)}
-                        className="pill pill-ok disabled:opacity-40"
+                      <span className="to-data flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-to-surface text-[11px] text-to-text2">
+                        {initialsOf(p.name)}
+                      </span>
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className={`truncate text-[15px] font-semibold -tracking-[0.01em] ${blocked ? 'text-to-text3' : 'text-to-text'}`}>
+                          {p.name}
+                          {isMe && ' (Du)'}
+                        </span>
+                        <span className={`to-data text-[10px] tracking-[0.08em] ${TONE_CLASS[status.tone]}`}>{status.text}</span>
+                      </span>
+                      <span
+                        className={`flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border-[1.5px] ${
+                          selected ? 'border-to-accent bg-to-accent' : 'border-to-line bg-transparent'
+                        } ${blocked || locked ? 'opacity-45' : ''}`}
                       >
-                        ✓ Kann
-                      </button>
-                      <button
-                        type="button"
-                        disabled={responding}
-                        onClick={() => respond(false)}
-                        className="pill pill-open disabled:opacity-40"
-                      >
-                        ✗ Kann nicht
-                      </button>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                        {selected && <CheckIcon className="text-to-onAccent" />}
+                      </span>
+                    </button>
+                    {isMe && selected && myConfirmation === 'pending' && (
+                      <div className="mb-2 flex items-center gap-2 pl-[44px]">
+                        <span className="text-xs text-to-text3">Kannst du selbst?</span>
+                        <button
+                          type="button"
+                          disabled={responding}
+                          onClick={() => respond(true)}
+                          className="pill pill-ok disabled:opacity-40"
+                        >
+                          ✓ Kann
+                        </button>
+                        <button
+                          type="button"
+                          disabled={responding}
+                          onClick={() => respond(false)}
+                          className="pill pill-open disabled:opacity-40"
+                        >
+                          ✗ Kann nicht
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
-          {hiddenCount > 0 && !squadExpanded && (
+          {kaderOpen && hiddenCount > 0 && !squadExpanded && (
             <button
               type="button"
               className="flex min-h-10 items-center gap-2 text-[13px] text-to-text2"
@@ -595,9 +614,28 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
             </button>
           )}
 
-          <button type="button" onClick={togglePublish} disabled={publishing} className="btn-primary !h-[52px] w-full text-[15px]">
-            {publishing ? 'Speichere…' : game.squad_published ? 'Kader aktualisieren' : 'Kader veröffentlichen'}
-          </button>
+          {kaderOpen && (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => setSquadPublished(true)}
+                disabled={publishing}
+                className="btn-primary !h-[52px] w-full text-[15px]"
+              >
+                {publishing ? 'Speichere…' : g.squad_published ? 'Kader aktualisieren' : 'Kader veröffentlichen'}
+              </button>
+              {g.squad_published && (
+                <button
+                  type="button"
+                  onClick={() => setSquadPublished(false)}
+                  disabled={publishing}
+                  className="h-11 w-full rounded-to-pill border border-to-dangerFrame text-[13px] font-semibold text-to-dangerText disabled:opacity-40"
+                >
+                  Kader zurücknehmen (nicht veröffentlicht)
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -605,10 +643,10 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
       {isPlayerOnly && (
         <div
           className={`flex flex-col gap-3 border-t border-to-divider px-5 pb-5 pt-4 ${
-            game.squad_published && nomination === 'in' ? 'bg-to-accentWash' : 'bg-to-surface2'
+            g.squad_published && nomination === 'in' ? 'bg-to-accentWash' : 'bg-to-surface2'
           }`}
         >
-          {!game.squad_published ? (
+          {!g.squad_published ? (
             <>
               <span className="to-label">KADER</span>
               <span className="text-[15px] text-to-text2">Der Kader für dieses Spiel steht noch nicht.</span>
@@ -660,7 +698,7 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
       )}
 
       {/* Kader ansehen — Spieler */}
-      {isPlayerOnly && game.squad_published && (
+      {isPlayerOnly && g.squad_published && (
         <>
           <button
             type="button"
@@ -822,7 +860,7 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
 
       {meetingSheetOpen && (
         <MeetingSheet
-          isHome={game.is_home}
+          isHome={g.is_home}
           value={meetingForm}
           onChange={setMeetingForm}
           busy={savingMeeting}
