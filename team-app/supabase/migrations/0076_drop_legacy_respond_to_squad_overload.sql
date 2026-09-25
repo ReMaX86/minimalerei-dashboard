@@ -1,0 +1,12 @@
+-- respond_to_squad() existiert seit Migration 0030 als (uuid, boolean).
+-- Migration 0060 fügte für den optionalen Absage-Grund einen zweiten,
+-- vierparametrigen Overload hinzu (create or replace ersetzt nur bei
+-- identischer Parameterliste) — der alte Zwei-Parameter-Overload blieb
+-- seither ungenutzt liegen und driftete auseinander: 0064/0075 haben nur
+-- noch den Vier-Parameter-Overload gepflegt (is_selected-Verhalten bei
+-- Absage), der alte Overload hängt auf einem älteren Stand fest. Ein
+-- Aufruf mit genau den zwei Basisparametern (wie es der Client tut) kann
+-- grundsätzlich beide Signaturen treffen — nicht länger riskieren, welcher
+-- Overload tatsächlich greift: legacy entfernen, nur noch eine gepflegte
+-- Version.
+drop function if exists public.respond_to_squad(uuid, boolean);

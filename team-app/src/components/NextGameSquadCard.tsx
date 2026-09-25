@@ -119,18 +119,23 @@ const TONE_CLASS: Record<Tone, string> = {
   away: 'text-to-vacation'
 };
 
-function statusFor(
-  row: GameSquadRow | undefined,
-  published: boolean,
-  absence: PlayerAbsence | undefined
-): { text: string; tone: Tone } {
+// Fünf Zustände (auf Nutzerwunsch): abwesend schlägt alles andere (kann
+// gar nicht ausgewählt werden), abgesagt zeigt weiter rot auch nachdem der
+// Haken automatisch entfernt wurde (siehe respond_to_squad() Migration
+// 0075), zugesagt/wartet nur für tatsächlich Nominierte, alle übrigen sind
+// schlicht nicht im Kader — nicht dasselbe wie "keine Antwort", die können
+// ja gar nicht antworten, solange sie nicht nominiert sind.
+function statusFor(row: GameSquadRow | undefined, absence: PlayerAbsence | undefined): { text: string; tone: Tone } {
   if (absence) {
-    return { text: `URLAUB · ${fmtDateShort(absence.start_date)} – ${fmtDateShort(absence.end_date)}`, tone: 'away' };
+    return { text: `ABWESEND · ${fmtDateShort(absence.start_date)} – ${fmtDateShort(absence.end_date)}`, tone: 'away' };
   }
-  const confirmation = row?.confirmation ?? 'pending';
-  if (confirmation === 'confirmed') return { text: published ? 'ZUGESAGT' : 'KANN', tone: 'ok' };
-  if (confirmation === 'declined') return { text: published ? 'ABGESAGT' : 'KANN NICHT', tone: 'bad' };
-  return { text: 'KEINE ANTWORT', tone: 'idle' };
+  if (row?.confirmation === 'declined') {
+    return { text: 'ABGESAGT', tone: 'bad' };
+  }
+  if (row?.is_selected) {
+    return row.confirmation === 'confirmed' ? { text: 'ZUGESAGT', tone: 'ok' } : { text: 'WARTE AUF ZU-/ABSAGE', tone: 'idle' };
+  }
+  return { text: 'NICHT IM KADER', tone: 'idle' };
 }
 
 // `label` ist konfigurierbar, weil dieselbe Karte auch für ein beliebiges
@@ -155,6 +160,11 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
   const [rideNote, setRideNote] = useState('');
   const [ridesBusyKey, setRidesBusyKey] = useState<string | null>(null);
   const [kaderOpen, setKaderOpen] = useState(false);
+  // Wer zuletzt veröffentlicht war, damit "Kader aktualisieren" ausgegraut
+  // bleibt, solange sich an der Kader-Zusammensetzung seit der letzten
+  // Veröffentlichung nichts geändert hat (null = noch nie veröffentlicht,
+  // dann ist der Knopf als "Kader veröffentlichen" immer aktiv).
+  const [publishedSelection, setPublishedSelection] = useState<string[] | null>(null);
 
   // `game` kommt als Prop vom Elternteil (Spiele.tsx/SpielplanTabelle.tsx)
   // und wird dort nur einmal geladen — schreiben wir selbst in die
@@ -220,6 +230,15 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
     supabase.from('games').update({ squad_decline_pending: false }).eq('id', g.id);
   }, [isAdmin, g.id, g.squad_decline_pending]);
 
+  // Startwert für den "hat sich seit der letzten Veröffentlichung etwas
+  // geändert"-Vergleich: beim ersten Laden gilt die gerade geladene
+  // Kader-Zusammensetzung als der zuletzt veröffentlichte Stand, sofern das
+  // Spiel schon veröffentlicht ist.
+  useEffect(() => {
+    if (!state || publishedSelection !== null || !g.squad_published) return;
+    setPublishedSelection(state.squad.filter((s) => s.is_selected).map((s) => s.player_id));
+  }, [state, g.squad_published, publishedSelection]);
+
   if (error) return <p className="card text-sm text-to-dangerText">{error}</p>;
   if (!state) return <div className="card h-[260px] animate-pulse !p-0" />;
 
@@ -237,6 +256,15 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
     .filter((s) => s.confirmation === 'declined')
     .map((s) => playersById[s.player_id]?.name)
     .filter((n): n is string => !!n);
+
+  // "Kader aktualisieren" nur klickbar, wenn sich die Zusammensetzung seit
+  // der letzten Veröffentlichung tatsächlich geändert hat — reine
+  // Zu-/Absagen von Spielern ändern selectedIds nicht (außer eine Absage
+  // entfernt den Platz automatisch, siehe respond_to_squad()) und lösen
+  // deshalb bewusst kein "es gibt was zu aktualisieren" aus.
+  const publishedSelectionKey = publishedSelection ? [...publishedSelection].sort().join(',') : null;
+  const currentSelectionKey = [...selectedIds].sort().join(',');
+  const hasUnpublishedChanges = publishedSelectionKey === null || currentSelectionKey !== publishedSelectionKey;
 
   const points = meetingPoints(g);
   const isPlayerOnly = role === 'player' && !isAdmin;
@@ -314,6 +342,10 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
       const { error: updError } = await supabase.from('games').update({ squad_published: published }).eq('id', g.id);
       if (updError) throw updError;
       setGameOverride((prev) => ({ ...prev, squad_published: published }));
+      // Neuer Vergleichspunkt für "Kader aktualisieren": nach dem
+      // Veröffentlichen gilt die gerade aktuelle Auswahl als der neue
+      // veröffentlichte Stand, nach dem Zurücknehmen gibt es keinen mehr.
+      setPublishedSelection(published ? selectedIds : null);
       await load();
     } catch {
       setError('Status konnte nicht geändert werden.');
@@ -547,7 +579,7 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
                 const absence = absenceByPlayer[p.id];
                 const blocked = !selected && !!absence;
                 const locked = !selected && atCap;
-                const status = statusFor(row, g.squad_published, absence);
+                const status = statusFor(row, absence);
                 const isMe = player?.id === p.id;
                 return (
                   <li key={p.id}>
@@ -619,7 +651,7 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
               <button
                 type="button"
                 onClick={() => setSquadPublished(true)}
-                disabled={publishing}
+                disabled={publishing || (g.squad_published && !hasUnpublishedChanges)}
                 className="btn-primary !h-[52px] w-full text-[15px]"
               >
                 {publishing ? 'Speichere…' : g.squad_published ? 'Kader aktualisieren' : 'Kader veröffentlichen'}
@@ -736,7 +768,7 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
                 state.players
                   .filter((p) => squadByPlayer[p.id]?.is_selected)
                   .map((p) => {
-                    const status = statusFor(squadByPlayer[p.id], true, undefined);
+                    const status = statusFor(squadByPlayer[p.id], undefined);
                     const isMe = player?.id === p.id;
                     return (
                       <li key={p.id} className="flex items-center gap-2.5">

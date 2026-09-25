@@ -2706,6 +2706,33 @@ hier die getroffenen Entscheidungen samt Begründung:
   aufteilen und die Aktionsknöpfe entsprechend größer werden. Betrifft nur Zustand A
   (Tastenfeld); die Spielerauswahl (Zustand B) bleibt unverändert oben mit Leerraum darunter,
   wie in der Vorlage vorgesehen.
+- **`NextGameSquadCard.tsx` (Kader): fünf Status-Zustände statt "KEINE ANTWORT" für alle
+  Nicht-Nominierten, "Kader aktualisieren" nur bei tatsächlicher Änderung klickbar, Absage nimmt
+  wieder automatisch aus dem Kader.** `statusFor()` unterscheidet jetzt sauber: ZUGESAGT (grün,
+  nominiert + bestätigt), ABGESAGT (rot, `confirmation === 'declined'` — unabhängig vom
+  Nominierungsstatus, damit die Absage auch nach dem automatischen Entfernen sichtbar bleibt),
+  WARTE AUF ZU-/ABSAGE (nominiert, noch keine Antwort), ABWESEND · Zeitraum (Urlaub, schlägt
+  alles andere), NICHT IM KADER (grau, alle übrigen — vorher fälschlich "KEINE ANTWORT", obwohl
+  diese Spieler gar nicht gefragt wurden). Der `published`-Parameter (unterschiedliche Wortwahl
+  vor/nach Veröffentlichung) ist komplett entfallen, da nicht mehr angefragt.
+  **"Kader aktualisieren" ausgegraut ohne Änderung:** ein lokaler `publishedSelection`-Snapshot
+  (Spieler-IDs zum Zeitpunkt der letzten Veröffentlichung dieser Sitzung) wird mit den aktuell
+  ausgewählten IDs verglichen — nur bei einem Unterschied ist der Knopf aktiv. Reine
+  Zu-/Absagen ändern diesen Vergleich nicht (nichts an der veröffentlichten Zusammensetzung hat
+  sich geändert), eine automatische Entfernung durch Absage dagegen schon.
+  **Migration `0075`/`0076` (Absage entfernt wieder automatisch aus dem Kader):** Migration
+  0064 hatte das absichtlich abgeschaltet ("Trainer entfernt den Haken manuell"), auf
+  Nutzerwunsch jetzt zurückgenommen — `respond_to_squad()` setzt bei einer Absage wieder
+  `is_selected = false`. Dabei aufgefallen: es gab zwei Function-Overloads gleichen Namens
+  (2-Parameter aus Migration 0030, 4-Parameter seit Migration 0060 für den Absage-Grund) —
+  `create or replace function` ersetzt nur bei exakt gleicher Parameterliste, der alte
+  2-Parameter-Overload blieb seit 0060 ungepflegt liegen und hatte dadurch noch den
+  ursprünglichen (zufällig bereits "richtigen") Stand von 0030, während 0064/0075 nur den
+  gepflegten 4-Parameter-Overload trafen. Da der Client mit exakt den zwei Basisparametern
+  aufruft, war nicht mehr sicher nachvollziehbar, welcher Overload beim Aufruf tatsächlich
+  greift. Migration 0076 entfernt den alten Overload ganz, damit es nur noch eine gepflegte
+  Version gibt. Nur auf Staging angewendet — Produktion (`pvnhwzarjwhplrcdjbfr`) noch offen,
+  bitte vor dem nächsten Live-Release freigeben.
 
 ## Projektstruktur
 
