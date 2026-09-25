@@ -6,7 +6,7 @@ import { ErrorNote } from '../components/ErrorNote';
 import { useTipoffLoader } from '../hooks/useTipoffLoader';
 import { TrikotPickSheet, type PickOption } from '../components/TrikotPickSheet';
 import { fmtDateBadge, fmtDateShort, fmtTime, hasKickedOff } from '../lib/format';
-import { latestTransferFrom, pendingWasherFor } from '../lib/trikots';
+import { latestTransferFrom, pendingWasherFor, washCountsFor } from '../lib/trikots';
 import { washRotationOrder } from '../lib/rotation';
 import {
   benoetigterSatz,
@@ -18,6 +18,7 @@ import {
   type TrikotSet,
   type TrikotHandoverLogRow,
   type TrikotTransferLogRow,
+  type TrikotWashAdjustmentLogRow,
   type TrikotWashLogRow
 } from '../types/database';
 
@@ -38,6 +39,7 @@ interface State {
   sets: TrikotSet[];
   washLog: TrikotWashLogRow[];
   transferLog: TrikotTransferLogRow[];
+  adjustmentLog: TrikotWashAdjustmentLogRow[];
   handoverLog: TrikotHandoverLogRow[];
   askResolutions: TrikotAskResolutionRow[];
 }
@@ -140,13 +142,14 @@ export function Trikots() {
     setError(null);
     const today = new Date().toISOString().slice(0, 10);
 
-    const [gameRes, pastGameRes, playersRes, setsRes, washRes, transferRes, handoverRes, askRes] = await Promise.all([
+    const [gameRes, pastGameRes, playersRes, setsRes, washRes, transferRes, adjustmentRes, handoverRes, askRes] = await Promise.all([
       supabase.from('games').select('*').gte('game_date', today).order('game_date').order('game_time').limit(1).maybeSingle(),
       supabase.from('games').select('*').lt('game_date', today).order('game_date', { ascending: false }).order('game_time', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('players').select('*').eq('is_active', true),
       supabase.from('trikot_sets').select('*').order('id'),
       supabase.from('trikot_wash_log').select('*').order('created_at', { ascending: false }),
       supabase.from('trikot_transfer_log').select('*').order('created_at', { ascending: false }),
+      supabase.from('trikot_wash_adjustment_log').select('*').order('created_at', { ascending: false }),
       supabase.from('trikot_handover_log').select('*').order('created_at', { ascending: false }),
       supabase.from('trikot_ask_resolutions').select('*')
     ]);
@@ -158,6 +161,7 @@ export function Trikots() {
       setsRes.error ||
       washRes.error ||
       transferRes.error ||
+      adjustmentRes.error ||
       handoverRes.error ||
       askRes.error
     ) {
@@ -186,6 +190,7 @@ export function Trikots() {
       sets: (setsRes.data as TrikotSet[]) ?? [],
       washLog: (washRes.data as TrikotWashLogRow[]) ?? [],
       transferLog: (transferRes.data as TrikotTransferLogRow[]) ?? [],
+      adjustmentLog: (adjustmentRes.data as TrikotWashAdjustmentLogRow[]) ?? [],
       handoverLog: (handoverRes.data as TrikotHandoverLogRow[]) ?? [],
       askResolutions: (askRes.data as TrikotAskResolutionRow[]) ?? []
     });
@@ -203,22 +208,21 @@ export function Trikots() {
 
   const gameStarted = !!state.nextGame && hasKickedOff(state.nextGame.game_date, state.nextGame.game_time);
 
-  const washCount: Record<string, number> = {};
-  state.washLog.forEach((row) => {
-    washCount[row.player_id] = (washCount[row.player_id] ?? 0) + 1;
-  });
+  const washCount = washCountsFor(state.washLog, state.adjustmentLog);
 
   const neededSet = state.nextGame ? benoetigterSatz(state.nextGame) : null;
   const confirmedForGame = state.nextGame
     ? state.washLog.find((w) => w.game_id === state.nextGame!.id && w.set_id === neededSet) ?? null
     : null;
-  const suggestion = state.nextGame ? pendingWasherFor(state.nextGame, state.squad, state.players, state.washLog)?.player ?? null : null;
+  const suggestion = state.nextGame
+    ? pendingWasherFor(state.nextGame, state.squad, state.players, state.washLog, state.adjustmentLog)?.player ?? null
+    : null;
   const isMe = !!suggestion && player?.id === suggestion.id;
   const phase: 'before' | 'live' | 'done' = confirmedForGame ? 'done' : gameStarted && isMe ? 'live' : 'before';
 
   const pastNeededSet = state.pastGame ? benoetigterSatz(state.pastGame) : null;
   const pastSuggestion = state.pastGame
-    ? pendingWasherFor(state.pastGame, state.pastSquad, state.players, state.washLog)?.player ?? null
+    ? pendingWasherFor(state.pastGame, state.pastSquad, state.players, state.washLog, state.adjustmentLog)?.player ?? null
     : null;
   const canConfirmPast =
     !!pastSuggestion && (isAdmin || player?.id === pastSuggestion.id || player?.is_captain || player?.is_co_captain);
@@ -546,7 +550,8 @@ export function Trikots() {
       {(() => {
         type HistoryRow =
           | { kind: 'wash'; id: string; created_at: string; setId: TrikotSetId; playerId: string; gameId: string | null }
-          | { kind: 'transfer'; id: string; created_at: string; setId: TrikotSetId; fromId: string | null; toId: string | null };
+          | { kind: 'transfer'; id: string; created_at: string; setId: TrikotSetId; fromId: string | null; toId: string | null }
+          | { kind: 'adjustment'; id: string; created_at: string; playerId: string; delta: number; reason: string | null };
         const handoverByGameSet: Record<string, TrikotHandoverLogRow> = {};
         state.handoverLog.forEach((h) => {
           handoverByGameSet[`${h.game_id}:${h.set_id}`] = h;
@@ -557,6 +562,9 @@ export function Trikots() {
           ),
           ...state.transferLog.map(
             (t): HistoryRow => ({ kind: 'transfer', id: t.id, created_at: t.created_at, setId: t.set_id, fromId: t.from_player_id, toId: t.to_player_id })
+          ),
+          ...state.adjustmentLog.map(
+            (a): HistoryRow => ({ kind: 'adjustment', id: a.id, created_at: a.created_at, playerId: a.player_id, delta: a.delta, reason: a.reason })
           )
         ].sort((a, b) => b.created_at.localeCompare(a.created_at));
 
@@ -571,9 +579,7 @@ export function Trikots() {
             {shown.map((row) => {
               let name: string;
               let sub: string;
-              let kind: 'wash' | 'transfer';
               if (row.kind === 'wash') {
-                kind = 'wash';
                 name = playersById[row.playerId]?.name ?? '?';
                 const handover = row.gameId ? handoverByGameSet[`${row.gameId}:${row.setId}`] : undefined;
                 if (handover?.suggested_player_id && handover.suggested_player_id !== handover.confirmed_player_id) {
@@ -584,8 +590,7 @@ export function Trikots() {
                 } else {
                   sub = '';
                 }
-              } else {
-                kind = 'transfer';
+              } else if (row.kind === 'transfer') {
                 const fromLabel = row.fromId ? playersById[row.fromId]?.name ?? '?' : 'niemandem';
                 if (row.toId) {
                   name = playersById[row.toId]?.name ?? '?';
@@ -594,18 +599,25 @@ export function Trikots() {
                   name = 'In der Halle abgelegt';
                   sub = `von ${fromLabel} abgegeben · keine Wäsche`;
                 }
+              } else {
+                name = playersById[row.playerId]?.name ?? '?';
+                sub = row.reason ? `${row.delta > 0 ? '+' : ''}${row.delta} · ${row.reason}` : `${row.delta > 0 ? '+' : ''}${row.delta}`;
               }
               return (
                 <div key={`${row.kind}-${row.id}`} className="flex gap-3 border-t border-to-surface2 px-4 py-3 first:border-t-0">
-                  <KitSwatch setId={row.setId} size={16} />
+                  {row.kind === 'adjustment' ? (
+                    <span className="mt-0.5 h-4 w-4 shrink-0 rounded-full border border-to-line" />
+                  ) : (
+                    <KitSwatch setId={row.setId} size={16} />
+                  )}
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <div className="flex items-baseline gap-2">
                       <span
                         className={`to-data inline-flex h-[17px] shrink-0 items-center rounded-to-pill px-1.5 text-[8px] font-semibold ${
-                          kind === 'wash' ? 'bg-to-accentSoft text-to-accent' : 'bg-to-surface2 text-to-text3'
+                          row.kind === 'wash' ? 'bg-to-accentSoft text-to-accent' : 'bg-to-surface2 text-to-text3'
                         }`}
                       >
-                        {kind === 'wash' ? 'WÄSCHE' : 'ÜBERGABE'}
+                        {row.kind === 'wash' ? 'WÄSCHE' : row.kind === 'transfer' ? 'ÜBERGABE' : 'ANPASSUNG'}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-sm font-semibold -tracking-[0.01em] text-to-text">{name}</span>
                       <span className="to-data shrink-0 text-[11px] text-to-textDisabled">{fmtDateShort(row.created_at.slice(0, 10))}</span>

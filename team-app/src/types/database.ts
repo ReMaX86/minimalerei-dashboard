@@ -257,6 +257,18 @@ export interface TrikotTransferLogRow {
   created_at: string;
 }
 
+// Migration 0069 (Element 20 "Admin · Trikots") — manuelle Korrektur des
+// Waschzählers ("Zähler ändern" / "Stände übertragen"), unabhängig vom
+// game-gebundenen trikot_wash_log. Der tatsächliche Waschzähler eines
+// Spielers ist washLog.length + Summe(delta) über diese Tabelle.
+export interface TrikotWashAdjustmentLogRow {
+  id: string;
+  player_id: string;
+  delta: number;
+  reason: string | null;
+  created_at: string;
+}
+
 // Migration 0067 — hält fest, dass die "Bitte nachtragen"-Nachfrage zu
 // einem Spiel+Satz beantwortet wurde (Antwort "Nein", per
 // resolve_trikot_ask_no()). Trägt anders als eine bestätigte Übernahme

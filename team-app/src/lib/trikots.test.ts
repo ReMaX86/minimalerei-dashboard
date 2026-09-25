@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { latestTransferFrom, pendingWasherFor } from './trikots';
+import { latestTransferFrom, pendingWasherFor, washCountsFor } from './trikots';
 
 const players = [
   { id: 'p-anna', name: 'Anna' },
@@ -50,6 +50,32 @@ describe('pendingWasherFor', () => {
     const overriddenGame = { ...homeGame, trikot_override: 'schwarz' as const };
     const result = pendingWasherFor(overriddenGame, squadOf('p-anna'), players, []);
     expect(result?.setId).toBe('schwarz');
+  });
+
+  it('counts manual adjustments towards the rotation, not just real washes', () => {
+    const adjustmentLog = [{ player_id: 'p-ben', delta: 3 }];
+    const result = pendingWasherFor(homeGame, squadOf('p-anna', 'p-ben'), players, [], adjustmentLog);
+    expect(result?.player.name).toBe('Anna');
+  });
+});
+
+describe('washCountsFor', () => {
+  it('sums real washes and adjustment deltas per player', () => {
+    const washLog = [{ player_id: 'p-anna' }, { player_id: 'p-anna' }, { player_id: 'p-ben' }];
+    const adjustmentLog = [
+      { player_id: 'p-anna', delta: -1 },
+      { player_id: 'p-ben', delta: 2 }
+    ];
+    expect(washCountsFor(washLog, adjustmentLog)).toEqual({ 'p-anna': 1, 'p-ben': 3 });
+  });
+
+  it('works with no adjustments at all', () => {
+    const washLog = [{ player_id: 'p-anna' }];
+    expect(washCountsFor(washLog)).toEqual({ 'p-anna': 1 });
+  });
+
+  it('lets a player start purely from an adjustment with no real washes', () => {
+    expect(washCountsFor([], [{ player_id: 'p-anna', delta: 5 }])).toEqual({ 'p-anna': 5 });
   });
 });
 

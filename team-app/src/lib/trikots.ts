@@ -6,12 +6,34 @@ import {
   type Player,
   type TrikotSetId,
   type TrikotTransferLogRow,
+  type TrikotWashAdjustmentLogRow,
   type TrikotWashLogRow
 } from '../types/database';
 
 export interface PendingWasher {
   setId: TrikotSetId;
   player: Pick<Player, 'id' | 'name'>;
+}
+
+/**
+ * Der tatsächliche Waschzähler pro Spieler: echte Wäschen (trikot_wash_log,
+ * eine Zeile je Wäsche) plus manuelle Korrekturen (trikot_wash_adjustment_log,
+ * Migration 0069 — Element 20 "Admin · Trikots", ein Delta je Anpassung).
+ * Zentrale Stelle, damit Rotation (naechsterSpieler/washRotationOrder),
+ * Vorschlag (pendingWasherFor) und Anzeige überall denselben Stand sehen.
+ */
+export function washCountsFor(
+  washLog: Pick<TrikotWashLogRow, 'player_id'>[],
+  adjustmentLog: Pick<TrikotWashAdjustmentLogRow, 'player_id' | 'delta'>[] = []
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  washLog.forEach((w) => {
+    counts[w.player_id] = (counts[w.player_id] ?? 0) + 1;
+  });
+  adjustmentLog.forEach((a) => {
+    counts[a.player_id] = (counts[a.player_id] ?? 0) + a.delta;
+  });
+  return counts;
 }
 
 /**
@@ -24,17 +46,15 @@ export function pendingWasherFor(
   game: Pick<Game, 'id' | 'squad_published' | 'is_home' | 'trikot_override'>,
   squad: Pick<GameSquadRow, 'player_id' | 'is_selected'>[],
   players: Pick<Player, 'id' | 'name'>[],
-  washLog: Pick<TrikotWashLogRow, 'game_id' | 'set_id' | 'player_id'>[]
+  washLog: Pick<TrikotWashLogRow, 'game_id' | 'set_id' | 'player_id'>[],
+  adjustmentLog: Pick<TrikotWashAdjustmentLogRow, 'player_id' | 'delta'>[] = []
 ): PendingWasher | null {
   if (!game.squad_published) return null;
   const setId = benoetigterSatz(game);
   const alreadyConfirmed = washLog.some((w) => w.game_id === game.id && w.set_id === setId);
   if (alreadyConfirmed) return null;
 
-  const washCount: Record<string, number> = {};
-  washLog.forEach((w) => {
-    washCount[w.player_id] = (washCount[w.player_id] ?? 0) + 1;
-  });
+  const washCount = washCountsFor(washLog, adjustmentLog);
   const player = naechsterSpieler(game, players, squad, washCount);
   if (!player) return null;
   return { setId, player };

@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Admin · Trikots</title>
+<!--
+  REFERENZ-UMSETZUNG des Admin-Reiters „Trikots".
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=list      Hauptseite: Wo sind die Sätze + drei Einstiege (Standard)
+    ?state=counters  Waschzähler-Liste
+    ?state=edit      Blatt „Zähler ändern"
+    ?state=saved     direkt nach dem Speichern (Liste sortiert sich neu)
+    ?state=bulk      „Stände übertragen" – alle auf einmal
+    ?state=owner     „Besitz korrigieren"
+    ?state=picker    Auswahl, wer einen Satz gerade hat
+    ?state=reset     Rückfrage vor „Rotation zurücksetzen"
+  Die Seite ist echt klickbar: Zähler ändern, sortieren, Besitz setzen, zurück.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.10);
+  --to-danger-frame:#5A2027;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer}
+input{font-family:inherit;color:var(--to-text)}
+.wrap{width:390px;margin:0 auto;padding:22px 0 28px;display:flex;flex-direction:column;gap:14px}
+.pad{padding-left:20px;padding-right:20px}
+
+.tabswrap{position:relative}
+.tabs{display:flex;gap:6px;padding:2px 20px 8px;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;white-space:nowrap;display:inline-flex;align-items:center;height:34px;padding:0 14px;
+  border-radius:999px;background:var(--to-surface);border:1px solid var(--to-border);
+  color:var(--to-text-2);font-size:13px;font-weight:500}
+.tab[aria-current="page"]{background:var(--to-accent);border-color:var(--to-accent);
+  color:var(--to-on-accent);font-weight:600}
+.tabsfade{position:absolute;right:0;top:0;bottom:8px;width:44px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(10,12,15,0),var(--to-bg) 72%)}
+
+.sec{display:flex;align-items:center;gap:12px;padding-top:4px}
+.sec__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1;flex:1 1 auto}
+
+/* Sets */
+.sets{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.set{border-radius:20px;background:var(--to-surface);border:1px solid var(--to-border);
+  padding:14px;display:flex;flex-direction:column;gap:10px;text-align:left;width:100%}
+.set__top{display:flex;align-items:center;gap:9px}
+.swatch{width:26px;height:26px;flex:none;border-radius:9px;border:1px solid}
+.swatch--black{background:#0A0C0F;border-color:#3A414C}
+.swatch--white{background:#F2F4F7;border-color:#F2F4F7}
+.set__label{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--to-text-3);line-height:1.3}
+.set__main{display:flex;flex-direction:column;gap:3px}
+.set__name{font-size:15px;font-weight:600;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.set__name--hall{color:var(--to-text-2)}
+.set__since{font-family:'Geist Mono',monospace;font-size:9px;color:var(--to-text-4)}
+
+/* Einstiege */
+.panel{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.entry{display:flex;align-items:center;gap:12px;min-height:60px;padding:9px 16px;width:100%;
+  border:0;border-top:1px solid var(--to-surface-2);background:transparent;text-align:left}
+.entry:first-child{border-top:0}
+.entry__main{flex:1 1 auto;display:flex;flex-direction:column;gap:2px}
+.entry__label{font-size:14px;font-weight:500}
+.entry__label--danger{color:var(--to-danger-text)}
+.entry__sub{font-size:11px;color:var(--to-text-4)}
+.chev{flex:none}
+
+/* Zählerliste */
+.dhead{display:flex;align-items:center;gap:12px}
+.iconbtn{width:34px;height:34px;flex:none;border-radius:12px;background:var(--to-surface);
+  border:1px solid var(--to-border);display:grid;place-items:center}
+.dhead__title{flex:1 1 auto;font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;
+  font-style:italic;font-size:22px;letter-spacing:-.035em;line-height:1}
+.dhead__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+.dhead__meta{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;
+  font-family:inherit;font-weight:600}
+.btn--ghost{height:30px;padding:0 12px;border-radius:999px;background:transparent;
+  border-color:var(--to-line);color:var(--to-text-2);font-size:12px;flex:none}
+.note{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;
+  background:rgba(200,255,46,.06);border:1px solid var(--to-accent-frame)}
+.note span{flex:1 1 auto;font-size:12px;color:var(--to-text-2);line-height:1.5}
+.note b{color:var(--to-accent);font-weight:600}
+.prow{display:flex;align-items:center;gap:12px;min-height:54px;padding:8px 16px;width:100%;
+  border:0;border-top:1px solid var(--to-surface-2);background:transparent;text-align:left}
+.prow:first-child{border-top:0}
+.prow--next{background:rgba(200,255,46,.05)}
+.prow__name{flex:1 1 auto;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow--next .prow__name{color:var(--to-accent);font-weight:600}
+.count{display:inline-flex;align-items:center;justify-content:center;min-width:38px;height:26px;
+  padding:0 10px;border-radius:999px;background:var(--to-surface-2);color:var(--to-text-2);
+  font-family:'Geist Mono',monospace;font-size:11px;font-weight:600;flex:none}
+.count--zero{background:var(--to-accent-soft);color:var(--to-accent)}
+.hint{font-size:11px;color:var(--to-text-4);line-height:1.5}
+
+/* Bulk */
+.brow{display:flex;align-items:center;gap:12px;min-height:52px;padding:6px 16px;
+  border-top:1px solid var(--to-surface-2)}
+.brow:first-child{border-top:0}
+.brow__name{flex:1 1 auto;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.numfield{display:flex;align-items:center;height:36px;width:70px;padding:0 12px;border-radius:12px;
+  background:#0F1216;border:1px solid var(--to-line);flex:none}
+.numfield input{flex:1 1 auto;min-width:0;border:0;background:transparent;outline:none;
+  font-family:'Geist Mono',monospace;font-size:15px;font-weight:600}
+.numfield span{font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-4)}
+.savebar{display:flex;gap:8px;padding-top:4px}
+.btn--primary{flex:1 1 auto;height:48px;border-radius:999px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:15px}
+.btn--cancel{flex:0 0 auto;height:48px;padding:0 20px;border-radius:999px;background:transparent;
+  border-color:var(--to-line);color:var(--to-text-2);font-size:15px}
+
+/* Blatt */
+.scrim{position:fixed;inset:0;background:rgba(5,6,8,.74);display:flex;flex-direction:column;
+  justify-content:flex-end;z-index:20}
+.sheet{width:390px;margin:0 auto;background:var(--to-surface);border-top:1px solid var(--to-border);
+  border-radius:26px 26px 0 0;padding:12px 20px 22px;display:flex;flex-direction:column;gap:13px}
+.sheet--danger{border-top-color:var(--to-danger-frame)}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sheet--danger .sheet__title{color:var(--to-danger-text)}
+.sheet__sub{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.stepper{display:flex;align-items:center;justify-content:center;gap:18px;padding:16px 0;
+  border-radius:18px;background:var(--to-surface-3);border:1px solid var(--to-hairline)}
+.stepbtn{width:46px;height:46px;border-radius:14px;border:1px solid var(--to-line);
+  background:transparent;display:grid;place-items:center}
+.stepbtn--plus{border-color:var(--to-accent-frame);background:rgba(200,255,46,.10)}
+.stepval{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:82px}
+.stepval__num{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:40px;line-height:1}
+.stepval__num--changed{color:var(--to-accent)}
+.stepval__before{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--to-text-4)}
+.f{display:flex;flex-direction:column;gap:6px}
+.f__label{font-size:12px;color:var(--to-text-3)}
+.field{height:46px;padding:0 14px;border-radius:14px;background:#0F1216;border:1px solid var(--to-line);
+  font-size:15px;width:100%;outline:none}
+.field::placeholder{color:var(--to-text-4)}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:999px;
+  background:transparent;border:1px solid var(--to-line);color:var(--to-text-2);font-size:13px}
+.chip[aria-pressed="true"]{background:var(--to-accent-soft);border-color:var(--to-accent-frame);
+  color:var(--to-accent);font-weight:600}
+.picker{display:flex;flex-direction:column;border-radius:18px;background:#0F1216;
+  border:1px solid var(--to-hairline);overflow:hidden;max-height:300px;overflow-y:auto}
+.pick{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 14px;width:100%;border:0;
+  border-top:1px solid var(--to-surface-2);background:transparent;text-align:left}
+.pick:first-child{border-top:0}
+.pick[aria-pressed="true"]{background:rgba(200,255,46,.06)}
+.av{width:30px;height:30px;flex:none;border-radius:50%;background:var(--to-surface-2);
+  display:grid;place-items:center;font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-3)}
+.pick__name{flex:1 1 auto;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick[aria-pressed="true"] .pick__name{color:var(--to-accent);font-weight:600}
+.losslist{display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:16px;
+  background:rgba(255,90,103,.06);border:1px solid var(--to-danger-frame)}
+.lossitem{display:flex;align-items:flex-start;gap:9px;font-size:13px;color:var(--to-text-2);line-height:1.45}
+.lossitem b{color:var(--to-text);font-weight:600}
+.btn--danger{height:48px;border-radius:999px;background:var(--to-danger);color:#120507;font-size:15px;width:100%}
+.btn--wide{height:44px;border-radius:999px;background:transparent;border-color:var(--to-line);
+  color:var(--to-text-2);font-size:14px;width:100%}
+.btn--text{height:24px;border:0;background:transparent;color:var(--to-text-3);font-size:13px;
+  font-weight:400;width:100%}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ============ HAUPTSEITE ============ -->
+  <div id="vList" style="display:flex;flex-direction:column;gap:14px">
+    <div class="tabswrap">
+      <div class="tabs" id="tabs"></div>
+      <span class="tabsfade"></span>
+    </div>
+
+    <div class="sec pad"><span class="sec__title">Wo sind die Sätze</span></div>
+
+    <div class="sets pad" id="setTiles"></div>
+
+    <section class="panel" style="margin:6px 20px 0">
+      <button class="entry" type="button" id="toCounters">
+        <span class="entry__main">
+          <span class="entry__label">Waschzähler bearbeiten</span>
+          <span class="entry__sub">Einzeln korrigieren oder alle Stände übertragen</span>
+        </span>
+        <svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </button>
+      <button class="entry" type="button" id="toOwner">
+        <span class="entry__main">
+          <span class="entry__label">Besitz korrigieren</span>
+          <span class="entry__sub">Wer hat gerade welchen Satz</span>
+        </span>
+        <svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </button>
+      <button class="entry" type="button" id="toReset">
+        <span class="entry__main">
+          <span class="entry__label entry__label--danger">Rotation zurücksetzen</span>
+          <span class="entry__sub">Verlauf, Zähler und Besitz auf Anfang</span>
+        </span>
+        <svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </button>
+    </section>
+  </div>
+
+  <!-- ============ WASCHZÄHLER ============ -->
+  <div id="vCounters" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="cBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__title">Waschzähler</span>
+      <button class="btn btn--ghost" type="button" id="toBulk">Alle bearbeiten</button>
+    </div>
+
+    <div class="note">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#C8FF2E" style="stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none" aria-hidden="true"><path d="M12 8v5M12 16h.01"></path><circle cx="12" cy="12" r="9"></circle></svg>
+      <span>Nächster Vorschlag: <b id="nextName">Axel Flaujac</b></span>
+    </div>
+
+    <section class="panel" id="counterList"></section>
+    <span class="hint">Jede Änderung steht im Verlauf als „Zähler vom Trainer angepasst".</span>
+  </div>
+
+  <!-- ============ STÄNDE ÜBERTRAGEN ============ -->
+  <div id="vBulk" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="bBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__title">Stände übertragen</span>
+        <span class="dhead__meta">ALLE AUF EINMAL</span>
+      </span>
+    </div>
+    <span class="hint">Wenn ihr mitten in der Saison mit der App startet: Trag ein, wie oft jeder bisher
+      gewaschen hat. Die Rotation rechnet danach normal weiter.</span>
+
+    <section class="panel" id="bulkList"></section>
+
+    <div class="note">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#C8FF2E" style="stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none" aria-hidden="true"><path d="M12 8v5M12 16h.01"></path><circle cx="12" cy="12" r="9"></circle></svg>
+      <span>Danach ist <b id="bulkNext">Axel Flaujac</b> als Nächster dran.</span>
+    </div>
+
+    <div class="savebar">
+      <button class="btn btn--primary" type="button" id="bSave">Alle speichern</button>
+      <button class="btn btn--cancel" type="button" id="bCancel">Abbrechen</button>
+    </div>
+  </div>
+
+  <!-- ============ BESITZ KORRIGIEREN ============ -->
+  <div id="vOwner" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="oBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__title">Besitz korrigieren</span>
+        <span class="dhead__meta">ÄNDERT KEINEN WASCHZÄHLER</span>
+      </span>
+    </div>
+
+    <section class="panel" id="ownerList"></section>
+    <span class="hint">Nur wer den Satz gerade zu Hause oder dabei hat. Gewaschen hat weiterhin, wer ihn
+      mitgenommen hat – der Zähler bleibt unverändert.</span>
+  </div>
+
+</div>
+
+<!-- ============ BLATT: ZÄHLER ÄNDERN ============ -->
+<div class="scrim" id="editScrim" hidden>
+  <div class="sheet">
+    <span class="sheet__grip"></span>
+    <span class="sheet__title" id="eName">Peter Woznicki</span>
+    <span class="sheet__sub">WASCHZÄHLER ANPASSEN</span>
+
+    <div class="stepper">
+      <button class="stepbtn" type="button" id="eMinus" aria-label="Weniger">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#A3ABB8" id="eMinusIcon" style="stroke-width:2.6;stroke-linecap:round" aria-hidden="true"><path d="M6 12h12"></path></svg>
+      </button>
+      <span class="stepval">
+        <span class="stepval__num" id="eVal">3</span>
+        <span class="stepval__before" id="eBefore">VORHER 3×</span>
+      </span>
+      <button class="stepbtn stepbtn--plus" type="button" id="ePlus" aria-label="Mehr">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#C8FF2E" style="stroke-width:2.6;stroke-linecap:round" aria-hidden="true"><path d="M12 6v12M6 12h12"></path></svg>
+      </button>
+    </div>
+
+    <span class="f">
+      <span class="f__label">Grund (steht im Verlauf)</span>
+      <input class="field" id="eReason" placeholder="z. B. Stand aus der Vorsaison">
+    </span>
+    <div class="chips" id="eChips"></div>
+
+    <button class="btn btn--primary" type="button" id="eSave" style="width:100%">Speichern</button>
+    <button class="btn--text" type="button" id="eCancel">Abbrechen</button>
+  </div>
+</div>
+
+<!-- ============ BLATT: WER HAT DEN SATZ ============ -->
+<div class="scrim" id="pickScrim" hidden>
+  <div class="sheet">
+    <span class="sheet__grip"></span>
+    <span class="sheet__title">Wer hat den Satz?</span>
+    <span class="sheet__sub" id="pSub">SCHWARZ · AUSWÄRTS</span>
+    <span class="hint">Der Waschzähler ändert sich dadurch NICHT.</span>
+    <div class="picker" id="pList"></div>
+    <button class="btn btn--text" type="button" id="pCancel">Abbrechen</button>
+  </div>
+</div>
+
+<!-- ============ BLATT: ZURÜCKSETZEN ============ -->
+<div class="scrim" id="resetScrim" hidden>
+  <div class="sheet sheet--danger">
+    <span class="sheet__grip"></span>
+    <span class="sheet__title">Rotation zurücksetzen?</span>
+    <span class="sheet__sub">BETRIFFT DIE GANZE SAISON</span>
+    <div class="losslist">
+      <span class="lossitem">– <span>Der komplette <b>Verlauf</b> wird gelöscht.</span></span>
+      <span class="lossitem">– <span>Alle <b>Waschzähler</b> gehen auf 0 zurück.</span></span>
+      <span class="lossitem">– <span>Beide Sätze stehen wieder auf <b>„Niemand"</b>.</span></span>
+    </div>
+    <span class="hint">Gedacht für den Saisonwechsel – nicht mitten in der Saison. Einzelne Korrekturen
+      gehen über „Waschzähler bearbeiten".</span>
+    <button class="btn btn--danger" type="button" id="rYes">Ja, alles zurücksetzen</button>
+    <button class="btn--text" type="button" id="rNo">Abbrechen</button>
+  </div>
+</div>
+
+<script>
+var STATE = new URLSearchParams(location.search).get('state') || 'list';
+
+var TABS = ['Spieler','Spiele','Kampfgericht','Training','Trikots','Betrachter','Meldungen','Funktionen'];
+var REASONS = ['Stand aus der Vorsaison','Korrektur','Hat extra gewaschen'];
+
+var PLAYERS = [
+  ['Axel Flaujac', 0], ['Benaia Tesfamariam', 0], ['Daniel Tekeste', 1], ['Finn Weidemann', 0],
+  ['Gürkan Ertas', 1], ['Jens Mertens', 1], ['Marc Rewald', 2], ['Peter Woznicki', 3],
+  ['Sven Hasenpusch', 1]
+];
+
+var SETS = [
+  { key:'black', label:'SCHWARZ · AUSWÄRTS', owner:'Marc Rewald', since:'SEIT 22.09.' },
+  { key:'white', label:'WEISS · HEIM', owner:null, since:'ABGEGEBEN 20.09.' }
+];
+
+var view = 'list', edit = null, pickFor = null, showReset = false;
+
+if (STATE === 'counters') { view = 'counters'; }
+if (STATE === 'edit')     { view = 'counters'; edit = { name:'Peter Woznicki', base:3, val:3, reason:null }; }
+if (STATE === 'saved')    { view = 'counters'; setCount('Peter Woznicki', 0); }
+if (STATE === 'bulk')     { view = 'bulk'; }
+if (STATE === 'owner')    { view = 'owner'; }
+if (STATE === 'picker')   { view = 'owner'; pickFor = 0; }
+if (STATE === 'reset')    { showReset = true; }
+
+function setCount(name, v){
+  for (var i = 0; i < PLAYERS.length; i++){ if (PLAYERS[i][0] === name) PLAYERS[i][1] = v; }
+}
+function el(tag, cls, text){
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+function initials(n){ return n.split(' ').map(function(p){ return p.charAt(0); }).join('').slice(0,2).toUpperCase(); }
+function sorted(){
+  return PLAYERS.slice().sort(function(a, b){ return a[1] - b[1] || (a[0] < b[0] ? -1 : 1); });
+}
+var CHEV = '<svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>';
+var PEN = '<svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"></path></svg>';
+
+function renderTabs(){
+  var host = document.getElementById('tabs');
+  host.innerHTML = '';
+  TABS.forEach(function(t, i){
+    var b = el('button','tab', t);
+    b.type = 'button';
+    if (i === 4) b.setAttribute('aria-current','page');
+    host.appendChild(b);
+  });
+}
+
+function renderSets(){
+  var host = document.getElementById('setTiles');
+  host.innerHTML = '';
+  SETS.forEach(function(s){
+    var n = el('div','set');
+    var top = el('div','set__top');
+    top.appendChild(el('span','swatch swatch--' + s.key));
+    top.appendChild(el('span','set__label', s.label));
+    n.appendChild(top);
+    var m = el('span','set__main');
+    m.appendChild(el('span','set__name' + (s.owner ? '' : ' set__name--hall'), s.owner || 'In der Halle'));
+    m.appendChild(el('span','set__since', s.since));
+    n.appendChild(m);
+    host.appendChild(n);
+  });
+}
+
+function renderCounters(){
+  var rows = sorted();
+  document.getElementById('nextName').textContent = rows[0][0];
+  var host = document.getElementById('counterList');
+  host.innerHTML = '';
+  rows.forEach(function(r, i){
+    var b = el('button','prow' + (i === 0 ? ' prow--next' : ''));
+    b.type = 'button';
+    b.appendChild(el('span','prow__name', r[0]));
+    b.appendChild(el('span','count' + (r[1] === 0 ? ' count--zero' : ''), r[1] + '×'));
+    b.insertAdjacentHTML('beforeend', PEN);
+    b.onclick = function(){ edit = { name:r[0], base:r[1], val:r[1], reason:null }; render(); };
+    host.appendChild(b);
+  });
+}
+
+function renderBulk(){
+  var host = document.getElementById('bulkList');
+  host.innerHTML = '';
+  PLAYERS.slice().sort(function(a,b){ return a[0] < b[0] ? -1 : 1; }).forEach(function(p){
+    var row = el('div','brow');
+    row.appendChild(el('span','brow__name', p[0]));
+    var f = el('span','numfield');
+    var inp = document.createElement('input');
+    inp.value = String(p[1]);
+    inp.inputMode = 'numeric';
+    inp.onchange = function(){ setCount(p[0], Math.max(0, parseInt(inp.value, 10) || 0)); render(); };
+    f.appendChild(inp);
+    f.appendChild(el('span', null, '×'));
+    row.appendChild(f);
+    host.appendChild(row);
+  });
+  document.getElementById('bulkNext').textContent = sorted()[0][0];
+}
+
+function renderOwner(){
+  var host = document.getElementById('ownerList');
+  host.innerHTML = '';
+  SETS.forEach(function(s, i){
+    var b = el('button','entry');
+    b.type = 'button';
+    b.style.minHeight = '66px';
+    b.insertAdjacentHTML('afterbegin', '<span class="swatch swatch--' + s.key + '" style="width:34px;height:34px;border-radius:11px"></span>');
+    var m = el('span','entry__main');
+    m.appendChild(el('span','entry__label', s.owner || 'In der Halle'));
+    m.appendChild(el('span','entry__sub', s.label + ' · ' + s.since));
+    b.appendChild(m);
+    b.insertAdjacentHTML('beforeend', CHEV);
+    b.onclick = function(){ pickFor = i; render(); };
+    host.appendChild(b);
+  });
+}
+
+function renderEdit(){
+  var s = document.getElementById('editScrim');
+  s.hidden = !edit;
+  if (!edit) return;
+  document.getElementById('eName').textContent = edit.name;
+  var v = document.getElementById('eVal');
+  v.textContent = String(edit.val);
+  v.className = 'stepval__num' + (edit.val !== edit.base ? ' stepval__num--changed' : '');
+  document.getElementById('eBefore').textContent = 'VORHER ' + edit.base + '×';
+  document.getElementById('eMinusIcon').setAttribute('stroke', edit.val === 0 ? '#3A414C' : '#A3ABB8');
+  document.getElementById('eReason').value = edit.reason || '';
+  var host = document.getElementById('eChips');
+  host.innerHTML = '';
+  REASONS.forEach(function(r){
+    var b = el('button','chip', r);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', edit.reason === r ? 'true' : 'false');
+    b.onclick = function(){ edit.reason = (edit.reason === r ? null : r); render(); };
+    host.appendChild(b);
+  });
+}
+
+function renderPick(){
+  var s = document.getElementById('pickScrim');
+  s.hidden = (pickFor === null);
+  if (pickFor === null) return;
+  var set = SETS[pickFor];
+  document.getElementById('pSub').textContent = set.label;
+  var host = document.getElementById('pList');
+  host.innerHTML = '';
+  var hall = el('button','pick');
+  hall.type = 'button';
+  hall.setAttribute('aria-pressed', set.owner ? 'false' : 'true');
+  hall.insertAdjacentHTML('afterbegin','<span class="av">H</span>');
+  hall.appendChild(el('span','pick__name','In der Halle abgelegt'));
+  hall.onclick = function(){ set.owner = null; set.since = 'ABGEGEBEN HEUTE'; pickFor = null; render(); };
+  host.appendChild(hall);
+  PLAYERS.slice().sort(function(a,b){ return a[0] < b[0] ? -1 : 1; }).forEach(function(p){
+    var b = el('button','pick');
+    b.type = 'button';
+    b.setAttribute('aria-pressed', set.owner === p[0] ? 'true' : 'false');
+    b.appendChild(el('span','av', initials(p[0])));
+    b.appendChild(el('span','pick__name', p[0]));
+    b.onclick = function(){ set.owner = p[0]; set.since = 'SEIT HEUTE'; pickFor = null; render(); };
+    host.appendChild(b);
+  });
+}
+
+function render(){
+  [['vList','list'],['vCounters','counters'],['vBulk','bulk'],['vOwner','owner']].forEach(function(p){
+    var n = document.getElementById(p[0]);
+    var on = (view === p[1]);
+    n.hidden = !on;
+    n.style.display = on ? 'flex' : 'none';
+  });
+  if (view === 'list'){ renderSets(); }
+  if (view === 'counters') renderCounters();
+  if (view === 'bulk') renderBulk();
+  if (view === 'owner') renderOwner();
+  renderEdit();
+  renderPick();
+  document.getElementById('resetScrim').hidden = !showReset;
+}
+
+document.getElementById('toCounters').onclick = function(){ view = 'counters'; render(); };
+document.getElementById('toOwner').onclick = function(){ view = 'owner'; render(); };
+document.getElementById('toReset').onclick = function(){ showReset = true; render(); };
+document.getElementById('cBack').onclick = function(){ view = 'list'; render(); };
+document.getElementById('oBack').onclick = function(){ view = 'list'; render(); };
+document.getElementById('bBack').onclick = function(){ view = 'counters'; render(); };
+document.getElementById('bCancel').onclick = function(){ view = 'counters'; render(); };
+document.getElementById('bSave').onclick = function(){ view = 'counters'; render(); };
+document.getElementById('toBulk').onclick = function(){ view = 'bulk'; render(); };
+document.getElementById('eMinus').onclick = function(){ if (edit && edit.val > 0){ edit.val--; render(); } };
+document.getElementById('ePlus').onclick = function(){ if (edit){ edit.val++; render(); } };
+document.getElementById('eCancel').onclick = function(){ edit = null; render(); };
+document.getElementById('eSave').onclick = function(){ setCount(edit.name, edit.val); edit = null; render(); };
+document.getElementById('pCancel').onclick = function(){ pickFor = null; render(); };
+document.getElementById('rNo').onclick = function(){ showReset = false; render(); };
+document.getElementById('rYes').onclick = function(){
+  PLAYERS.forEach(function(p){ p[1] = 0; });
+  SETS.forEach(function(s){ s.owner = null; s.since = 'ZURÜCKGESETZT'; });
+  showReset = false;
+  render();
+};
+['editScrim','pickScrim','resetScrim'].forEach(function(id){
+  document.getElementById(id).onclick = function(e){
+    if (e.target !== this) return;
+    if (id === 'editScrim') edit = null;
+    if (id === 'pickScrim') pickFor = null;
+    if (id === 'resetScrim') showReset = false;
+    render();
+  };
+});
+
+renderTabs();
+render();
+</script>
+</body>
+</html>
