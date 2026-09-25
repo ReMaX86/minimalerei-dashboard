@@ -2696,6 +2696,16 @@ hier die getroffenen Entscheidungen samt Begründung:
   nur Layout/Anordnung betrifft, keine Logik oder Inhalte. Spielstand-Schriftgröße im Querformat
   (44px) ebenfalls unverändert gelassen, obwohl die Vorlage dort 34px zeigt — das war eine
   separate, explizite Nutzeranfrage kurz zuvor.
+  **Nachbesserung (echtes iPad):** `WideKeypad` füllte bisher nur seine intrinsische Höhe —
+  auf einem realen, hohen iPad-Bildschirm blieb dadurch sichtbar Leerraum zwischen „Auf dem
+  Feld" und der Bestätigungszeile stehen, obwohl die Vorlage-CSS (`minmax(56px,1fr)` je
+  Knopfzeile) genau das verhindern sollte, weil `1fr` nur *innerhalb* der eigenen Grid-Höhe
+  verteilt, die Grid-Höhe selbst aber am Inhalt hing statt an der verfügbaren Panelhöhe. Fix:
+  `WideKeypad` bekam `flex-1` (plus `min-h-0`, damit es auch schrumpfen kann) — es wächst jetzt
+  mit dem linken Panel mit, wodurch die eigenen `1fr`-Zeilen die komplette Resthöhe unter sich
+  aufteilen und die Aktionsknöpfe entsprechend größer werden. Betrifft nur Zustand A
+  (Tastenfeld); die Spielerauswahl (Zustand B) bleibt unverändert oben mit Leerraum darunter,
+  wie in der Vorlage vorgesehen.
 
 ## Projektstruktur
 

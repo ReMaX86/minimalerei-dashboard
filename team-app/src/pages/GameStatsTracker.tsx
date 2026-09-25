@@ -1111,7 +1111,7 @@ export function GameStatsTracker() {
 
   function WideKeypad() {
     return (
-      <div className="grid grid-cols-4 grid-rows-[auto_repeat(4,minmax(56px,1fr))_auto] gap-2.5">
+      <div className="grid min-h-0 flex-1 grid-cols-4 grid-rows-[auto_repeat(4,minmax(56px,1fr))_auto] gap-2.5">
         <span className="to-data col-span-4 pl-0.5 text-[9px] tracking-[0.1em] text-to-text3" style={{ gridRow: 1 }}>
           TB WÜLFRATH · WAS IST PASSIERT?
         </span>
