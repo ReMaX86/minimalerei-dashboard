@@ -456,11 +456,11 @@ export function PlayersAdmin() {
             <>
               <div className="flex items-center gap-3">
                 <span className="to-data text-[10px] tracking-[0.12em] text-to-textDisabled">INAKTIV · {inactiveFiltered.length}</span>
-                <span className="h-px flex-1 bg-to-hairline" />
+                <span className="h-px flex-1 bg-to-divider" />
               </div>
               <div className="flex flex-col overflow-hidden rounded-to-2xl border border-dashed border-to-line bg-to-bg opacity-[0.78]">
                 {inactiveFiltered.map((p) => (
-                  <div key={p.id} className="flex min-h-[52px] items-center gap-2.5 border-t border-to-surface3 px-3.5 py-2 first:border-t-0">
+                  <div key={p.id} className="flex min-h-[52px] items-center gap-2.5 border-t border-to-surface2 px-3.5 py-2 first:border-t-0">
                     <button
                       type="button"
                       onClick={() => {
@@ -527,7 +527,7 @@ export function PlayersAdmin() {
             </div>
           )}
 
-          <div className="flex items-center gap-3 rounded-to-lg border border-to-hairline bg-to-surface2 p-3.5">
+          <div className="flex items-center gap-3 rounded-to-lg border border-to-divider bg-to-surface2 p-3.5">
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="to-data text-[9px] tracking-[0.12em] text-to-text3">ANMELDECODE</span>
               <span className="to-data text-[18px] font-semibold tracking-[0.1em] text-to-text">{codes[selected.id]?.code ?? '…'}</span>
@@ -561,7 +561,7 @@ export function PlayersAdmin() {
 
           <div className="flex flex-col gap-2">
             <span className="to-data text-[9px] tracking-[0.12em] text-to-textDisabled">ROLLE IM TEAM</span>
-            <div className="flex gap-1 rounded-to-lg border border-to-hairline bg-to-surface3 p-1">
+            <div className="flex gap-1 rounded-to-lg border border-to-divider bg-to-surface2 p-1">
               {(['Spieler', 'Co-Captain', 'Captain'] as const).map((r) => {
                 const on = roleOf(selected) === r;
                 return (
@@ -579,7 +579,7 @@ export function PlayersAdmin() {
             </div>
           </div>
 
-          <div className="flex flex-col overflow-hidden rounded-to-lg border border-to-hairline bg-to-surface">
+          <div className="flex flex-col overflow-hidden rounded-to-lg border border-to-divider bg-to-surface">
             <SwitchRow
               label="Trainerrechte"
               sub="Sieht den Adminbereich und kann Kader veröffentlichen"
@@ -604,7 +604,7 @@ export function PlayersAdmin() {
           <button
             type="button"
             onClick={() => openProfile(selected)}
-            className="flex min-h-[56px] items-center gap-3 rounded-to-lg border border-to-hairline bg-to-surface px-3.5 text-left"
+            className="flex min-h-[56px] items-center gap-3 rounded-to-lg border border-to-divider bg-to-surface px-3.5 text-left"
           >
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="text-sm font-medium text-to-text">Profil bearbeiten</span>
@@ -656,7 +656,7 @@ export function PlayersAdmin() {
 
           <div className="flex flex-col gap-2">
             <span className="to-data text-[9px] tracking-[0.12em] text-to-textDisabled">PFLEGT AUCH DER SPIELER SELBST</span>
-            <div className="flex flex-col overflow-hidden rounded-to-lg border border-to-hairline bg-to-surface">
+            <div className="flex flex-col overflow-hidden rounded-to-lg border border-to-divider bg-to-surface">
               <label className="relative flex min-h-[54px] cursor-pointer items-center gap-3 px-3.5">
                 <span className="flex-1 text-sm text-to-text2">Größe</span>
                 <span className="to-data text-sm font-medium text-to-text">{fmtHeight(detailsForm.height_cm)}</span>

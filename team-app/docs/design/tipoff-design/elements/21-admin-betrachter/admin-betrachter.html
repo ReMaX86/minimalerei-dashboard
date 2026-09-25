@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Admin · Betrachter</title>
+<!--
+  REFERENZ-UMSETZUNG des Admin-Reiters „Betrachter".
+  Baugleich zum Reiter „Spieler" (Element 15) – nur ohne Rollen und ohne Profil.
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=list      Liste, Standard
+    ?state=copied    Code direkt aus der Liste kopiert
+    ?state=created   Blatt nach dem Anlegen: Code steht bereit
+    ?state=detail    Detailseite eines Betrachters
+    ?state=inactive  Detailseite eines deaktivierten Betrachters
+    ?state=empty     noch kein Betrachter angelegt
+  Die Seite ist echt klickbar: Zeile öffnen, Code kopieren, Schalter kippen, anlegen.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.10);
+  --to-danger-frame:#5A2027;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer}
+input{font-family:inherit;color:var(--to-text)}
+.wrap{width:390px;margin:0 auto;padding:22px 0 28px;display:flex;flex-direction:column;gap:14px}
+.pad{padding-left:20px;padding-right:20px}
+
+.tabswrap{position:relative}
+.tabs{display:flex;gap:6px;padding:2px 20px 8px;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;white-space:nowrap;display:inline-flex;align-items:center;height:34px;padding:0 14px;
+  border-radius:999px;background:var(--to-surface);border:1px solid var(--to-border);
+  color:var(--to-text-2);font-size:13px;font-weight:500}
+.tab[aria-current="page"]{background:var(--to-accent);border-color:var(--to-accent);
+  color:var(--to-on-accent);font-weight:600}
+.tabsfade{position:absolute;right:0;top:0;bottom:8px;width:44px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(10,12,15,0),var(--to-bg) 72%)}
+
+/* Rechte-Karte */
+.rights{border-radius:20px;background:var(--to-surface);border:1px solid var(--to-border);
+  padding:15px 16px;display:flex;flex-direction:column;gap:11px}
+.rights__lede{font-size:12px;color:var(--to-text-3);line-height:1.55}
+.rights__cols{display:flex;gap:14px}
+.rcol{flex:1 1 0;display:flex;flex-direction:column;gap:7px;min-width:0}
+.rcol__label{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em}
+.rcol--yes .rcol__label{color:var(--to-accent)}
+.rcol--no .rcol__label{color:var(--to-text-4)}
+.ritem{display:flex;align-items:center;gap:7px;font-size:12px}
+.rcol--yes .ritem{color:var(--to-text-2)}
+.rcol--no .ritem{color:var(--to-text-4)}
+.ritem svg{flex:none}
+
+/* Anlegen */
+.create{border-radius:20px;background:var(--to-surface);border:1px solid var(--to-border);
+  padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.create__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.create__row{display:flex;gap:8px}
+.field{flex:1 1 auto;min-width:0;height:44px;padding:0 14px;border-radius:14px;background:#0F1216;
+  border:1px solid var(--to-line);color:var(--to-text);font-size:14px;outline:none}
+.field::placeholder{color:var(--to-text-4)}
+.field:focus{border-color:var(--to-accent-frame)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;
+  font-family:inherit;font-weight:600}
+.btn--add{height:44px;padding:0 18px;border-radius:14px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:14px;flex:none}
+.hint{font-size:11px;color:var(--to-text-4);line-height:1.45}
+
+/* Liste */
+.sechead{display:flex;align-items:center;gap:12px;padding-top:2px}
+.sechead__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4)}
+.sechead__rule{flex:1 1 auto;height:1px;background:var(--to-hairline)}
+.panel{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.panel--off{background:#0F1216;border-style:dashed;opacity:.78}
+.row{display:flex;align-items:center;gap:10px;min-height:60px;padding:10px 14px;
+  border-top:1px solid var(--to-surface-2)}
+.row:first-child{border-top:0}
+.row__open{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:11px;border:0;
+  background:transparent;padding:0;text-align:left}
+.av{width:34px;height:34px;flex:none;border-radius:50%;background:var(--to-surface-2);
+  display:grid;place-items:center;font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-2)}
+.row__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px}
+.row__name{font-size:14px;font-weight:600;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;
+  border:1px solid var(--to-line);color:var(--to-text-4);
+  font-family:'Geist Mono',monospace;font-size:8px;font-weight:600;letter-spacing:.06em}
+.code{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 10px;border-radius:999px;
+  background:var(--to-surface-2);border:0;flex:none;
+  font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-2);letter-spacing:.04em}
+.code--done{background:rgba(200,255,46,.16);color:var(--to-accent)}
+.chev{flex:none}
+.panel--off .row{min-height:52px}
+.panel--off .row__name{font-size:13px;color:var(--to-text-3);font-weight:500}
+.btn--small{height:26px;padding:0 11px;border-radius:999px;border-color:var(--to-line);
+  background:transparent;color:var(--to-text-2);font-size:12px;flex:none}
+.empty{border-radius:20px;background:var(--to-surface);border:1px dashed var(--to-line);
+  padding:24px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.empty__title{font-size:14px;font-weight:600}
+.empty__sub{font-size:12px;color:var(--to-text-4);line-height:1.5}
+
+/* Detailseite */
+.dhead{display:flex;align-items:center;gap:12px}
+.iconbtn{width:34px;height:34px;flex:none;border-radius:12px;background:var(--to-surface);
+  border:1px solid var(--to-border);display:grid;place-items:center}
+.dhead__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+.dhead__name{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:22px;letter-spacing:-.035em;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dhead__meta{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.codecard{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;
+  background:var(--to-surface-3);border:1px solid var(--to-hairline)}
+.codecard__main{flex:1 1 auto;display:flex;flex-direction:column;gap:3px}
+.codecard__label{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-text-3)}
+.codecard__code{font-family:'Geist Mono',monospace;font-size:18px;font-weight:600;letter-spacing:.1em}
+.btn--copy{height:36px;padding:0 14px;border-radius:999px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:13px;flex:none}
+.btn--copy.is-done{background:rgba(200,255,46,.16);color:var(--to-accent)}
+.coderow{display:flex;align-items:center;gap:10px;padding:0 2px}
+.coderow__age{flex:1 1 auto;font-size:12px;color:var(--to-text-3)}
+.btn--link{border:0;background:transparent;font-size:13px;font-weight:600;color:var(--to-accent);padding:0}
+.switches{display:flex;flex-direction:column;border-radius:16px;background:var(--to-surface);
+  border:1px solid var(--to-hairline);overflow:hidden}
+.sw{display:flex;align-items:center;gap:12px;min-height:58px;padding:10px 14px;width:100%;
+  border:0;background:transparent;text-align:left}
+.sw__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.sw__label{font-size:14px;font-weight:500}
+.sw__sub{font-size:11px;color:var(--to-text-4);line-height:1.4}
+.track{width:44px;height:26px;flex:none;border-radius:999px;background:var(--to-surface-2);
+  border:1px solid var(--to-line);display:flex;align-items:center;justify-content:flex-start;padding:0 3px}
+.knob{width:18px;height:18px;border-radius:50%;background:var(--to-text-4)}
+.sw[aria-pressed="true"] .track{background:var(--to-accent);border-color:var(--to-accent);justify-content:flex-end}
+.sw[aria-pressed="true"] .knob{background:var(--to-on-accent)}
+.note{border-radius:16px;background:var(--to-danger-soft);border:1px solid var(--to-danger-frame);
+  padding:13px 15px;display:flex;flex-direction:column;gap:5px}
+.note__label{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-danger-text)}
+.note__text{font-size:12px;color:var(--to-text-2);line-height:1.5}
+
+/* Blatt */
+.scrim{position:fixed;inset:0;background:rgba(5,6,8,.74);display:flex;flex-direction:column;
+  justify-content:flex-end;z-index:20}
+.sheet{width:390px;margin:0 auto;background:var(--to-surface);border-top:1px solid var(--to-border);
+  border-radius:26px 26px 0 0;padding:12px 20px 22px;display:flex;flex-direction:column;gap:14px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sheet__sub{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.bigcode{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 16px;
+  border-radius:18px;background:var(--to-surface-3);border:1px solid var(--to-accent-frame)}
+.bigcode__label{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-text-3)}
+.bigcode__val{font-family:'Geist Mono',monospace;font-size:30px;font-weight:700;letter-spacing:.16em;
+  color:var(--to-accent)}
+.sheet__note{font-size:12px;color:var(--to-text-4);line-height:1.5;text-align:center}
+.btn--primary{height:46px;border-radius:999px;background:var(--to-accent);color:var(--to-on-accent);
+  font-size:15px;width:100%}
+.btn--text{height:24px;border:0;background:transparent;color:var(--to-text-3);font-size:13px;
+  font-weight:400;width:100%}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ============ LISTE ============ -->
+  <div id="vList" style="display:flex;flex-direction:column;gap:14px">
+
+    <div class="tabswrap">
+      <div class="tabs" id="tabs"></div>
+      <span class="tabsfade"></span>
+    </div>
+
+    <div class="rights pad" style="margin:0 20px;padding:15px 16px">
+      <span class="rights__lede">Betrachter schauen nur zu – z. B. ein Abteilungsleiter, der weder
+        Spieler noch Trainer ist.</span>
+      <div class="rights__cols">
+        <span class="rcol rcol--yes">
+          <span class="rcol__label">SIEHT</span>
+          <span class="ritem"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#C8FF2E" style="stroke-width:3;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M5 13l4 4L19 7"></path></svg>Spielplan</span>
+          <span class="ritem"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#C8FF2E" style="stroke-width:3;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M5 13l4 4L19 7"></path></svg>Tabelle</span>
+          <span class="ritem"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#C8FF2E" style="stroke-width:3;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M5 13l4 4L19 7"></path></svg>Kampfgericht</span>
+        </span>
+        <span class="rcol rcol--no">
+          <span class="rcol__label">SIEHT NICHT</span>
+          <span class="ritem"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#5B626D" style="stroke-width:2.6;stroke-linecap:round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>Kader</span>
+          <span class="ritem"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#5B626D" style="stroke-width:2.6;stroke-linecap:round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>Trikots</span>
+          <span class="ritem"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#5B626D" style="stroke-width:2.6;stroke-linecap:round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>Admin</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="create" style="margin:0 20px">
+      <span class="create__label">NEUEN BETRACHTER ANLEGEN</span>
+      <div class="create__row">
+        <input class="field" id="newName" placeholder="Name des Betrachters" autocomplete="off">
+        <button class="btn btn--add" id="addBtn" type="button">Anlegen</button>
+      </div>
+      <span class="hint">Der Anmeldecode wird sofort erzeugt und kann danach kopiert werden.</span>
+    </div>
+
+    <div class="sechead pad">
+      <span class="sechead__label" id="activeLabel">AKTIV · 2</span>
+      <span class="sechead__rule"></span>
+    </div>
+
+    <section class="panel" id="listActive" style="margin:0 20px"></section>
+    <div class="empty pad" id="emptyBox" style="margin:0 20px" hidden>
+      <span class="empty__title">Noch kein Betrachter</span>
+      <span class="empty__sub">Leg jemanden an, der Spielplan und Kampfgericht mitlesen soll, ohne
+        Spieler oder Trainer zu sein.</span>
+    </div>
+
+    <div class="sechead pad" id="offHead">
+      <span class="sechead__label" id="offLabel">INAKTIV · 1</span>
+      <span class="sechead__rule"></span>
+    </div>
+
+    <section class="panel panel--off" id="listOff" style="margin:0 20px"></section>
+  </div>
+
+  <!-- ============ DETAILSEITE ============ -->
+  <div id="vDetail" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="dBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__name" id="dName">Lutz Granderath</span>
+        <span class="dhead__meta" id="dMeta">BETRACHTER · AKTIV</span>
+      </span>
+      <span class="av" id="dAv">LG</span>
+    </div>
+
+    <div class="note" id="dNote" hidden>
+      <span class="note__label">DEAKTIVIERT</span>
+      <span class="note__text">Der Code funktioniert nicht mehr. Beim Aktivieren gilt derselbe Code
+        wieder – oder du erzeugst einen neuen.</span>
+    </div>
+
+    <div class="codecard">
+      <span class="codecard__main">
+        <span class="codecard__label">ANMELDECODE</span>
+        <span class="codecard__code" id="dCode">LUT61</span>
+      </span>
+      <button class="btn btn--copy" type="button" id="dCopy">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" style="stroke-width:2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path id="dCopyPath" d=""></path></svg>
+        <span id="dCopyLabel">Kopieren</span>
+      </button>
+    </div>
+    <div class="coderow">
+      <span class="coderow__age" id="dAge">Code wurde am 18.08. erzeugt</span>
+      <button class="btn--link" type="button" id="dNew">Neuen Code erzeugen</button>
+    </div>
+
+    <div class="switches">
+      <button class="sw" type="button" id="swActive" aria-pressed="true">
+        <span class="sw__main">
+          <span class="sw__label">Zugang aktiv</span>
+          <span class="sw__sub">Aus: der Code funktioniert nicht mehr, die Person bleibt in der Liste</span>
+        </span>
+        <span class="track"><span class="knob"></span></span>
+      </button>
+    </div>
+
+    <div class="rights">
+      <span class="create__label">WAS DIESE PERSON SIEHT</span>
+      <div class="rights__cols">
+        <span class="rcol rcol--yes">
+          <span class="rcol__label">SIEHT</span>
+          <span class="ritem"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#C8FF2E" style="stroke-width:3;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M5 13l4 4L19 7"></path></svg>Spielplan</span>
+          <span class="ritem"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#C8FF2E" style="stroke-width:3;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M5 13l4 4L19 7"></path></svg>Tabelle</span>
+          <span class="ritem"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#C8FF2E" style="stroke-width:3;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M5 13l4 4L19 7"></path></svg>Kampfgericht</span>
+        </span>
+        <span class="rcol rcol--no">
+          <span class="rcol__label">SIEHT NICHT</span>
+          <span class="ritem"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#5B626D" style="stroke-width:2.6;stroke-linecap:round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>Kader</span>
+          <span class="ritem"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#5B626D" style="stroke-width:2.6;stroke-linecap:round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>Trikots</span>
+          <span class="ritem"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#5B626D" style="stroke-width:2.6;stroke-linecap:round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>Admin</span>
+        </span>
+      </div>
+      <span class="hint">Feste Rechte – für Betrachter gibt es nichts einzustellen.</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============ BLATT NACH DEM ANLEGEN ============ -->
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet">
+    <span class="sheet__grip"></span>
+    <span class="sheet__title">Betrachter angelegt</span>
+    <span class="sheet__sub" id="cName">LUTZ GRANDERATH</span>
+    <div class="bigcode">
+      <span class="bigcode__label">ANMELDECODE</span>
+      <span class="bigcode__val" id="cCode">LUT61</span>
+    </div>
+    <span class="sheet__note">Schick den Code an die Person – damit meldet sie sich das erste Mal an.</span>
+    <button class="btn btn--primary" type="button" id="cCopy">Code kopieren</button>
+    <button class="btn--text" type="button" id="cClose">Fertig</button>
+  </div>
+</div>
+
+<script>
+var STATE = new URLSearchParams(location.search).get('state') || 'list';
+
+var TABS = ['Spieler','Spiele','Kampfgericht','Training','Trikots','Betrachter','Meldungen','Funktionen'];
+
+var VIEWERS = [
+  { ini:'LG', name:'Lutz Granderath', code:'LUT61', active:true,  age:'Code wurde am 18.08. erzeugt' },
+  { ini:'SB', name:'Sabine Kuhlmann', code:'SAB24', active:true,  age:'Code wurde am 02.09. erzeugt' },
+  { ini:'HW', name:'Horst Wieland',   code:'HOR07', active:false, age:'Code wurde am 11.05. erzeugt' }
+];
+
+var view = 'list', idx = 0, copiedRow = null, copiedDetail = false, noneYet = false;
+
+if (STATE === 'detail')   { view = 'detail'; idx = 0; }
+if (STATE === 'inactive') { view = 'detail'; idx = 2; }
+if (STATE === 'copied')   { copiedRow = 0; }
+if (STATE === 'empty')    { noneYet = true; }
+
+var COPY = 'M9 9h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2zM5 15V6a1 1 0 0 1 1-1h9';
+var CHECK = 'M5 13l4 4L19 7';
+
+function el(tag, cls, text){
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+function icon(path, stroke){
+  return '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="' + stroke +
+    '" style="stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="' +
+    path + '"></path></svg>';
+}
+var CHEV = '<svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>';
+
+function renderTabs(){
+  var host = document.getElementById('tabs');
+  host.innerHTML = '';
+  TABS.forEach(function(t, i){
+    var b = el('button','tab', t);
+    b.type = 'button';
+    if (i === 5) b.setAttribute('aria-current','page');
+    host.appendChild(b);
+  });
+}
+
+function renderList(){
+  var act = document.getElementById('listActive');
+  var off = document.getElementById('listOff');
+  act.innerHTML = ''; off.innerHTML = '';
+
+  var list = noneYet ? [] : VIEWERS;
+  list.forEach(function(v, i){
+    var row = el('div','row');
+    var open = el('button','row__open');
+    open.type = 'button';
+    open.appendChild(el('span','av', v.ini));
+    var main = el('span','row__main');
+    main.appendChild(el('span','row__name', v.name));
+    if (!v.active){
+      var tags = el('span', null);
+      tags.appendChild(el('span','tag','INAKTIV'));
+      main.appendChild(tags);
+    }
+    open.appendChild(main);
+    open.onclick = function(){ idx = i; view = 'detail'; copiedDetail = false; render(); };
+    row.appendChild(open);
+
+    if (v.active){
+      var done = (copiedRow === i);
+      var code = el('button','code' + (done ? ' code--done' : ''));
+      code.type = 'button';
+      code.appendChild(el('span', null, done ? 'KOPIERT' : v.code));
+      code.insertAdjacentHTML('beforeend', icon(done ? CHECK : COPY, '#C8FF2E'));
+      code.onclick = function(){ copiedRow = (copiedRow === i ? null : i); render(); };
+      row.appendChild(code);
+      row.insertAdjacentHTML('beforeend', CHEV);
+      act.appendChild(row);
+    } else {
+      var on = el('button','btn btn--small','Aktivieren');
+      on.type = 'button';
+      on.onclick = function(){ v.active = true; render(); };
+      row.appendChild(on);
+      off.appendChild(row);
+    }
+  });
+
+  var nActive = list.filter(function(v){ return v.active; }).length;
+  var nOff = list.length - nActive;
+  document.getElementById('activeLabel').textContent = 'AKTIV · ' + nActive;
+  document.getElementById('offLabel').textContent = 'INAKTIV · ' + nOff;
+  document.getElementById('emptyBox').hidden = (nActive > 0);
+  act.hidden = (nActive === 0);
+  document.getElementById('offHead').hidden = (nOff === 0);
+  off.hidden = (nOff === 0);
+}
+
+function renderDetail(){
+  var v = VIEWERS[idx];
+  document.getElementById('dName').textContent = v.name;
+  document.getElementById('dMeta').textContent = 'BETRACHTER · ' + (v.active ? 'AKTIV' : 'INAKTIV');
+  document.getElementById('dAv').textContent = v.ini;
+  document.getElementById('dNote').hidden = v.active;
+  document.getElementById('dCode').textContent = v.code;
+  document.getElementById('dAge').textContent = v.age;
+  var btn = document.getElementById('dCopy');
+  btn.classList.toggle('is-done', copiedDetail);
+  document.getElementById('dCopyPath').setAttribute('d', copiedDetail ? CHECK : COPY);
+  document.getElementById('dCopyLabel').textContent = copiedDetail ? 'Kopiert' : 'Kopieren';
+  document.getElementById('swActive').setAttribute('aria-pressed', v.active ? 'true' : 'false');
+}
+
+function render(){
+  var onList = (view === 'list');
+  document.getElementById('vList').hidden = !onList;
+  document.getElementById('vList').style.display = onList ? 'flex' : 'none';
+  document.getElementById('vDetail').hidden = onList;
+  document.getElementById('vDetail').style.display = onList ? 'none' : 'flex';
+  if (onList) renderList(); else renderDetail();
+  document.getElementById('scrim').hidden = (STATE !== 'created');
+}
+
+document.getElementById('dBack').onclick = function(){ view = 'list'; render(); };
+document.getElementById('dCopy').onclick = function(){ copiedDetail = !copiedDetail; render(); };
+document.getElementById('dNew').onclick = function(){
+  var v = VIEWERS[idx];
+  v.code = v.name.slice(0,3).toUpperCase().replace(/[^A-ZÄÖÜ]/g,'X') + (10 + Math.floor(Math.random()*89));
+  v.age = 'Code wurde heute erzeugt';
+  copiedDetail = false;
+  render();
+};
+document.getElementById('swActive').onclick = function(){
+  VIEWERS[idx].active = !VIEWERS[idx].active;
+  render();
+};
+document.getElementById('cClose').onclick = function(){ STATE = 'list'; render(); };
+document.getElementById('cCopy').onclick = function(){ document.getElementById('cCopy').textContent = 'Kopiert'; };
+document.getElementById('addBtn').onclick = function(){
+  var v = document.getElementById('newName').value.trim();
+  if (!v) return;
+  document.getElementById('cName').textContent = v.toUpperCase();
+  document.getElementById('cCode').textContent =
+    v.slice(0,3).toUpperCase().replace(/[^A-ZÄÖÜ]/g,'X') + (10 + Math.floor(Math.random()*89));
+  STATE = 'created';
+  render();
+};
+
+renderTabs();
+render();
+</script>
+</body>
+</html>
