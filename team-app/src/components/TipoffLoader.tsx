@@ -4,6 +4,21 @@
 // für alle Ladezustände in der App — ersetzt das bisherige to-mark-ring-pulse.
 export type TipoffLoaderSize = 'page' | 'card' | 'inline';
 
+// Volle Klassennamen als Literal, nicht per Template-String zusammengesetzt
+// (`tipoff-loader--${size}`): Tailwinds Content-Scan sucht nach exakten
+// String-Vorkommen in den Quelldateien, auch für handgeschriebene
+// @layer-components-Regeln — bei zusammengesetzten Strings findet er
+// "tipoff-loader--page" & Co. nirgends und wirft die zugehörigen CSS-Regeln
+// beim Production-Build komplett raus (kein Fehler, einfach lautlos weg).
+// Betraf bisher --page/--card/--inline: ohne Breiten/Höhen-Regel fiel die
+// Animation auf die SVG-Standardgröße des Browsers zurück, viel größer als
+// gedacht — das war vermutlich der eigentliche Grund für "zu groß".
+const SIZE_CLASS: Record<TipoffLoaderSize, string> = {
+  page: 'tipoff-loader--page',
+  card: 'tipoff-loader--card',
+  inline: 'tipoff-loader--inline'
+};
+
 interface TipoffLoaderProps {
   size?: TipoffLoaderSize;
   /** Mono-Zeile "LÄDT" darunter (nur für size="page" vorgesehen). */
@@ -16,7 +31,7 @@ interface TipoffLoaderProps {
 export function TipoffLoader({ size = 'page', label, hideFromScreenReaders, className }: TipoffLoaderProps) {
   const loader = (
     <span
-      className={`tipoff-loader tipoff-loader--${size}${className ? ` ${className}` : ''}`}
+      className={`tipoff-loader ${SIZE_CLASS[size]}${className ? ` ${className}` : ''}`}
       role={hideFromScreenReaders ? undefined : 'status'}
       aria-live={hideFromScreenReaders ? undefined : 'polite'}
       aria-label={hideFromScreenReaders ? undefined : 'Lädt'}

@@ -403,16 +403,16 @@
 
   /* Drei Größen */
   .tipoff-loader--page {
-    width: 64px;
-    height: 64px;
+    width: 32px;
+    height: 32px;
   }
   .tipoff-loader--card {
-    width: 40px;
-    height: 40px;
+    width: 20px;
+    height: 20px;
   }
   .tipoff-loader--inline {
-    width: 22px;
-    height: 22px;
+    width: 11px;
+    height: 11px;
   }
   /* Bei 22px sind die gebogenen Nähte Matsch: nur das Kreuz, dafür kräftiger,
      und ohne Schatten */
