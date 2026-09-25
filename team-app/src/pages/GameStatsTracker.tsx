@@ -794,12 +794,12 @@ export function GameStatsTracker() {
           <div className="flex items-end justify-center gap-2.5">
             <span className="flex flex-col items-end gap-0.5">
               <span className="to-data text-[9px] tracking-[0.1em] text-to-accent">TBW</span>
-              <span className="to-number text-[40px] leading-none text-to-text min-[900px]:text-[30px]">{teamScore.us}</span>
+              <span className="to-number text-[64px] leading-none text-to-text min-[900px]:text-[44px]">{teamScore.us}</span>
             </span>
-            <span className="to-number pb-1 text-lg text-to-textDisabled">:</span>
+            <span className="to-number pb-2 text-2xl text-to-textDisabled min-[900px]:pb-1 min-[900px]:text-xl">:</span>
             <span className="flex flex-col gap-0.5">
               <span className="to-data text-[9px] tracking-[0.1em] text-to-text3">{game?.opponent?.slice(0, 3).toUpperCase() ?? 'GEG'}</span>
-              <span className="to-number text-[40px] leading-none text-to-text2 min-[900px]:text-[30px]">{teamScore.opponent}</span>
+              <span className="to-number text-[64px] leading-none text-to-text2 min-[900px]:text-[44px]">{teamScore.opponent}</span>
             </span>
           </div>
           {/* Nur noch Anzeige, nicht mehr antippbar — Viertel wechseln geht
