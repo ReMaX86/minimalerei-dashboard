@@ -241,6 +241,10 @@ export interface Game {
   // geklickt wurde, aber noch kein Punkt erfasst ist (sonst wäre der
   // Reset ausgerechnet in genau diesem Fall unsichtbar).
   last_announced_quarter: number;
+  // Serverseitig geführtes "welches Viertel läuft gerade" (Migration 0074,
+  // Element 24) — überlebt damit einen Reload oder eine Übernahme des
+  // Trackings durch jemand anderen, siehe set_game_quarter()-RPC.
+  current_quarter: number;
   // Dedup-Marker für die "Spiel gestartet"-Push (Migration 0057) — null bis
   // zum ersten wurfrelevanten game_stat_events-Eintrag, danach der
   // Zeitpunkt, zu dem die Push verschickt wurde. Vom Client nirgends
@@ -482,7 +486,12 @@ export type StatType =
   | 'fg3_miss'
   | 'ft_made'
   | 'ft_miss'
+  // 'rebound' bleibt für schon erfasste, alte Events gültig — neue
+  // Erfassungen unterscheiden seit Element 24 DEF/OFF (siehe Migration
+  // 0074), zählen im Box-Score aber weiterhin gemeinsam als "Reb".
   | 'rebound'
+  | 'rebound_def'
+  | 'rebound_off'
   | 'assist'
   | 'steal'
   | 'block'
@@ -506,10 +515,12 @@ export const STAT_TYPE_LABELS: Record<StatType, string> = {
   ft_made: 'FW ✓',
   ft_miss: 'FW ✗',
   rebound: 'Rebound',
+  rebound_def: 'Reb DEF',
+  rebound_off: 'Reb OFF',
   assist: 'Assist',
   steal: 'Steal',
   block: 'Block',
-  turnover: 'Ballverlust',
+  turnover: 'Turnover',
   foul: 'Foul'
 };
 

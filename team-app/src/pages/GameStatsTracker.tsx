@@ -2,19 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Avatar } from '../components/Avatar';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { useScrollResetOnChange } from '../hooks/useScrollResetOnChange';
 import { useTipoffLoader } from '../hooks/useTipoffLoader';
 import {
   computeBoxScore,
-  computePlusMinus,
   computeQuarterScores,
   computeTeamScore,
-  computeTeamTotals,
-  fgPct,
-  fmtPlusMinus,
+  countPlayerFouls,
+  countTeamFouls,
   quarterLabel
 } from '../lib/gameStats';
 import { fmtDate, fmtTime, shortPlayerName } from '../lib/format';
@@ -30,34 +27,30 @@ import {
   type StatType
 } from '../types/database';
 
-const COURT_SIZE = 5;
+// Element 24 "Live-Tracking" — Vorlage: docs/design/tipoff-design/elements/
+// 24-tracking/tracking.html. Eine Datei, zwei Layouts (Handy-Stapel unter
+// 900px, Querformat mit drei Spalten ab 900px), per Media Query statt
+// zweier Routen — dieselben Unterkomponenten (Keypad/Bestätigung/
+// Spielerauswahl/Verlauf/Box-Score) werden in beiden Layouts wiederverwendet.
 
-const SCORING_BUTTONS: { made: StatType; miss: StatType; label: string }[] = [
-  { made: 'fg2_made', miss: 'fg2_miss', label: '2er' },
-  { made: 'fg3_made', miss: 'fg3_miss', label: '3er' },
-  { made: 'ft_made', miss: 'ft_miss', label: 'FW' }
+const COURT_SIZE = 5;
+const HEARTBEAT_MS = 15_000;
+
+const SHOT_BUTTONS: { made: StatType; miss: StatType; label: string; sub: string }[] = [
+  { made: 'fg2_made', miss: 'fg2_miss', label: '2er', sub: '2 PUNKTE' },
+  { made: 'fg3_made', miss: 'fg3_miss', label: '3er', sub: '3 PUNKTE' },
+  { made: 'ft_made', miss: 'ft_miss', label: 'FW', sub: '1 PUNKT' }
 ];
 
-const OTHER_STATS: StatType[] = ['rebound', 'assist', 'steal', 'block', 'turnover', 'foul'];
-
 // Für den Gegner wird laut Schema (Migration 0028) nur der Punktestand
-// getrackt — kein Fehlwurf, kein Box-Score. Nur bei diesen drei Aktionen
-// taucht die "Gegner"-Kachel im "Wer?"-Picker auf.
-const OPPONENT_ELIGIBLE = new Set<StatType>(['fg2_made', 'fg3_made', 'ft_made']);
-
-// Kurzform für die kleineren Aktions-Kreise — die vollen Bezeichnungen aus
-// STAT_TYPE_LABELS (z. B. "Ballverlust") sind für einen Kreis zu lang,
-// werden aber weiterhin im "Zuletzt"-Log und der Box-Score-Kopfzeile genutzt.
-const OTHER_STAT_SHORT: Partial<Record<StatType, string>> = {
-  rebound: 'Reb',
-  assist: 'Ast',
-  steal: 'Stl',
-  block: 'Blk',
-  turnover: 'TO',
-  foul: 'Foul'
-};
-
-const HEARTBEAT_MS = 15_000;
+// getrackt — kein Fehlwurf, kein Box-Score. Nur diese drei Aktionen tauchen
+// deshalb in der eigenen "GEGNER TRIFFT"-Zeile auf (§6), keine
+// Spielerauswahl nötig.
+const OPPONENT_BUTTONS: { statType: StatType; label: string; pts: number }[] = [
+  { statType: 'ft_made', label: '+1', pts: 1 },
+  { statType: 'fg2_made', label: '+2', pts: 2 },
+  { statType: 'fg3_made', label: '+3', pts: 3 }
+];
 
 type LockState =
   | { kind: 'loading' }
@@ -66,102 +59,244 @@ type LockState =
   | { kind: 'takenOver' }
   | { kind: 'held' };
 
-// Kleines Nummern-Badge oben links auf dem Avatar — nur gerendert, wenn für
-// diesen Spieler in diesem Spiel eine Trikotnummer hinterlegt ist (Migration
-// 0044). Bewusst kein Platzhalter ohne Nummer, um nicht "0" oder "?" auf
-// jedem Spieler-Tile stehen zu haben, wenn die Zuordnung übersprungen wurde.
-function NumberBadge({ number }: { number: number }) {
+type Sheet = 'quarter' | 'finish' | null;
+
+interface LogEntry {
+  id: string;
+  quarter: number;
+  num: string;
+  text: string;
+  pts: number;
+  opp?: boolean;
+  sub?: boolean;
+}
+
+function foulTone(fouls: number): 'warn' | 'danger' | null {
+  if (fouls >= 5) return 'danger';
+  if (fouls >= 4) return 'warn';
+  return null;
+}
+
+// ---------- Icons (self-contained, wie in den übrigen Admin-Screens) ----------
+function CheckIcon() {
   return (
-    <span className="absolute -left-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-to-accent px-1 text-[10px] font-extrabold text-to-text shadow ring-2 ring-white">
-      {number}
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+function XMarkIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+function SwapIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17 3l4 4-4 4M21 7H8M7 21l-4-4 4-4M3 17h13" />
+    </svg>
+  );
+}
+function UndoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3" />
+    </svg>
+  );
+}
+function PersonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#7C8594" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="8.6" r="3.7" />
+      <path d="M4.8 20.2a7.6 7.6 0 0 1 14.4 0" />
+    </svg>
+  );
+}
+function BackChevronIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M15 6l-6 6 6 6" />
+    </svg>
+  );
+}
+
+// ---------- Kleine, in beiden Layouts wiederverwendete Bausteine ----------
+
+function Photo({ player, size }: { player: Player; size: number }) {
+  const initials = player.name
+    .split(' ')
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-to-border bg-to-surface2"
+      style={{ width: size, height: size }}
+    >
+      {player.photo_url ? (
+        <img src={player.photo_url} alt="" className="h-full w-full object-cover" />
+      ) : player.photo_url === null ? (
+        <PersonIcon />
+      ) : null}
+      {!player.photo_url && <span className="text-xs font-semibold text-to-text3">{initials}</span>}
     </span>
+  );
+}
+
+function ShotButton({
+  label,
+  sub,
+  make,
+  height,
+  onClick
+}: {
+  label: string;
+  sub: string;
+  make: boolean;
+  height: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ height }}
+      className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-to-lg border font-semibold ${
+        make
+          ? 'border-to-borderMatchday bg-to-accentSoft text-to-accent'
+          : 'border-to-dangerFrame bg-to-dangerSoft text-to-dangerText'
+      }`}
+    >
+      <span className="flex items-center gap-1.5 text-[19px] font-bold">
+        {label}
+        {make ? <CheckIcon /> : <XMarkIcon />}
+      </span>
+      <span className="to-data text-[8px] tracking-[0.08em] opacity-70">{sub}</span>
+    </button>
+  );
+}
+
+function PadButton({
+  label,
+  sub,
+  danger,
+  volt,
+  height,
+  onClick
+}: {
+  label: string;
+  sub?: string;
+  danger?: boolean;
+  volt?: boolean;
+  height: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ height }}
+      className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-to-lg border text-[15px] font-semibold ${
+        danger
+          ? 'border-to-dangerFrame bg-to-dangerSoft text-to-dangerText'
+          : volt
+            ? 'flex-row gap-2 border-to-borderMatchday bg-to-accentWash text-to-accent'
+            : 'border-to-line bg-to-surface2 text-to-text'
+      }`}
+    >
+      {volt && <SwapIcon />}
+      {label}
+      {sub && <span className="to-data text-[8px] tracking-[0.08em] text-to-textDisabled">{sub}</span>}
+    </button>
   );
 }
 
 function PlayerTile({
   player,
   number,
-  onClick,
+  fouls,
+  size,
+  photoSize,
   selected,
-  disabled
+  onClick
 }: {
   player: Player;
   number?: number;
+  fouls: number;
+  size: number;
+  photoSize: number;
+  selected: boolean;
   onClick: () => void;
-  selected?: boolean;
-  disabled?: boolean;
 }) {
+  const tone = foulTone(fouls);
   return (
     <button
-      disabled={disabled}
+      type="button"
       onClick={onClick}
-      className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-3 text-center disabled:opacity-30 ${
-        selected ? 'border-to-accent bg-to-accentSoft' : 'border-transparent bg-to-bg active:scale-[0.97]'
+      style={{ height: size }}
+      className={`flex flex-1 items-center gap-2.5 rounded-to-lg border px-2.5 text-left ${
+        selected
+          ? 'border-to-accent bg-to-accentWash'
+          : tone === 'danger'
+            ? 'border-to-dangerFrame bg-to-surface2'
+            : 'border-to-line bg-to-surface2'
       }`}
     >
-      <div className="relative">
-        <Avatar player={player} size="lg" />
-        {number !== undefined && <NumberBadge number={number} />}
-      </div>
-      <span className="text-sm font-semibold leading-tight text-to-text">{shortPlayerName(player.name)}</span>
+      <Photo player={player} size={photoSize} />
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className={`to-number text-[26px] leading-none ${tone === 'danger' ? 'text-to-dangerText' : 'text-to-text'}`}>
+          {number ?? '–'}
+        </span>
+        <span className="truncate text-xs font-semibold text-to-text">{shortPlayerName(player.name)}</span>
+        <span
+          className={`to-data text-[8px] tracking-[0.06em] ${
+            tone === 'danger' ? 'text-to-dangerText' : tone === 'warn' ? 'text-to-vacation' : 'text-to-textDisabled'
+          }`}
+        >
+          {fouls} {fouls === 1 ? 'FOUL' : 'FOULS'}
+        </span>
+      </span>
     </button>
   );
 }
 
-// Optisch bewusst abgesetzt von den Spieler-Kacheln (gestrichelter Rand,
-// gedeckte statt navy/grüne Farben) — ist kein Mitspieler, sondern der
-// Punktestand des Gegners.
-function OpponentTile({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+function CancelTile({ size, onClick }: { size: number; onClick: () => void }) {
   return (
     <button
-      disabled={disabled}
+      type="button"
       onClick={onClick}
-      className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-to-line bg-transparent p-3 text-center disabled:opacity-30"
+      style={{ height: size }}
+      className="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-to-lg border border-dashed border-to-dangerFrame text-[13px] font-semibold text-to-dangerText"
     >
-      <span className="flex h-24 w-24 items-center justify-center rounded-full bg-to-surface2 text-3xl">🆚</span>
-      <span className="text-sm font-semibold leading-tight text-to-text2">Gegner</span>
+      <XMarkIcon size={22} />
+      Abbrechen
     </button>
   );
 }
 
-function ActionCircle({
-  label,
-  sublabel,
-  tone,
-  onClick,
-  disabled,
-  size = 'md'
-}: {
-  label: string;
-  sublabel?: string;
-  tone: 'make' | 'miss' | 'neutral';
-  onClick: () => void;
-  disabled?: boolean;
-  size?: 'md' | 'sm';
-}) {
-  // Volltonfarbe statt nur Umriss — auf einen Blick klarer als Treffer/
-  // Fehlwurf zu erkennen als dünner farbiger Rand mit farbiger Schrift.
-  // Ein dezenter Verlauf (hellere Ausgangsfarbe zur Kernfarbe) statt platt
-  // eingefärbt wirkt weniger wie ein reines Icon und moderner.
-  const toneClasses =
-    tone === 'make'
-      ? 'bg-gradient-to-b from-[#4ADE80] to-status-ok text-white shadow-[0_4px_14px_-4px_rgba(34,197,94,0.55)]'
-      : tone === 'miss'
-        ? 'bg-gradient-to-b from-[#F58C90] to-tbw-red text-white shadow-[0_4px_14px_-4px_rgba(229,72,77,0.55)]'
-        : 'bg-gradient-to-b from-tbw-navy to-tbw-navyDark text-white shadow-[0_4px_14px_-4px_rgba(7,22,15,0.4)]';
-  // Feste Größe statt an die Grid-Spalte gestreckt (aspect-square) — sonst
-  // werden die Kreise auf einem Handy riesig und die Aktionsliste passt
-  // nicht mehr auf einen Bildschirm.
-  const dims = size === 'md' ? 'h-[76px] w-[76px]' : 'h-16 w-16';
+function CourtChip({ player, number, fouls }: { player: Player; number?: number; fouls: number }) {
+  const tone = foulTone(fouls);
   return (
-    <button
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex ${dims} shrink-0 flex-col items-center justify-center gap-0.5 rounded-full text-center transition active:scale-95 disabled:opacity-40 ${toneClasses}`}
-    >
-      <span className="text-base font-extrabold leading-none">{label}</span>
-      {sublabel && <span className="text-[9px] font-bold uppercase tracking-wide opacity-80">{sublabel}</span>}
-    </button>
+    <span className="flex flex-1 flex-col items-center gap-1 rounded-to-md border border-to-border bg-to-surface2 py-2">
+      <span
+        className={`flex h-[34px] w-[34px] items-center justify-center rounded-to-sm ${
+          tone === 'danger' ? 'bg-to-dangerSoft text-to-dangerText' : 'bg-to-surface text-to-text'
+        }`}
+      >
+        <span className="to-number text-base leading-none">{number ?? '–'}</span>
+      </span>
+      <span className="truncate text-[10px] text-to-text2">{player.name.split(' ')[0]}</span>
+      <span
+        className={`to-data text-[8px] ${
+          tone === 'danger' ? 'text-to-dangerText' : tone === 'warn' ? 'text-to-vacation' : 'text-to-textDisabled'
+        }`}
+      >
+        {fouls} F
+      </span>
+    </span>
   );
 }
 
@@ -175,14 +310,8 @@ export function GameStatsTracker() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [squadPlayerIds, setSquadPlayerIds] = useState<string[]>([]);
   const [onCourtIds, setOnCourtIds] = useState<string[]>([]);
-  const [substituting, setSubstituting] = useState(false);
-  const [outgoingId, setOutgoingId] = useState<string | null>(null);
   const [events, setEvents] = useState<GameStatEvent[]>([]);
   const [lineupLog, setLineupLog] = useState<GameLineupLogRow[]>([]);
-  // Trikotnummern für dieses Spiel (ändern sich von Spiel zu Spiel, siehe
-  // Migration 0044) — numbers ist der gespeicherte Stand, numberDrafts die
-  // Texteingaben während der Bearbeitung (Strings, damit ein leeres Feld
-  // möglich ist, statt eine 0 zu erzwingen).
   const [numbers, setNumbers] = useState<Record<string, number>>({});
   const [numberDrafts, setNumberDrafts] = useState<Record<string, string>>({});
   const [manualNumbersEdit, setManualNumbersEdit] = useState(false);
@@ -190,11 +319,21 @@ export function GameStatsTracker() {
   const [lockState, setLockState] = useState<LockState>({ kind: 'loading' });
   const showLockLoader = useTipoffLoader(lockState.kind === 'loading');
   const [error, setError] = useState<string | null>(null);
-  // Erst Aktion, dann Spieler: pendingAction ist gesetzt, sobald eine
-  // Aktion angetippt wurde, und wartet auf den zugehörigen Spieler.
-  const [pendingAction, setPendingAction] = useState<StatType | null>(null);
-  const [quarter, setQuarter] = useState(1);
   const [busy, setBusy] = useState(false);
+
+  // Erst Aktion, dann Spieler — oder umgekehrt (Querformat, §2): sobald
+  // beide gesetzt sind, wird sofort gebucht. Bleibt pendingPlayer nach einem
+  // Freiwurf stehen (Rückfrage 6, "kurz ausgewählt bleiben"), reicht beim
+  // nächsten Freiwurf derselben Serie ein Tipp auf FW.
+  const [pendingAction, setPendingAction] = useState<StatType | null>(null);
+  const [pendingPlayer, setPendingPlayer] = useState<string | null>(null);
+  const [subMode, setSubMode] = useState<'out' | 'in' | null>(null);
+  const [outgoingId, setOutgoingId] = useState<string | null>(null);
+  const [showBox, setShowBox] = useState(false);
+  const [sheet, setSheet] = useState<Sheet>(null);
+  const [foulOutPlayerId, setFoulOutPlayerId] = useState<string | null>(null);
+
+  const quarter = game?.current_quarter ?? 1;
   const insertedStack = useRef<string[]>([]);
   const heartbeatInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -220,12 +359,6 @@ export function GameStatsTracker() {
     );
   }, [gameId]);
 
-  // Optimistisch lokal setzen und im Hintergrund speichern — bleibt über
-  // eine Übernahme des Trackings hinweg erhalten (siehe Migration 0029).
-  // Zusätzlich ein Log-Eintrag (Migration 0055, für die +/- -Berechnung) —
-  // dessen echter created_at-Zeitstempel kommt aus der DB zurück und wird
-  // direkt lokal ergänzt, damit +/- schon während des laufenden Trackens
-  // stimmt und nicht erst nach einem Neuladen.
   const persistOnCourt = useCallback(
     (next: string[]) => {
       setOnCourtIds(next);
@@ -261,20 +394,30 @@ export function GameStatsTracker() {
   }
 
   function startSubstitution() {
-    setSubstituting(true);
+    setPendingAction(null);
+    setPendingPlayer(null);
+    setSubMode('out');
     setOutgoingId(null);
   }
-
   function cancelSubstitution() {
-    setSubstituting(false);
+    setSubMode(null);
     setOutgoingId(null);
   }
-
+  function pickOutgoing(id: string) {
+    setOutgoingId(id);
+    setSubMode('in');
+  }
   function confirmSubstitution(incomingId: string) {
     if (!outgoingId) return;
+    const outP = playersById[outgoingId];
+    const inP = playersById[incomingId];
     persistOnCourt(onCourtIds.map((id) => (id === outgoingId ? incomingId : id)));
-    setSubstituting(false);
+    if (outP && inP) {
+      pushLog({ quarter, num: inP ? String(numbers[inP.id] ?? '') : '', text: `${inP.name} kommt für ${outP.name}`, pts: 0, sub: true });
+    }
+    setSubMode(null);
     setOutgoingId(null);
+    setPendingPlayer(null);
   }
 
   const stopHeartbeat = useCallback(() => {
@@ -330,11 +473,7 @@ export function GameStatsTracker() {
 
     async function init() {
       setError(null);
-      const { data: gameRow, error: gameError } = await supabase
-        .from('games')
-        .select('*')
-        .eq('id', gameId)
-        .maybeSingle();
+      const { data: gameRow, error: gameError } = await supabase.from('games').select('*').eq('id', gameId).maybeSingle();
       if (cancelled) return;
       if (gameError || !gameRow) {
         setError('Spiel nicht gefunden.');
@@ -368,6 +507,13 @@ export function GameStatsTracker() {
     // Spiel laufen (Claim starten/Session laden), nicht bei jedem Re-Render.
   }, [gameId]);
 
+  function pushLog(_entry: Omit<LogEntry, 'id'>) {
+    // Verlauf/Bestätigung werden direkt aus events/lineupLog abgeleitet
+    // (siehe recentLog unten) — Substitutionen tragen sich über lineupLog
+    // schon selbst ein, ein zusätzlicher lokaler Log-Eintrag ist dafür nicht
+    // nötig. Funktion bleibt als Hook für spätere reine UI-Events bestehen.
+  }
+
   async function addStat(team: 'us' | 'opponent', statType: StatType, playerId: string | null) {
     if (!gameId || busy) return;
     setBusy(true);
@@ -375,14 +521,7 @@ export function GameStatsTracker() {
     try {
       const { data, error: insertError } = await supabase
         .from('game_stat_events')
-        .insert({
-          game_id: gameId,
-          team,
-          player_id: playerId,
-          quarter,
-          stat_type: statType,
-          created_by_name: myName
-        })
+        .insert({ game_id: gameId, team, player_id: playerId, quarter, stat_type: statType, created_by_name: myName })
         .select()
         .single();
       if (insertError) throw insertError;
@@ -390,6 +529,16 @@ export function GameStatsTracker() {
       insertedStack.current.push(row.id);
       setEvents((prev) => [...prev, row]);
       setPendingAction(null);
+      // Freiwurf-Serie (Rückfrage 6): denselben Spieler nach einem Freiwurf
+      // ausgewählt lassen, jede andere Aktion hebt die Auswahl wieder auf.
+      if (statType === 'ft_made' || statType === 'ft_miss') {
+        setPendingPlayer(playerId);
+      } else {
+        setPendingPlayer(null);
+      }
+      if (statType === 'foul' && playerId && countPlayerFouls([...events, row], playerId) >= 5) {
+        setFoulOutPlayerId(playerId);
+      }
     } catch {
       setError('Aktion konnte nicht gespeichert werden.');
     } finally {
@@ -397,15 +546,47 @@ export function GameStatsTracker() {
     }
   }
 
+  function handleAction(statType: StatType) {
+    if (pendingPlayer) {
+      const isOpponentOnly = false;
+      void isOpponentOnly;
+      addStat('us', statType, pendingPlayer);
+      return;
+    }
+    setPendingAction(statType);
+  }
+
+  function handlePlayerTap(playerId: string) {
+    if (pendingAction) {
+      addStat('us', pendingAction, playerId);
+      return;
+    }
+    setPendingPlayer((prev) => (prev === playerId ? null : playerId));
+  }
+
+  function cancelPicker() {
+    setPendingAction(null);
+    setPendingPlayer(null);
+  }
+
+  // "Zurück" (Rückfrage 3): beliebig viele Schritte, solange das Viertel
+  // läuft — nimmt immer den zuletzt gespeicherten Eintrag DES AKTUELLEN
+  // VIERTELS aus der Datenbank zurück statt nur aus einem lokalen Array,
+  // damit der Knopf auch nach einem Neuladen oder einer Übernahme des
+  // Trackings weiter funktioniert.
+  const quarterEvents = events.filter((e) => e.quarter === quarter);
+  const lastQuarterEvent = quarterEvents[quarterEvents.length - 1] ?? null;
+
   async function undo() {
-    const lastId = insertedStack.current.pop();
-    if (!lastId || busy) return;
+    if (!lastQuarterEvent || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const { error: delError } = await supabase.from('game_stat_events').delete().eq('id', lastId);
+      const { error: delError } = await supabase.from('game_stat_events').delete().eq('id', lastQuarterEvent.id);
       if (delError) throw delError;
-      setEvents((prev) => prev.filter((e) => e.id !== lastId));
+      setEvents((prev) => prev.filter((e) => e.id !== lastQuarterEvent.id));
+      insertedStack.current = insertedStack.current.filter((id) => id !== lastQuarterEvent.id);
+      setPendingPlayer(null);
     } catch {
       setError('Rückgängig machen fehlgeschlagen.');
     } finally {
@@ -415,9 +596,6 @@ export function GameStatsTracker() {
 
   async function finalize() {
     if (!gameId || busy) return;
-    if (!window.confirm('Spiel wirklich beenden? Der Endstand wird dann als Push an alle verschickt und die Stats-Erfassung ist danach abgeschlossen.')) {
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
@@ -431,27 +609,45 @@ export function GameStatsTracker() {
     }
   }
 
-  // Live-Ticker: bei Wechsel in Q2-Q4 den Zwischenstand des soeben beendeten
-  // Viertels per Push verschicken. announce_quarter_score() dedupliziert
-  // serverseitig per "Ratchet" (Migration 0042) — bewusst kein Fehler-UI
-  // hier, ein Fehlschlag bei dieser Zusatzbenachrichtigung soll die
-  // eigentliche Stats-Erfassung nie stören.
-  //
-  // Nachfrage vor dem eigentlichen Wechsel (auf Nutzeranfrage, nachdem ein
-  // versehentliches Durchklicken vor Spielbeginn schon einmal den Ratchet
-  // verbraucht hatte, siehe Migration 0053) — verhindert genau dieses
-  // Vertippen, da die Push sonst sofort mit dem (dann falschen)
-  // Zwischenstand rausginge.
-  function selectQuarter(q: number) {
-    if (q === quarter) return;
-    const ok = window.confirm(
-      `Ist ${quarterLabel(quarter)} wirklich beendet und möchtest du zu ${quarterLabel(q)} wechseln?`
-    );
-    if (!ok) return;
-    setQuarter(q);
-    if (gameId && q >= 2 && q <= 4) {
-      supabase.rpc('announce_quarter_score', { p_game_id: gameId, p_quarter: q - 1 }).then(undefined, () => {});
+  // Viertel beenden (§8, NEU): manuell über das Blatt, nie automatisch.
+  // "Push senden" ruft dieselbe bestehende announce_quarter_score()-RPC auf
+  // (Migration 0042/0053, broadcastet an ALLE mit aktivem Push — siehe
+  // api/notify.ts "quarter-score", unverändert übernommen) — bisher lief
+  // das automatisch bei jedem Viertelwechsel, jetzt nur noch auf Wunsch.
+  // current_quarter wird dabei serverseitig mit fortgeschrieben (Migration
+  // 0074), damit ein Reload/eine Übernahme nicht auf Q1 zurückspringt.
+  async function endQuarter(withPush: boolean) {
+    if (!gameId || busy || !game) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (withPush) {
+        await supabase.rpc('announce_quarter_score', { p_game_id: gameId, p_quarter: quarter });
+      }
+      const nextQuarter = Math.min(9, quarter + 1);
+      const { error: quarterError } = await supabase.rpc('set_game_quarter', { p_game_id: gameId, p_quarter: nextQuarter });
+      if (quarterError) throw quarterError;
+      setGame((g) => (g ? { ...g, current_quarter: nextQuarter } : g));
+      setSheet(null);
+    } catch {
+      setError('Viertel konnte nicht beendet werden.');
+    } finally {
+      setBusy(false);
     }
+  }
+
+  // Zurückspringen über die Viertel-Leiste (§8) — wie bisher mit
+  // Rückfrage, jetzt aber serverseitig persistiert statt nur lokal.
+  async function jumpToQuarter(q: number) {
+    if (!gameId || q === quarter) return;
+    const ok = window.confirm(`Ist ${quarterLabel(quarter)} wirklich beendet und möchtest du zu ${quarterLabel(q)} wechseln?`);
+    if (!ok) return;
+    const { error: quarterError } = await supabase.rpc('set_game_quarter', { p_game_id: gameId, p_quarter: q });
+    if (quarterError) {
+      setError('Viertel konnte nicht gewechselt werden.');
+      return;
+    }
+    setGame((g) => (g ? { ...g, current_quarter: q } : g));
   }
 
   async function reopen() {
@@ -479,41 +675,23 @@ export function GameStatsTracker() {
 
   const playersById: Record<string, Player> = {};
   players.forEach((p) => (playersById[p.id] = p));
-  // Nur den veröffentlichten Kader dieses Spiels zum Tracken anbieten — ist
-  // (noch) keiner gesetzt, auf alle aktiven Spieler zurückfallen, damit das
-  // Tracken nicht blockiert, nur weil der Kader vergessen wurde.
-  const trackablePlayers =
-    squadPlayerIds.length > 0 ? players.filter((p) => squadPlayerIds.includes(p.id)) : players;
-  // Bei einem sehr kleinen Kader (z. B. beim Testen) ergibt eine
-  // Auf-dem-Feld/Bank-Unterscheidung keinen Sinn — dann direkt alle
-  // antippbar lassen.
+  const trackablePlayers = squadPlayerIds.length > 0 ? players.filter((p) => squadPlayerIds.includes(p.id)) : players;
   const useCourtSplit = trackablePlayers.length > COURT_SIZE;
   const onCourtPlayers = trackablePlayers.filter((p) => onCourtIds.includes(p.id));
   const benchPlayers = trackablePlayers.filter((p) => !onCourtIds.includes(p.id));
+  const pickablePlayers = useCourtSplit ? onCourtPlayers : trackablePlayers;
 
-  // Trikotnummern: direkt beim Start des Trackings abgefragt (vor der
-  // Startaufstellung), solange für dieses Spiel noch gar keine Nummer
-  // hinterlegt ist und die Aufstellung noch nicht steht — läuft danach
-  // automatisch nicht mehr auf, ohne dass dafür ein extra "erledigt"-Flag
-  // in der Datenbank nötig wäre. "Überspringen" markiert nur lokal
-  // (numbersDismissed) als erledigt, ohne etwas zu speichern — bei einem
-  // Neuladen der Seite würde dann erneut gefragt, was hier bewusst in Kauf
-  // genommen wird statt eines eigenen Persistenz-Flags nur für diesen Fall.
   const showNumbersCard =
     (trackablePlayers.length > 0 && onCourtIds.length === 0 && Object.keys(numbers).length === 0 && !numbersDismissed) ||
     manualNumbersEdit;
 
   function openNumbersEditor() {
-    setNumberDrafts(
-      Object.fromEntries(trackablePlayers.map((p) => [p.id, numbers[p.id] !== undefined ? String(numbers[p.id]) : '']))
-    );
+    setNumberDrafts(Object.fromEntries(trackablePlayers.map((p) => [p.id, numbers[p.id] !== undefined ? String(numbers[p.id]) : ''])));
     setManualNumbersEdit(true);
   }
-
   function closeNumbersEditor() {
     setManualNumbersEdit(false);
   }
-
   function skipNumbers() {
     setNumbersDismissed(true);
   }
@@ -535,10 +713,7 @@ export function GameStatsTracker() {
         .from('game_player_numbers')
         .delete()
         .eq('game_id', gameId)
-        .in(
-          'player_id',
-          trackablePlayers.map((p) => p.id)
-        );
+        .in('player_id', trackablePlayers.map((p) => p.id));
       if (delError) throw delError;
       const toInsert = Object.entries(numberDrafts)
         .filter(([, v]) => v.trim() !== '')
@@ -557,107 +732,762 @@ export function GameStatsTracker() {
     }
   }
 
-  // Für Textkontexte, wo ein NumberBadge zu groß wäre (kleine Avatare,
-  // Bank-Pills, "Zuletzt"-Zeilen, Box-Score) — Nummer als Präfix vor dem Namen.
-  function numPrefix(playerId: string): string {
-    return numbers[playerId] !== undefined ? `#${numbers[playerId]} ` : '';
-  }
-
   const boxScore = computeBoxScore(events);
-  const teamTotals = computeTeamTotals(boxScore);
-  // fallbackOnCourtIds greift nur, solange zu einem Event noch kein
-  // Log-Eintrag existiert — siehe computePlusMinus()-Kommentar in
-  // gameStats.ts.
-  const plusMinusByPlayer = computePlusMinus(
-    events,
-    lineupLog,
-    trackablePlayers.map((p) => p.id)
-  );
-  // Bei einem von Hand nachgetragenen Endstand (siehe GamesAdmin.tsx
-  // "Endstand nachtragen") gibt es keine game_stat_events, aus denen sich
-  // ein Punktestand berechnen ließe — dann den in games.final_score_us/
-  // final_score_opponent gespeicherten Endstand anzeigen statt fälschlich
-  // "0 : 0" in der Kopfzeile.
   const teamScore =
     lockState.kind === 'readonly' && events.length === 0 && game?.final_score_us !== null && game?.final_score_us !== undefined
       ? { us: game.final_score_us, opponent: game.final_score_opponent ?? 0 }
       : computeTeamScore(events);
   const quarterScores = computeQuarterScores(events);
-  const recentEvents = [...events].slice(-6).reverse();
-  const lastEvent = events[events.length - 1];
+  const teamFouls = countTeamFouls(events, quarter);
 
-  // Welcher der sich gegenseitig ausschließenden Bildschirme gerade
-  // angezeigt wird (Startaufstellung/Auswechseln/"Wer?"-Picker/Aktions-
-  // Raster) — wechselt der Screen, wird nach oben gescrollt. Sonst bleibt
-  // man z. B. nach "Wechseln" auf der Scroll-Position des
-  // Auf-dem-Feld-Buttons stehen und sieht die neue Spielerauswahl gar
-  // nicht, ohne selbst wieder hochzuscrollen.
+  // Verlauf (Element 24 §7) — Stats-Events und Wechsel gemeinsam,
+  // zeitlich sortiert, neueste zuerst.
+  const statLogEntries: (LogEntry & { created_at: string })[] = events.map((e) => ({
+    id: e.id,
+    quarter: e.quarter,
+    num: e.team === 'opponent' ? '' : e.player_id ? String(numbers[e.player_id] ?? '') : '',
+    text:
+      e.team === 'opponent'
+        ? `Gegner · ${STAT_TYPE_LABELS[e.stat_type]}`
+        : `${playersById[e.player_id ?? '']?.name ?? '?'} · ${STAT_TYPE_LABELS[e.stat_type]}${
+            e.stat_type === 'foul' && e.player_id ? ` (${countPlayerFouls(events.filter((x) => x.created_at <= e.created_at), e.player_id)}.)` : ''
+          }`,
+    pts: e.stat_type === 'fg2_made' ? 2 : e.stat_type === 'fg3_made' ? 3 : e.stat_type === 'ft_made' ? 1 : 0,
+    opp: e.team === 'opponent',
+    created_at: e.created_at
+  }));
+
+  const subLogEntries: (LogEntry & { created_at: string })[] = [];
+  for (let i = 1; i < lineupLog.length; i++) {
+    const prev = lineupLog[i - 1];
+    const l = lineupLog[i];
+    const inId = l.on_court_player_ids.find((id) => !prev.on_court_player_ids.includes(id));
+    const outId = prev.on_court_player_ids.find((id) => !l.on_court_player_ids.includes(id));
+    const inP = inId ? playersById[inId] : undefined;
+    const outP = outId ? playersById[outId] : undefined;
+    if (inP && outP) {
+      subLogEntries.push({
+        id: l.id,
+        quarter: 0,
+        num: String(numbers[inP.id] ?? ''),
+        text: `${inP.name} kommt für ${outP.name}`,
+        pts: 0,
+        sub: true,
+        created_at: l.created_at
+      });
+    }
+  }
+
+  const logEntries = [...statLogEntries, ...subLogEntries].sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+  const lastLogEntry = logEntries[0] ?? null;
+
   const screenKey =
     trackablePlayers.length === 0
       ? 'empty'
       : showNumbersCard
         ? 'numbers'
         : useCourtSplit && onCourtIds.length < COURT_SIZE
-        ? 'lineup'
-        : useCourtSplit && onCourtIds.length === COURT_SIZE && substituting
-          ? `sub-${outgoingId ?? 'out'}`
-          : pendingAction
-            ? `picker-${pendingAction}`
-            : 'idle';
-
+          ? 'lineup'
+          : subMode
+            ? `sub-${subMode}`
+            : pendingAction && !pendingPlayer
+              ? `picker-${pendingAction}`
+              : showBox
+                ? 'box'
+                : 'idle';
   useScrollResetOnChange(screenKey);
+
+  if (error && !game) return <ErrorNote message={error} />;
+
+  // ============ Kopf ============
+  function Header({ withEndButton }: { withEndButton: boolean }) {
+    return (
+      <div className="flex flex-col gap-2.5 rounded-to-xl border border-to-border bg-to-surface p-3.5 min-[900px]:flex-row min-[900px]:items-center min-[900px]:gap-4">
+        <div className="flex flex-1 flex-col gap-2.5">
+          <div className="flex items-end justify-center gap-2.5">
+            <span className="flex flex-col items-end gap-0.5">
+              <span className="to-data text-[9px] tracking-[0.1em] text-to-accent">TBW</span>
+              <span className="to-number text-[40px] leading-none text-to-text min-[900px]:text-[30px]">{teamScore.us}</span>
+            </span>
+            <span className="to-number pb-1 text-lg text-to-textDisabled">:</span>
+            <span className="flex flex-col gap-0.5">
+              <span className="to-data text-[9px] tracking-[0.1em] text-to-text3">{game?.opponent?.slice(0, 3).toUpperCase() ?? 'GEG'}</span>
+              <span className="to-number text-[40px] leading-none text-to-text2 min-[900px]:text-[30px]">{teamScore.opponent}</span>
+            </span>
+          </div>
+          <div className="flex gap-1.5">
+            {[1, 2, 3, 4].map((q) => {
+              const qs = quarterScores.find((x) => x.quarter === q);
+              const done = q < quarter;
+              const live = q === quarter;
+              return (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => jumpToQuarter(q)}
+                  className={`flex flex-1 flex-col items-center gap-0.5 rounded-to-md border py-2 ${
+                    live
+                      ? 'flex-[1.4] border-to-accent bg-to-accent'
+                      : done
+                        ? 'border-to-border bg-to-surface2'
+                        : 'border-to-divider bg-transparent'
+                  }`}
+                >
+                  <span className={`to-data text-[11px] font-bold ${live ? 'text-to-onAccent' : done ? 'text-to-text2' : 'text-to-textDisabled'}`}>
+                    Q{q}
+                  </span>
+                  <span className={`to-data text-[8px] ${live ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>
+                    {live ? 'LÄUFT' : qs ? `${qs.us}:${qs.opponent}` : '–'}
+                  </span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => jumpToQuarter(quarter > 4 ? quarter + 1 : 5)}
+              className={`flex flex-col items-center gap-0.5 rounded-to-md border px-3 py-2 ${
+                quarter > 4 ? 'border-to-accent bg-to-accent' : 'border-to-divider bg-transparent'
+              }`}
+            >
+              <span className={`to-data text-[11px] font-bold ${quarter > 4 ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>
+                {quarter > 4 ? quarterLabel(quarter) : 'OT'}
+              </span>
+              <span className={`to-data text-[8px] ${quarter > 4 ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>{quarter > 4 ? 'LÄUFT' : '–'}</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="to-data text-[9px] tracking-[0.12em] text-to-text3">TEAMFOULS Q{quarter}</span>
+            <span className="flex gap-1">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <span key={i} className={`h-2 w-2 rounded-full ${i < teamFouls ? 'bg-to-vacation' : 'bg-to-border'}`} />
+              ))}
+            </span>
+            <span className="to-data ml-auto text-[9px] text-to-vacation">{teamFouls >= 5 ? 'IM BONUS' : `${5 - teamFouls} BIS BONUS`}</span>
+          </div>
+        </div>
+        {withEndButton && (
+          <button
+            type="button"
+            onClick={() => setSheet('quarter')}
+            className="hidden h-11 shrink-0 rounded-to-pill border border-to-line px-5 text-sm font-semibold text-to-text2 min-[900px]:block"
+          >
+            Viertel beenden
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // ============ Tastenfeld ============
+  function Keypad({ shotHeight, actionHeight }: { shotHeight: number; actionHeight: number }) {
+    return (
+      <div className="flex flex-col gap-2">
+        <span className="to-data pl-0.5 text-[9px] tracking-[0.1em] text-to-text3">
+          {game?.opponent ? `TB WÜLFRATH · WAS IST PASSIERT?` : 'WAS IST PASSIERT?'}
+        </span>
+        {SHOT_BUTTONS.map(({ made, miss, label, sub }) => (
+          <div key={made} className="flex gap-2.5">
+            <ShotButton label={label} sub={sub} make height={shotHeight} onClick={() => handleAction(made)} />
+            <ShotButton label={label} sub="DANEBEN" make={false} height={shotHeight} onClick={() => handleAction(miss)} />
+          </div>
+        ))}
+        <div className="flex gap-2.5">
+          <PadButton label="Reb DEF" sub="DEFENSIV" height={actionHeight} onClick={() => handleAction('rebound_def')} />
+          <PadButton label="Reb OFF" sub="OFFENSIV" height={actionHeight} onClick={() => handleAction('rebound_off')} />
+        </div>
+        <div className="flex gap-2.5">
+          <PadButton label="Assist" height={actionHeight} onClick={() => handleAction('assist')} />
+          <PadButton label="Steal" height={actionHeight} onClick={() => handleAction('steal')} />
+        </div>
+        <div className="flex gap-2.5">
+          <PadButton label="Block" height={actionHeight} onClick={() => handleAction('block')} />
+          <PadButton label="Turnover" height={actionHeight} onClick={() => handleAction('turnover')} />
+        </div>
+        <div className="flex gap-2.5">
+          <PadButton label="Foul" danger height={actionHeight} onClick={() => handleAction('foul')} />
+          <PadButton label="Wechseln" volt height={actionHeight} onClick={startSubstitution} />
+        </div>
+        <div className="flex items-center gap-2.5 rounded-to-lg border border-to-dangerFrame bg-to-dangerSoft px-3.5" style={{ height: actionHeight }}>
+          <span className="to-data flex-1 text-[9px] tracking-[0.1em] text-to-dangerText">GEGNER TRIFFT</span>
+          {OPPONENT_BUTTONS.map((o) => (
+            <button
+              key={o.statType}
+              type="button"
+              disabled={busy}
+              onClick={() => addStat('opponent', o.statType, null)}
+              className="h-[42px] w-[58px] rounded-to-md border border-to-dangerFrame bg-to-dangerSoft text-[16px] font-bold text-to-dangerText"
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ============ Bestätigung ============
+  function ConfirmBar() {
+    return (
+      <div className="flex items-center gap-2.5 rounded-to-lg border border-to-border bg-to-surface2 py-2.5 pl-3.5 pr-2.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="to-data text-[8px] tracking-[0.12em] text-to-textDisabled">ZULETZT GETIPPT</span>
+          <span className="flex min-w-0 items-center gap-2">
+            {lastLogEntry?.num && (
+              <span className="to-data flex h-[22px] min-w-[26px] shrink-0 items-center justify-center rounded-to-sm bg-to-surface2 px-1.5 text-[11px] text-to-text2">
+                {lastLogEntry.num}
+              </span>
+            )}
+            <span className="truncate text-sm font-semibold text-to-text">{lastLogEntry ? lastLogEntry.text : 'Noch nichts getippt'}</span>
+            {!!lastLogEntry?.pts && (
+              <span className={`to-data shrink-0 text-xs font-bold ${lastLogEntry.opp ? 'text-to-dangerText' : 'text-to-accent'}`}>
+                +{lastLogEntry.pts}
+              </span>
+            )}
+          </span>
+        </span>
+        <button
+          type="button"
+          disabled={!lastQuarterEvent || busy}
+          onClick={undo}
+          className="flex h-[46px] shrink-0 items-center gap-1.5 rounded-to-md border border-to-dangerFrame bg-to-dangerSoft px-4 text-sm font-semibold text-to-dangerText disabled:opacity-40"
+        >
+          <UndoIcon />
+          Zurück
+        </button>
+      </div>
+    );
+  }
+
+  // ============ Spielerauswahl ============
+  function RosterGrid({
+    label,
+    list,
+    tileSize,
+    photoSize,
+    showCancel,
+    onCancel,
+    onPick,
+    selectedId
+  }: {
+    label: string;
+    list: Player[];
+    tileSize: number;
+    photoSize: number;
+    showCancel: boolean;
+    onCancel: () => void;
+    onPick: (id: string) => void;
+    selectedId: string | null;
+  }) {
+    const rows: Player[][] = [];
+    for (let i = 0; i < list.length; i += 2) rows.push(list.slice(i, i + 2));
+    return (
+      <div className="flex flex-col gap-2.5 rounded-to-xl border border-to-borderMatchday bg-to-surface p-3.5">
+        {label && <span className="to-data pl-1 text-[9px] tracking-[0.12em] text-to-accent">{label}</span>}
+        {rows.map((row, i) => (
+          <div key={i} className="flex gap-2.5">
+            {row.map((p) => (
+              <PlayerTile
+                key={p.id}
+                player={p}
+                number={numbers[p.id]}
+                fouls={countPlayerFouls(events, p.id)}
+                size={tileSize}
+                photoSize={photoSize}
+                selected={selectedId === p.id}
+                onClick={() => onPick(p.id)}
+              />
+            ))}
+            {row.length === 1 && showCancel && <CancelTile size={tileSize} onClick={onCancel} />}
+            {row.length === 1 && !showCancel && <span className="flex-1" />}
+          </div>
+        ))}
+        {list.length % 2 === 0 && showCancel && (
+          <div className="flex gap-2.5">
+            <CancelTile size={tileSize} onClick={onCancel} />
+            <span className="flex-1" />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ============ Auf dem Feld (Handy) ============
+  function CourtRow() {
+    return (
+      <div className="flex flex-col gap-2.5 rounded-to-xl border border-to-border bg-to-surface p-3">
+        <span className="to-data pl-0.5 text-[9px] tracking-[0.1em] text-to-text3">AUF DEM FELD</span>
+        <div className="flex gap-1.5">
+          {onCourtPlayers.map((p) => (
+            <CourtChip key={p.id} player={p} number={numbers[p.id]} fouls={countPlayerFouls(events, p.id)} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ============ Verlauf ============
+  function HistoryPanel({ limit }: { limit: number }) {
+    const rows = logEntries.slice(0, limit);
+    return (
+      <div className="overflow-hidden rounded-to-xl border border-to-border bg-to-surface">
+        <span className="to-data block px-3.5 pb-2 pt-2.5 text-[9px] tracking-[0.1em] text-to-text3">VERLAUF</span>
+        {rows.length === 0 ? (
+          <p className="border-t border-to-surface2 px-3.5 py-2.5 text-[13px] text-to-text2">Noch keine Aktionen.</p>
+        ) : (
+          rows.map((l) => (
+            <div key={l.id} className="flex items-center gap-2.5 border-t border-to-surface2 px-3.5 py-2.5">
+              <span className="to-data w-6 shrink-0 text-[9px] text-to-textDisabled">{l.quarter > 0 ? `Q${l.quarter}` : ''}</span>
+              <span className="to-data flex h-5 min-w-6 shrink-0 items-center justify-center rounded-to-sm bg-to-surface2 px-1.5 text-[10px] text-to-text3">
+                {l.num || '–'}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[13px] text-to-text2">{l.text}</span>
+              <span className={`to-data shrink-0 text-[11px] font-bold ${l.pts ? (l.opp ? 'text-to-dangerText' : 'text-to-accent') : 'text-to-textDisabled'}`}>
+                {l.pts ? `+${l.pts}` : ''}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  // ============ Box-Score (Bugfix §9) ============
+  function SimpleBoxScore({ onlyCourt }: { onlyCourt: boolean }) {
+    const list = onlyCourt ? onCourtPlayers : trackablePlayers.filter((p) => onCourtIds.includes(p.id) || boxScore.some((b) => b.playerId === p.id));
+    const rows = list.map((p) => ({
+      player: p,
+      box: boxScore.find((b) => b.playerId === p.id) ?? { points: 0, rebounds: 0, fouls: 0 }
+    }));
+    const totalPts = rows.reduce((s, r) => s + r.box.points, 0);
+    const totalReb = rows.reduce((s, r) => s + r.box.rebounds, 0);
+    const totalF = rows.reduce((s, r) => s + r.box.fouls, 0);
+    return (
+      <div className="overflow-hidden rounded-to-xl border border-to-border bg-to-surface">
+        <div className="flex items-center gap-2 bg-to-surface2 px-3.5 py-2.5">
+          <span className="to-data flex-1 text-[8px] tracking-[0.1em] text-to-textDisabled">SPIELER</span>
+          <span className="to-data w-7 text-right text-[8px] tracking-[0.1em] text-to-textDisabled">PKT</span>
+          <span className="to-data w-7 text-right text-[8px] tracking-[0.1em] text-to-textDisabled">REB</span>
+          <span className="to-data w-5 text-right text-[8px] tracking-[0.1em] text-to-textDisabled">F</span>
+        </div>
+        {rows.map(({ player: p, box }) => (
+          <div key={p.id} className="flex items-center gap-2 border-t border-to-surface2 px-3.5 py-2">
+            <span className="min-w-0 flex-1 truncate text-xs font-medium text-to-text">{p.name}</span>
+            <span className="w-7 text-right text-[11px] font-bold text-to-text">{box.points}</span>
+            <span className="w-7 text-right text-[11px] text-to-text2">{box.rebounds}</span>
+            <span className="w-5 text-right text-[11px] text-to-text2">{box.fouls}</span>
+          </div>
+        ))}
+        <div className="flex items-center gap-2 border-t border-to-surface2 bg-to-surface2 px-3.5 py-2">
+          <span className="flex-1 text-xs font-bold text-to-accent">Team</span>
+          <span className="w-7 text-right text-[11px] font-bold text-to-accent">{totalPts}</span>
+          <span className="w-7 text-right text-[11px] font-bold text-to-accent">{totalReb}</span>
+          <span className="w-5 text-right text-[11px] font-bold text-to-accent">{totalF}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // ============ Blätter ============
+  function Sheets() {
+    return (
+      <>
+        {sheet === 'quarter' && game && (
+          <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 sm:items-center" onClick={() => setSheet(null)}>
+            <div
+              className="flex w-full max-w-lg flex-col gap-3.5 rounded-t-[24px] border border-to-border bg-to-surface p-5 sm:rounded-b-[24px]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="mx-auto h-1 w-9 rounded-full bg-to-line" />
+              <span className="to-display-sm text-to-text">Viertel {quarter} beenden?</span>
+              <div className="flex items-center gap-3.5 rounded-to-lg border border-to-divider bg-to-surface2 p-4">
+                <span className="flex flex-1 flex-col gap-0.5">
+                  <span className="to-data text-[9px] tracking-[0.1em] text-to-accent">TB WÜLFRATH</span>
+                  <span className="to-number text-[30px] leading-none text-to-text">{teamScore.us}</span>
+                </span>
+                <span className="to-number text-lg text-to-textDisabled">:</span>
+                <span className="flex flex-1 flex-col items-end gap-0.5">
+                  <span className="to-data text-[9px] tracking-[0.1em] text-to-text3">{game.opponent.toUpperCase()}</span>
+                  <span className="to-number text-[30px] leading-none text-to-text2">{teamScore.opponent}</span>
+                </span>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-to-lg border border-to-borderMatchday bg-to-accentWash p-3.5 text-xs leading-relaxed text-to-text2">
+                <CheckIcon />
+                <span>
+                  Alle im Team bekommen den Zwischenstand als Push:{' '}
+                  <strong className="text-to-text">
+                    Ende Q{quarter} · {teamScore.us}:{teamScore.opponent}
+                  </strong>
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-to-textDisabled">
+                Danach läuft Viertel {quarter + 1}, die Teamfouls fangen wieder bei null an. Zurückspringen geht über die Viertel-Leiste.
+              </p>
+              <div className="flex flex-col gap-2">
+                <button type="button" disabled={busy} onClick={() => endQuarter(true)} className="btn-primary h-[46px] rounded-to-pill text-[15px] disabled:opacity-60">
+                  Viertel beenden und Push senden
+                </button>
+                <button type="button" disabled={busy} onClick={() => endQuarter(false)} className="btn-secondary h-[46px] rounded-to-pill text-[15px]">
+                  Beenden ohne Push
+                </button>
+                <button type="button" onClick={() => setSheet(null)} className="h-6 text-[13px] text-to-text3">
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {sheet === 'finish' && game && (
+          <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 sm:items-center" onClick={() => setSheet(null)}>
+            <div
+              className="flex w-full max-w-lg flex-col gap-3.5 rounded-t-[24px] border border-to-border bg-to-surface p-5 sm:rounded-b-[24px]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="mx-auto h-1 w-9 rounded-full bg-to-line" />
+              <span className="to-display-sm text-to-text">Spiel beenden?</span>
+              <p className="text-xs leading-relaxed text-to-textDisabled">
+                Endstand {teamScore.us}:{teamScore.opponent}. Danach wandern Ergebnis und Box-Score in die Statistik, und die Meldung geht an alle.
+                Nachträgliche Korrekturen macht der Trainer im Adminbereich unter „Spiele".
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setSheet(null);
+                    finalize();
+                  }}
+                  className="btn-primary h-[46px] rounded-to-pill text-[15px] disabled:opacity-60"
+                >
+                  Spiel beenden
+                </button>
+                <button type="button" onClick={() => setSheet(null)} className="btn-secondary h-[46px] rounded-to-pill text-[15px]">
+                  Weiter tracken
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {foulOutPlayerId && playersById[foulOutPlayerId] && (
+          <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 sm:items-center" onClick={() => setFoulOutPlayerId(null)}>
+            <div
+              className="flex w-full max-w-lg flex-col gap-3.5 rounded-t-[24px] border border-to-border bg-to-surface p-5 sm:rounded-b-[24px]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="mx-auto h-1 w-9 rounded-full bg-to-line" />
+              <span className="to-display-sm text-to-text">{playersById[foulOutPlayerId].name} hat 5 Fouls</span>
+              <p className="text-xs leading-relaxed text-to-textDisabled">
+                Nach dem fünften Foul darf {playersById[foulOutPlayerId].name} nicht mehr eingesetzt werden. Wechsle jemanden von der Bank ein — bis
+                dahin steht die Nummer rot auf dem Feld.
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const outId = foulOutPlayerId;
+                    setFoulOutPlayerId(null);
+                    setSubMode('in');
+                    setOutgoingId(outId);
+                  }}
+                  className="btn-primary h-[46px] rounded-to-pill text-[15px]"
+                >
+                  Jetzt wechseln
+                </button>
+                <button type="button" onClick={() => setFoulOutPlayerId(null)} className="h-6 text-[13px] text-to-text3">
+                  Später
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // ============ Hauptbereich (Aufstellung/Wechsel/Aktionen, beide Layouts teilen sich Unterkomponenten) ============
+  function TrackingBody({ wide }: { wide: boolean }) {
+    if (trackablePlayers.length === 0) {
+      return (
+        <div className="rounded-to-xl border border-to-border bg-to-surface p-4">
+          <p className="text-sm text-to-text3">Kein Kader für dieses Spiel hinterlegt.</p>
+        </div>
+      );
+    }
+
+    if (showNumbersCard) {
+      return (
+        <div className="flex flex-col gap-3 rounded-to-xl border border-to-border bg-to-surface p-4">
+          <span className="to-data text-[10px] tracking-[0.12em] text-to-text3">TRIKOTNUMMERN</span>
+          <p className="text-xs text-to-textDisabled">Welcher Spieler hat welche Nummer? Kann auch leer bleiben und später ergänzt werden.</p>
+          <ul className="flex flex-col divide-y divide-to-divider">
+            {trackablePlayers.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
+                <span className="flex items-center gap-2.5 text-sm font-medium text-to-text">
+                  <Photo player={p} size={36} />
+                  {p.name}
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={99}
+                  placeholder="–"
+                  value={numberDrafts[p.id] ?? ''}
+                  onChange={(e) => setNumberDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                  className="input w-16 !py-2 text-center"
+                />
+              </li>
+            ))}
+          </ul>
+          <div className="flex gap-2.5">
+            <button type="button" disabled={busy} onClick={saveNumbers} className="btn-primary h-[56px] flex-1 text-sm">
+              {manualNumbersEdit ? 'Speichern' : 'Weiter zur Aufstellung'}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={manualNumbersEdit ? closeNumbersEditor : skipNumbers}
+              className="btn-secondary h-[56px] flex-1 text-sm"
+            >
+              {manualNumbersEdit ? 'Abbrechen' : 'Überspringen'}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (useCourtSplit && onCourtIds.length < COURT_SIZE) {
+      return (
+        <div className="flex flex-col gap-3 rounded-to-xl border border-to-border bg-to-surface p-4">
+          <span className="to-data text-[10px] tracking-[0.12em] text-to-text3">
+            STARTAUFSTELLUNG ({onCourtIds.length}/{COURT_SIZE})
+          </span>
+          <div className="flex flex-col gap-2.5">
+            {Array.from({ length: Math.ceil(trackablePlayers.length / 2) }).map((_, i) => (
+              <div key={i} className="flex gap-2.5">
+                {trackablePlayers.slice(i * 2, i * 2 + 2).map((p) => (
+                  <PlayerTile
+                    key={p.id}
+                    player={p}
+                    number={numbers[p.id]}
+                    fouls={0}
+                    size={wide ? 100 : 116}
+                    photoSize={wide ? 48 : 56}
+                    selected={onCourtIds.includes(p.id)}
+                    onClick={() => toggleStarter(p.id)}
+                  />
+                ))}
+                {trackablePlayers.slice(i * 2, i * 2 + 2).length === 1 && <span className="flex-1" />}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (subMode) {
+      const list = subMode === 'out' ? onCourtPlayers : benchPlayers;
+      return (
+        <RosterGrid
+          label={subMode === 'out' ? 'WER GEHT RAUS?' : 'WER KOMMT REIN?'}
+          list={list}
+          tileSize={wide ? 100 : 116}
+          photoSize={wide ? 48 : 56}
+          showCancel
+          onCancel={cancelSubstitution}
+          onPick={(id) => (subMode === 'out' ? pickOutgoing(id) : confirmSubstitution(id))}
+          selectedId={null}
+        />
+      );
+    }
+
+    if (pendingAction && !wide) {
+      return (
+        <div className="flex flex-col gap-2">
+          <RosterGrid
+            label={`WER WAR ES? · ${STAT_TYPE_LABELS[pendingAction].toUpperCase()}`}
+            list={pickablePlayers}
+            tileSize={116}
+            photoSize={56}
+            showCancel
+            onCancel={cancelPicker}
+            onPick={(id) => addStat('us', pendingAction, id)}
+            selectedId={pendingPlayer}
+          />
+          <ConfirmBar />
+          <p className="px-1 text-xs leading-relaxed text-to-textDisabled">
+            Die Auswahl steht an der Stelle des Tastenfelds – kein Scrollen, kein Suchen. Nach dem Tipp ist das Tastenfeld sofort wieder da.
+          </p>
+        </div>
+      );
+    }
+
+    if (showBox && !wide) {
+      return (
+        <div className="flex flex-col gap-3">
+          <SimpleBoxScore onlyCourt={false} />
+          <button type="button" onClick={() => setShowBox(false)} className="h-[52px] rounded-to-pill border border-to-line text-[15px] font-semibold text-to-text2">
+            Zurück zum Tracking
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-2.5">
+        <Keypad shotHeight={62} actionHeight={58} />
+        <ConfirmBar />
+        <CourtRow />
+        <HistoryPanel limit={3} />
+        <button type="button" onClick={() => setShowBox(true)} className="h-[52px] rounded-to-pill border border-to-line text-[15px] font-semibold text-to-text2">
+          Box-Score ansehen
+        </button>
+        <button type="button" onClick={() => setSheet('quarter')} className="h-[52px] rounded-to-pill border border-to-line text-[15px] font-semibold text-to-text2">
+          Viertel beenden
+        </button>
+        <button
+          type="button"
+          onClick={() => setSheet('finish')}
+          className="h-[52px] rounded-to-pill border border-to-dangerFrame bg-to-dangerSoft text-[15px] font-semibold text-to-dangerText"
+        >
+          Spiel beenden
+        </button>
+        <p className="px-1 text-xs leading-relaxed text-to-textDisabled">
+          Keine Spieluhr. Erst die Aktion, dann der Spieler – „Zurück" nimmt den letzten Eintrag sofort wieder raus.
+        </p>
+      </div>
+    );
+  }
+
+  // ============ Querformat (ab 900px, drei Spalten) ============
+  function WideBody() {
+    const benchRows: Player[][] = [];
+    for (let i = 0; i < benchPlayers.length; i += 3) benchRows.push(benchPlayers.slice(i, i + 3));
+    const midTitle = pendingAction
+      ? `WER WAR ES? · ${STAT_TYPE_LABELS[pendingAction].toUpperCase()}`
+      : subMode
+        ? subMode === 'out'
+          ? 'WER GEHT RAUS?'
+          : 'WER KOMMT REIN?'
+        : 'MANNSCHAFT · IMMER ANTIPPBAR';
+    const midList = subMode === 'in' ? benchPlayers : subMode === 'out' ? onCourtPlayers : pickablePlayers;
+    const showCancelInMid = !!pendingAction || !!pendingPlayer || !!subMode;
+
+    return (
+      <div className="flex items-start gap-3">
+        <div className="flex w-[330px] shrink-0 flex-col gap-2.5 rounded-to-xl border border-to-border bg-to-surface p-3.5">
+          <Keypad shotHeight={52} actionHeight={44} />
+          <ConfirmBar />
+        </div>
+        <div className="min-w-0 flex-1 rounded-to-xl border border-to-borderMatchday bg-to-surface p-3.5">
+          <span className="to-data mb-2.5 block text-[9px] tracking-[0.12em] text-to-accent">{midTitle}</span>
+          {trackablePlayers.length === 0 ? (
+            <p className="text-sm text-to-text3">Kein Kader für dieses Spiel hinterlegt.</p>
+          ) : useCourtSplit && onCourtIds.length < COURT_SIZE ? (
+            <div className="flex flex-col gap-2.5">
+              {Array.from({ length: Math.ceil(trackablePlayers.length / 2) }).map((_, i) => (
+                <div key={i} className="flex gap-2.5">
+                  {trackablePlayers.slice(i * 2, i * 2 + 2).map((p) => (
+                    <PlayerTile
+                      key={p.id}
+                      player={p}
+                      number={numbers[p.id]}
+                      fouls={0}
+                      size={100}
+                      photoSize={48}
+                      selected={onCourtIds.includes(p.id)}
+                      onClick={() => toggleStarter(p.id)}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {(() => {
+                const rows: Player[][] = [];
+                for (let i = 0; i < midList.length; i += 2) rows.push(midList.slice(i, i + 2));
+                return rows.map((row, i) => (
+                  <div key={i} className="flex gap-2.5">
+                    {row.map((p) => (
+                      <PlayerTile
+                        key={p.id}
+                        player={p}
+                        number={numbers[p.id]}
+                        fouls={countPlayerFouls(events, p.id)}
+                        size={100}
+                        photoSize={48}
+                        selected={subMode ? false : pendingPlayer === p.id}
+                        onClick={() => (subMode === 'out' ? pickOutgoing(p.id) : subMode === 'in' ? confirmSubstitution(p.id) : handlePlayerTap(p.id))}
+                      />
+                    ))}
+                    {row.length === 1 && showCancelInMid && (
+                      <CancelTile size={100} onClick={subMode ? cancelSubstitution : cancelPicker} />
+                    )}
+                    {row.length === 1 && !showCancelInMid && <span className="flex-1" />}
+                  </div>
+                ));
+              })()}
+              {!subMode && (
+                <>
+                  <span className="to-data pt-1.5 text-[9px] tracking-[0.1em] text-to-text3">BANK</span>
+                  {benchRows.map((row, i) => (
+                    <div key={i} className="flex gap-1.5">
+                      {row.map((p) => (
+                        <span key={p.id} className="flex flex-1 items-center gap-1.5 rounded-to-md border border-to-border bg-to-surface2 px-2 py-1.5">
+                          <span className="to-number text-sm text-to-text">{numbers[p.id] ?? '–'}</span>
+                          <span className="truncate text-xs text-to-text2">{shortPlayerName(p.name)}</span>
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex w-[262px] shrink-0 flex-col gap-3">
+          <HistoryPanel limit={4} />
+          <SimpleBoxScore onlyCourt />
+          <button
+            type="button"
+            onClick={() => setSheet('finish')}
+            className="h-[44px] rounded-to-pill border border-to-dangerFrame bg-to-dangerSoft text-sm font-semibold text-to-dangerText"
+          >
+            Spiel beenden
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-to-bg pb-8">
-      <div className="sticky top-0 z-10 bg-to-surface px-4 py-3 text-to-text">
-        <div className="flex items-center justify-between">
-          <button className="text-sm font-semibold text-to-text2" onClick={goBack}>
-            ← Zurück
-          </button>
-          <p className="text-sm font-bold">{game ? `vs. ${game.opponent}` : 'Spiel-Stats'}</p>
-          <span className="w-12" />
-        </div>
-        {game && (
-          <p className="mt-0.5 text-center text-xs text-to-text3">
-            {fmtDate(game.game_date)} · {fmtTime(game.game_time)} Uhr
-          </p>
-        )}
-        {game && (
-          <div className="mt-2 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wide text-to-text3">
-            <span className="text-to-accent">TB Wülfrath</span>
-            <span className="text-to-text3">–</span>
-            <span className="truncate">{game.opponent}</span>
-          </div>
-        )}
-        <p className="text-center text-3xl font-extrabold">
-          <span className="text-to-accent">{teamScore.us}</span> : {teamScore.opponent}
-        </p>
-        {quarterScores.length > 0 && (
-          <p className="mt-1 text-center text-xs text-to-text3">
-            {quarterScores.map((q) => `${quarterLabel(q.quarter)} ${q.us}:${q.opponent}`).join(' · ')}
-          </p>
-        )}
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-to-divider bg-to-surface px-4 py-3">
+        <button type="button" onClick={goBack} className="flex items-center gap-1 text-sm font-semibold text-to-text2">
+          <BackChevronIcon />
+          Zurück
+        </button>
+        <p className="text-sm font-bold text-to-text">{game ? `vs. ${game.opponent}` : 'Spiel-Stats'}</p>
+        <span className="w-14" />
       </div>
+      {game && (
+        <p className="pt-2 text-center text-xs text-to-text3">
+          {fmtDate(game.game_date)} · {fmtTime(game.game_time)} Uhr
+        </p>
+      )}
 
-      <div className="px-4 py-4">
-        {error && (
-          <div className="mb-3">
-            <ErrorNote message={error} />
-          </div>
-        )}
-
+      <div className="mx-auto flex max-w-[1024px] flex-col gap-3 px-4 py-4 min-[900px]:px-5">
+        {error && <ErrorNote message={error} />}
         {showLockLoader && <LoadingSpinner label />}
 
         {lockState.kind === 'blocked' && (
           <div className="card space-y-3 text-center">
             <p className="text-sm text-to-text2">
-              Wird gerade von <span className="font-bold text-to-text">{lockState.session.holder_name}</span>{' '}
-              getrackt (seit{' '}
-              {new Date(lockState.session.started_at).toLocaleTimeString('de-DE', {
-                hour: '2-digit',
-                minute: '2-digit'
-              })}{' '}
-              Uhr).
+              Wird gerade von <span className="font-bold text-to-text">{lockState.session.holder_name}</span> getrackt (seit{' '}
+              {new Date(lockState.session.started_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr).
             </p>
             <button className="btn-primary w-full" disabled={busy} onClick={() => claim(true)}>
               Trotzdem übernehmen
@@ -670,9 +1500,7 @@ export function GameStatsTracker() {
 
         {lockState.kind === 'takenOver' && (
           <div className="card space-y-3 text-center">
-            <p className="text-sm text-to-text2">
-              Jemand anderes hat die Eingabe übernommen. Deine Aktionen werden ab jetzt nicht mehr gespeichert.
-            </p>
+            <p className="text-sm text-to-text2">Jemand anderes hat die Eingabe übernommen. Deine Aktionen werden ab jetzt nicht mehr gespeichert.</p>
             <button className="btn-secondary w-full" onClick={goBack}>
               Zurück
             </button>
@@ -680,24 +1508,16 @@ export function GameStatsTracker() {
         )}
 
         {lockState.kind === 'readonly' && (
-          <div className="card mb-3">
+          <div className="card space-y-3">
             <p className="text-sm font-bold text-to-text">Stats abgeschlossen</p>
             {events.length === 0 ? (
-              // Endstand wurde nachträglich eingetragen (siehe GamesAdmin.tsx
-              // "Endstand nachtragen"), nie live getrackt — es gibt also keine
-              // game_stat_events und damit keinen Box-Score zum Ansehen.
-              // "Wieder öffnen" bewusst ausgeblendet: das würde nur unnötig
-              // eine Live-Tracking-Sitzung starten (Aufstellung, Trikotnummern
-              // ...), die dann wieder mit "Spiel beenden" abgeschlossen werden
-              // müsste — inklusive einer zweiten "Spiel beendet"-Push.
-              <p className="mt-1 text-xs text-to-text3">
-                Für dieses Spiel wurden keine Einzelspieler-Stats erfasst — der Endstand wurde manuell nachgetragen.
-              </p>
+              <p className="text-xs text-to-text3">Für dieses Spiel wurden keine Einzelspieler-Stats erfasst — der Endstand wurde manuell nachgetragen.</p>
             ) : (
               <>
-                <p className="mt-1 text-xs text-to-text3">Nur noch zur Ansicht.</p>
+                <p className="text-xs text-to-text3">Nur noch zur Ansicht.</p>
+                <SimpleBoxScore onlyCourt={false} />
                 {isAdmin && (
-                  <button className="btn-secondary mt-3 w-full" disabled={busy} onClick={reopen}>
+                  <button className="btn-secondary w-full" disabled={busy} onClick={reopen}>
                     Wieder öffnen
                   </button>
                 )}
@@ -706,408 +1526,22 @@ export function GameStatsTracker() {
           </div>
         )}
 
-        {lockState.kind === 'held' && (
+        {lockState.kind === 'held' && game && (
           <>
-            <div className="card space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Viertel</p>
-              <div className="flex flex-wrap gap-2">
-                {[1, 2, 3, 4].map((q) => (
-                  <button
-                    key={q}
-                    className={`flex-1 rounded-xl py-2 text-sm font-bold ${
-                      quarter === q ? 'bg-to-accent text-to-onAccent' : 'bg-to-bg text-to-text2'
-                    }`}
-                    onClick={() => selectQuarter(q)}
-                  >
-                    Q{q}
-                  </button>
-                ))}
-                <button
-                  className={`rounded-xl px-3 py-2 text-sm font-bold ${
-                    quarter > 4 ? 'bg-to-accent text-to-onAccent' : 'bg-to-bg text-to-text2'
-                  }`}
-                  onClick={() => selectQuarter(quarter > 4 ? quarter + 1 : 5)}
-                >
-                  {quarter > 4 ? quarterLabel(quarter) : 'OT'}
-                </button>
+            <div className="min-[900px]:hidden">
+              <div className="flex flex-col gap-3">
+                <Header withEndButton={false} />
+                <TrackingBody wide={false} />
               </div>
             </div>
-
-            {trackablePlayers.length === 0 && (
-              <div className="card mt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Spieler</p>
-                <p className="mt-2 text-sm text-to-text3">Kein Kader für dieses Spiel hinterlegt.</p>
+            <div className="hidden min-[900px]:block">
+              <div className="flex flex-col gap-3">
+                <Header withEndButton />
+                <WideBody />
               </div>
-            )}
-
-            {trackablePlayers.length > 0 && !showNumbersCard && (
-              <button
-                className="mt-2 block text-xs font-bold text-to-accent"
-                onClick={openNumbersEditor}
-              >
-                🔢 Trikotnummern bearbeiten
-              </button>
-            )}
-
-            {trackablePlayers.length > 0 && showNumbersCard && (
-              <div className="card mt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Trikotnummern</p>
-                <p className="mt-1 text-xs text-to-text3">
-                  Welcher Spieler hat welche Nummer? Kann auch leer bleiben und später ergänzt werden.
-                </p>
-                <ul className="mt-3 divide-y divide-to-divider">
-                  {trackablePlayers.map((p) => (
-                    <li key={p.id} className="flex items-center justify-between gap-3 py-2">
-                      <span className="flex items-center gap-2 text-sm font-medium text-to-text">
-                        <Avatar player={p} size="xs" />
-                        {p.name}
-                      </span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        max={99}
-                        placeholder="–"
-                        value={numberDrafts[p.id] ?? ''}
-                        onChange={(e) => setNumberDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                        className="input w-16 !py-1.5 text-center"
-                      />
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-3 flex gap-2">
-                  <button className="btn-primary flex-1 !py-2 text-sm" disabled={busy} onClick={saveNumbers}>
-                    {manualNumbersEdit ? 'Speichern' : 'Weiter zur Aufstellung'}
-                  </button>
-                  <button
-                    className="btn-secondary flex-1 !py-2 text-sm"
-                    disabled={busy}
-                    onClick={manualNumbersEdit ? closeNumbersEditor : skipNumbers}
-                  >
-                    {manualNumbersEdit ? 'Abbrechen' : 'Überspringen'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {trackablePlayers.length > 0 && !showNumbersCard && useCourtSplit && onCourtIds.length < COURT_SIZE && (
-              <div className="card mt-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">
-                  Startaufstellung ({onCourtIds.length}/{COURT_SIZE})
-                </p>
-                <p className="mt-1 text-xs text-to-text3">Wer steht auf dem Feld?</p>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  {trackablePlayers.map((p) => (
-                    <PlayerTile
-                      key={p.id}
-                      player={p}
-                      number={numbers[p.id]}
-                      selected={onCourtIds.includes(p.id)}
-                      disabled={!onCourtIds.includes(p.id) && onCourtIds.length >= COURT_SIZE}
-                      onClick={() => toggleStarter(p.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {trackablePlayers.length > 0 &&
-              !showNumbersCard &&
-              useCourtSplit &&
-              onCourtIds.length === COURT_SIZE &&
-              substituting && (
-                <div className="card mt-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">
-                      {outgoingId ? 'Wer kommt rein?' : 'Wer geht raus?'}
-                    </p>
-                    <button className="text-xs font-bold text-to-dangerText" onClick={cancelSubstitution}>
-                      Abbrechen
-                    </button>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    {(outgoingId ? benchPlayers : onCourtPlayers).map((p) => (
-                      <PlayerTile
-                        key={p.id}
-                        player={p}
-                        number={numbers[p.id]}
-                        onClick={() => (outgoingId ? confirmSubstitution(p.id) : setOutgoingId(p.id))}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-            {trackablePlayers.length > 0 &&
-              !showNumbersCard &&
-              (!useCourtSplit || onCourtIds.length === COURT_SIZE) &&
-              !substituting &&
-              pendingAction && (
-                <div className="card mt-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">
-                      Wer? — {STAT_TYPE_LABELS[pendingAction]}
-                    </p>
-                    <button className="text-xs font-bold text-to-dangerText" onClick={() => setPendingAction(null)}>
-                      Abbrechen
-                    </button>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    {(useCourtSplit ? onCourtPlayers : trackablePlayers).map((p) => (
-                      <PlayerTile
-                        key={p.id}
-                        player={p}
-                        number={numbers[p.id]}
-                        disabled={busy}
-                        onClick={() => addStat('us', pendingAction, p.id)}
-                      />
-                    ))}
-                    {OPPONENT_ELIGIBLE.has(pendingAction) && (
-                      <OpponentTile disabled={busy} onClick={() => addStat('opponent', pendingAction, null)} />
-                    )}
-                  </div>
-                </div>
-              )}
-
-            {trackablePlayers.length > 0 &&
-              !showNumbersCard &&
-              (!useCourtSplit || onCourtIds.length === COURT_SIZE) &&
-              !substituting &&
-              !pendingAction && (
-                <>
-                  {lastEvent && (
-                    <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-to-text3">
-                      <span>Zuletzt:</span>
-                      {lastEvent.team === 'us' && lastEvent.player_id && playersById[lastEvent.player_id] && (
-                        <Avatar player={playersById[lastEvent.player_id]} size="xs" />
-                      )}
-                      <span className="font-semibold text-to-text2">
-                        {lastEvent.team === 'opponent'
-                          ? 'Gegner'
-                          : `${numPrefix(lastEvent.player_id ?? '')}${playersById[lastEvent.player_id ?? '']?.name ?? '?'}`}
-                      </span>
-                      <span>· {STAT_TYPE_LABELS[lastEvent.stat_type]}</span>
-                    </p>
-                  )}
-
-                  <div className="card mt-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Aktion</p>
-                    <div className="mt-2 flex flex-col items-center gap-2">
-                      {SCORING_BUTTONS.map(({ made, miss, label }) => (
-                        <div key={made} className="flex gap-4">
-                          <ActionCircle label={label} sublabel="Treffer" tone="make" onClick={() => setPendingAction(made)} />
-                          <ActionCircle label={label} sublabel="Fehlwurf" tone="miss" onClick={() => setPendingAction(miss)} />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-3 grid grid-cols-3 justify-items-center gap-2">
-                      {OTHER_STATS.map((statType) => (
-                        <ActionCircle
-                          key={statType}
-                          size="sm"
-                          label={OTHER_STAT_SHORT[statType] ?? STAT_TYPE_LABELS[statType]}
-                          tone="neutral"
-                          onClick={() => setPendingAction(statType)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  {useCourtSplit && (
-                    <div className="card mt-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Auf dem Feld</p>
-                        <button className="text-xs font-bold text-to-accent" onClick={startSubstitution}>
-                          🔄 Wechseln
-                        </button>
-                      </div>
-                      <div className="mt-2 grid grid-cols-5 gap-1">
-                        {onCourtPlayers.map((p) => (
-                          <div key={p.id} className="flex flex-col items-center gap-1">
-                            <Avatar player={p} size="xs" />
-                            <span className="text-center text-[9px] font-semibold leading-tight text-to-text">
-                              {numPrefix(p.id)}
-                              {shortPlayerName(p.name)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      {benchPlayers.length > 0 && (
-                        <>
-                          <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-to-text3">Bank</p>
-                          <div className="mt-1 flex flex-wrap gap-1.5">
-                            {benchPlayers.map((p) => (
-                              <span key={p.id} className="rounded-full bg-to-bg px-2.5 py-1 text-xs text-to-text3">
-                                {numPrefix(p.id)}
-                                {shortPlayerName(p.name)}
-                              </span>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-
-            <div className="card mt-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Zuletzt</p>
-                <button
-                  className="text-xs font-bold text-to-dangerText disabled:opacity-30"
-                  disabled={insertedStack.current.length === 0 || busy}
-                  onClick={undo}
-                >
-                  Rückgängig
-                </button>
-              </div>
-              {recentEvents.length === 0 ? (
-                <p className="mt-1 text-xs text-to-text3">Noch keine Aktionen.</p>
-              ) : (
-                <ul className="mt-1 space-y-1">
-                  {recentEvents.map((e) => {
-                    const evPlayer = e.player_id ? playersById[e.player_id] : undefined;
-                    return (
-                      <li key={e.id} className="flex items-center gap-2 text-xs text-to-text2">
-                        {evPlayer && <Avatar player={evPlayer} size="xs" />}
-                        <span>
-                          {quarterLabel(e.quarter)} ·{' '}
-                          {e.team === 'opponent' ? 'Gegner' : `${numPrefix(e.player_id ?? '')}${evPlayer?.name ?? '?'}`} ·{' '}
-                          {STAT_TYPE_LABELS[e.stat_type]}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
             </div>
-
-            <button className="btn-primary mt-3 w-full" disabled={busy} onClick={finalize}>
-              Spiel beenden
-            </button>
+            <Sheets />
           </>
-        )}
-
-        {boxScore.length > 0 && (
-          <div className="card mt-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-to-text3">Box-Score</p>
-            <div className="mt-2 overflow-x-auto">
-              <table className="w-full min-w-[680px] text-left text-xs">
-                <thead>
-                  <tr className="text-to-text3">
-                    <th className="sticky left-0 z-10 border-r border-to-divider bg-to-surface py-1 pr-2 font-semibold">
-                      Spieler
-                    </th>
-                    <th className="px-1 py-1 text-right font-semibold">Pkt</th>
-                    <th className="px-1 py-1 text-right font-semibold">2P</th>
-                    <th className="px-1 py-1 text-right font-semibold">2P%</th>
-                    <th className="px-1 py-1 text-right font-semibold">3P</th>
-                    <th className="px-1 py-1 text-right font-semibold">3P%</th>
-                    <th className="px-1 py-1 text-right font-semibold">FW</th>
-                    <th className="px-1 py-1 text-right font-semibold">FW%</th>
-                    <th className="px-1 py-1 text-right font-semibold">Reb</th>
-                    <th className="px-1 py-1 text-right font-semibold">Ast</th>
-                    <th className="px-1 py-1 text-right font-semibold">Stl</th>
-                    <th className="px-1 py-1 text-right font-semibold">Blk</th>
-                    <th className="px-1 py-1 text-right font-semibold">TO</th>
-                    <th className="px-1 py-1 text-right font-semibold">PF</th>
-                    <th className="pl-1 py-1 text-right font-semibold">+/-</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {boxScore.map((b) => (
-                    <tr key={b.playerId} className="border-t border-to-divider">
-                      <td className="sticky left-0 z-10 border-r border-to-divider bg-to-surface py-1.5 pr-2 font-semibold text-to-text">
-                        <div className="flex items-center gap-2">
-                          {playersById[b.playerId] && <Avatar player={playersById[b.playerId]} size="xs" />}
-                          {numPrefix(b.playerId)}
-                          {playersById[b.playerId] ? shortPlayerName(playersById[b.playerId].name) : '?'}
-                        </div>
-                      </td>
-                      <td className="px-1 py-1.5 text-right font-bold text-to-text">{b.points}</td>
-                      <td className="px-1 py-1.5 text-right text-to-text2">
-                        {b.fg2m}/{b.fg2a}
-                      </td>
-                      <td className="px-1 py-1.5 text-right text-to-text3">{fgPct(b.fg2m, b.fg2a)}</td>
-                      <td className="px-1 py-1.5 text-right text-to-text2">
-                        {b.fg3m}/{b.fg3a}
-                      </td>
-                      <td className="px-1 py-1.5 text-right text-to-text3">{fgPct(b.fg3m, b.fg3a)}</td>
-                      <td className="px-1 py-1.5 text-right text-to-text2">
-                        {b.ftm}/{b.fta}
-                      </td>
-                      <td className="px-1 py-1.5 text-right text-to-text3">{fgPct(b.ftm, b.fta)}</td>
-                      <td className="px-1 py-1.5 text-right text-to-text2">{b.rebounds}</td>
-                      <td className="px-1 py-1.5 text-right text-to-text2">{b.assists}</td>
-                      <td className="px-1 py-1.5 text-right text-to-text2">{b.steals}</td>
-                      <td className="px-1 py-1.5 text-right text-to-text2">{b.blocks}</td>
-                      <td className="px-1 py-1.5 text-right text-to-text2">{b.turnovers}</td>
-                      <td className="px-1 py-1.5 text-right text-to-text2">{b.fouls}</td>
-                      {(() => {
-                        const pm = plusMinusByPlayer[b.playerId] ?? 0;
-                        return (
-                          <td
-                            className={`py-1.5 pl-1 text-right font-semibold ${
-                              pm > 0 ? 'text-to-accent' : pm < 0 ? 'text-to-dangerText' : 'text-to-text3'
-                            }`}
-                          >
-                            {fmtPlusMinus(pm)}
-                          </td>
-                        );
-                      })()}
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  {(() => {
-                    // Team-+/- ist bewusst der tatsächliche Punktabstand
-                    // (teamScore.us - teamScore.opponent), NICHT die Summe
-                    // der einzelnen +/- -Werte oben — jeder Korb fließt dort
-                    // in bis zu 5 Spieler-Werte gleichzeitig ein, eine
-                    // Summe würde also mehrfach zählen.
-                    const teamNet = teamScore.us - teamScore.opponent;
-                    return (
-                      <tr className="border-t-2 border-to-border bg-to-bg font-bold text-to-text">
-                        <td className="sticky left-0 z-10 border-r border-to-divider bg-to-bg py-1.5 pr-2">Team</td>
-                        <td className="px-1 py-1.5 text-right">{teamTotals.points}</td>
-                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">
-                          {teamTotals.fg2m}/{teamTotals.fg2a}
-                        </td>
-                        <td className="px-1 py-1.5 text-right font-normal text-to-text3">
-                          {fgPct(teamTotals.fg2m, teamTotals.fg2a)}
-                        </td>
-                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">
-                          {teamTotals.fg3m}/{teamTotals.fg3a}
-                        </td>
-                        <td className="px-1 py-1.5 text-right font-normal text-to-text3">
-                          {fgPct(teamTotals.fg3m, teamTotals.fg3a)}
-                        </td>
-                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">
-                          {teamTotals.ftm}/{teamTotals.fta}
-                        </td>
-                        <td className="px-1 py-1.5 text-right font-normal text-to-text3">
-                          {fgPct(teamTotals.ftm, teamTotals.fta)}
-                        </td>
-                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.rebounds}</td>
-                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.assists}</td>
-                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.steals}</td>
-                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.blocks}</td>
-                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.turnovers}</td>
-                        <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.fouls}</td>
-                        <td
-                          className={`py-1.5 pl-1 text-right ${
-                            teamNet > 0 ? 'text-to-accent' : teamNet < 0 ? 'text-to-dangerText' : 'text-to-text3'
-                          }`}
-                        >
-                          {fmtPlusMinus(teamNet)}
-                        </td>
-                      </tr>
-                    );
-                  })()}
-                </tfoot>
-              </table>
-            </div>
-          </div>
         )}
       </div>
     </div>

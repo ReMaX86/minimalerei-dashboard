@@ -25,6 +25,13 @@
   --to-danger: #FF5A67;      /* Foul Red – nur Warnung/abgemeldet/offen */
   --to-danger-text: #FF7A85;
   --to-danger-soft: rgba(255, 90, 103, 0.12);
+  --to-danger-frame: #5A2027; /* Karten-/Knopf-Rand in gedämpftem Rot (z. B. "Spiel beenden",
+                                 5.-Foul-Blatt) — Pendant zu --to-vacation-frame/--to-border-matchday.
+                                 Vorher wurde dafür an vielen Stellen border-to-danger/30 verwendet,
+                                 was mangels passendem Alpha-Format der CSS-Variable (var() liefert
+                                 hier einen vollen Hex-String, keine per Tailwind-Opacity-Modifier
+                                 zerlegbare RGB-Trias) komplett wirkungslos blieb — keine Klasse
+                                 wurde generiert, der Rand blieb unsichtbar. */
   --to-vacation: #E9B949;    /* nur für "Urlaub" (Training-Karte) */
   --to-vacation-soft: rgba(233, 185, 73, 0.12);
   --to-vacation-frame: #4A3C12; /* Karten-Rand "Abwesenheit" während ein Zeitraum läuft */

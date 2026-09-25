@@ -2578,6 +2578,50 @@ hier die getroffenen Entscheidungen samt Begründung:
   Kampfgericht/Trikots gibt es weiterhin keine eigene Detailseite — nur die Zeile mit Schalter.
   Liga-Tabelle-Detailseite übernimmt Liga-ID-Feld und Sync-Status/"Jetzt holen" 1:1 aus der
   bisherigen `StandingsSyncSettings.tsx`-Logik.
+- **Element 24 "Live-Tracking": zwei Layouts (Handy/iPad-Querformat), Fouls pro Spieler und
+  Team, getrennte Rebounds, manuelles Viertel-Ende mit Push, Box-Score-Bugfix (Migration
+  `0074`).** `GameStatsTracker.tsx` komplett neu — dieselbe Seite trägt jetzt zwei Layouts
+  (Handy-Stapel, ab 900px ein Querformat mit drei Spalten für iPad quer), rein per Media
+  Query, keine zweite Route. Vor der Umsetzung sechs Rückfragen aus dem PROMPT geprüft: vier
+  ließen sich direkt im Code beantworten (Mehrfach-Tracking ist bereits serverseitig weich
+  gesperrt, siehe `claim_stat_session`/Migration 0028; +/- rechnete schon korrekt inkl.
+  Wechsel über `game_lineup_log`; die Zwischenstand-Push beim Viertelwechsel ging schon an
+  alle mit aktivem Push, nicht nur Abwesende), zwei blieben offen und wurden dem Nutzer
+  vorgelegt (5. Foul nur markieren statt hart sperren — der Referenz-Code sperrt trotz
+  Sheet-Text ebenfalls nicht wirklich; "Zurück" auf beliebig viele Schritte aus der Datenbank
+  statt nur einem lokalen Array umgestellt, plus eine dritte, im PROMPT selbst als "noch nicht
+  gebaut" markierte Frage zur Freiwurf-Serie, ebenfalls angenommen). **Fouls pro Spieler und
+  Teamfouls pro Viertel (§4, NEU) brauchen keine eigene Spalte** — beides ergibt sich direkt
+  aus den längst vorhandenen `foul`-Events in `game_stat_events` (`countPlayerFouls()`/
+  `countTeamFouls()` in `gameStats.ts`), setzt sich beim Viertelwechsel dadurch von selbst auf
+  0 zurück. Beim 5. Foul öffnet sich automatisch das Wechsel-Blatt; die Auswahl bleibt aber
+  bewusst nicht hart gesperrt (Rückfrage-Antwort), nur rot markiert. **Rebounds getrennt (§5,
+  NEU):** zwei neue `stat_type`-Werte `rebound_def`/`rebound_off` (Migration `0074`, der alte
+  `rebound`-Typ bleibt für bereits erfasste Events gültig, alle drei zählen im Box-Score
+  gemeinsam als "Reb"). **Viertel-Ende mit Push (§8, NEU):** das aktuelle Viertel steckte
+  bisher nur in einem lokalen React-State von `GameStatsTracker.tsx` — ein Neuladen oder eine
+  Übernahme des Trackings sprang dadurch immer auf Q1 zurück, obwohl Punkte/Fouls korrekt aus
+  der DB kamen. Jetzt in `games.current_quarter` persistiert (Migration `0074`, neue RPC
+  `set_game_quarter()`, dieselbe Berechtigungsprüfung wie beim Stats-Erfassen). Das
+  Viertel-Ende-Blatt bietet "mit Push" (ruft die schon bestehende `announce_quarter_score()`-
+  RPC auf, die bisher automatisch bei jedem Viertelwechsel feuerte) oder "ohne Push" — reine
+  Oberflächen-Entscheidung, die Push-Logik/Empfängerkreis selbst bleibt unverändert.
+  **"Zurück" (§7):** nimmt jetzt beliebig viele Schritte zurück, aber immer den zuletzt
+  gespeicherten Eintrag DES AKTUELLEN VIERTELS aus der Datenbank (nicht mehr aus einem rein
+  lokalen Array, das bei Reload/Übernahme leer war). **Freiwurf-Serie:** nach einem gebuchten
+  Freiwurf bleibt derselbe Spieler kurz vorausgewählt (`pendingPlayer` bleibt gesetzt statt
+  geleert), eine andere Aktion oder ein anderer Spieler hebt die Auswahl wieder auf — dieselbe
+  `pendingPlayer`-Vorauswahl trägt im Querformat auch "erst Spieler, dann Aktion". **Box-Score-
+  Bugfix (§9):** die neue, einfache Tabelle (Spieler/Pkt/Reb/F, eine Zeile pro Spieler mit
+  vollem Namen, letzte Zeile "Team" in Volt) ersetzt die bisherige, deutlich umfangreichere
+  Tabelle (FG%/3P%/+/- usw. je Spalte) — pixelgenau nach Vorlage, die ausführlicheren Werte
+  bleiben in `gameStats.ts` für andere Screens (Bestenliste, Spielerprofil) unverändert
+  erhalten, nur der Tracker selbst zeigt jetzt die einfache Ansicht. **Nebenbei gefunden:**
+  `border-to-danger/30` (Tailwind-Opacity-Modifier auf eine CSS-Variable, die schon ein voller
+  Hex-Farbwert ist) erzeugte app-weit gar keine CSS-Regel — unsichtbare rote Ränder an über 30
+  Stellen in 9 weiteren Dateien. Für `GameStatsTracker.tsx` und die Tokens selbst behoben
+  (neues `--to-danger-frame`, analog zu `--to-vacation-frame`/`--to-border-matchday`), die
+  übrigen Fundstellen als eigene Aufgabe vorgeschlagen statt hier mit erledigt.
 
 ## Projektstruktur
 

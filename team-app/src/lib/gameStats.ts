@@ -63,6 +63,8 @@ function applyStat(row: PlayerBoxScore, statType: StatType) {
       row.fta++;
       break;
     case 'rebound':
+    case 'rebound_def':
+    case 'rebound_off':
       row.rebounds++;
       break;
     case 'assist':
@@ -236,4 +238,20 @@ export function quarterLabel(quarter: number): string {
   if (quarter <= 4) return `Q${quarter}`;
   const ot = quarter - 4;
   return ot === 1 ? 'OT' : `${ot}. OT`;
+}
+
+// Teamfouls für die Kopfzeile (Element 24 §4, NEU) — bewusst nicht als
+// eigene Spalte gespeichert: jedes eigene 'foul'-Event ist bereits pro
+// Viertel abgelegt (siehe game_stat_events.quarter), ein Zählen "wie viele
+// davon im aktuellen Viertel" reicht und setzt sich beim Viertelwechsel von
+// selbst auf 0 zurück, ohne dass irgendwo ein Reset ausgelöst werden müsste.
+export function countTeamFouls(events: GameStatEvent[], quarter: number): number {
+  return events.filter((e) => e.team === 'us' && e.stat_type === 'foul' && e.quarter === quarter).length;
+}
+
+// Fouls eines einzelnen Spielers über das GANZE Spiel (nicht nur das
+// aktuelle Viertel — anders als countTeamFouls) — für die Foulstand-Anzeige
+// an den Spielerkacheln und die 5-Foul-Erkennung.
+export function countPlayerFouls(events: GameStatEvent[], playerId: string): number {
+  return events.filter((e) => e.team === 'us' && e.stat_type === 'foul' && e.player_id === playerId).length;
 }

@@ -28,6 +28,7 @@ export default {
           danger: 'var(--to-danger)',
           dangerText: 'var(--to-danger-text)',
           dangerSoft: 'var(--to-danger-soft)',
+          dangerFrame: 'var(--to-danger-frame)',
           vacation: 'var(--to-vacation)',
           vacationSoft: 'var(--to-vacation-soft)',
           vacationFrame: 'var(--to-vacation-frame)',

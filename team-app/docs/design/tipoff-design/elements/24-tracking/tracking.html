@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Live-Tracking</title>
+<!--
+  REFERENZ-UMSETZUNG Element 24 · Live-Tracking
+  Eine Datei, zwei Layouts: unter 900px Breite der Handy-Stapel, ab 900px das Querformat
+  mit drei Spalten (iPad). Werte entsprechen tokens.css – in der App die Token-Variablen
+  verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=track      Handy · Standard
+    ?state=who        Handy · Spielerauswahl nach „2er ✓"
+    ?state=sub        Handy · Wechseln
+    ?state=foulout    Handy · 5. Foul, Spieler muss raus
+    ?state=box        Handy · Box-Score
+    ?state=quarter    Blatt „Viertel beenden?"
+    ?state=finish     Blatt „Spiel beenden?"
+    ?state=pad        Querformat · Standard
+    ?state=padaction  Querformat · Aktion gewählt, Mannschaft weiter bedienbar
+  Die Seite ist echt bedienbar: Aktion tippen, Spieler wählen, zurücknehmen, wechseln,
+  Viertel beenden. Keine Spieluhr.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.10);
+  --to-danger-frame:#5A2027;
+  --to-vacation:#E9B949; --to-vacation-soft:rgba(233,185,73,.12); --to-vacation-frame:rgba(233,185,73,.32);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:transparent;padding:0}
+.wrap{width:390px;margin:0 auto;padding:20px 16px 22px;display:flex;flex-direction:column;gap:12px}
+.mono{font-family:'Geist Mono',monospace}
+.lbl{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-text-3)}
+
+/* Kopf */
+.head{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  padding:13px 15px;display:flex;flex-direction:column;gap:11px}
+.score{display:flex;align-items:flex-end;justify-content:center;gap:10px}
+.score__side{display:flex;flex-direction:column;gap:2px}
+.score__side--l{align-items:flex-end}
+.score__tag{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em}
+.score__tag--us{color:var(--to-accent)} .score__tag--them{color:var(--to-text-3)}
+.score__val{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:46px;line-height:.86}
+.score__val--them{color:var(--to-text-2)}
+.score__sep{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:22px;
+  line-height:2;color:var(--to-text-4)}
+.qrow{display:flex;gap:5px}
+.q{flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0;
+  border-radius:12px;background:transparent;border:1px solid var(--to-hairline)}
+.q__l{font-family:'Geist Mono',monospace;font-size:11px;font-weight:700;color:var(--to-text-4)}
+.q__s{font-family:'Geist Mono',monospace;font-size:8px;color:var(--to-text-4)}
+.q--done{background:var(--to-surface-3);border-color:var(--to-border)}
+.q--done .q__l{color:var(--to-text-2)}
+.q--live{flex-grow:1.4;background:var(--to-accent);border-color:var(--to-accent)}
+.q--live .q__l{color:var(--to-on-accent)}
+.q--live .q__s{color:rgba(10,12,15,.62)}
+.foulrow{display:flex;align-items:center;gap:9px}
+.dots{display:flex;gap:4px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--to-border)}
+.dot--on{background:var(--to-vacation)}
+.bonus{margin-left:auto;font-family:'Geist Mono',monospace;font-size:9px;color:var(--to-vacation)}
+
+/* Aktionen */
+.pad{display:flex;flex-direction:column;gap:9px}
+.prow{display:flex;gap:9px}
+.btn{flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  height:58px;border-radius:16px;background:var(--to-surface-3);border:1px solid var(--to-line);
+  font-size:15px;font-weight:600}
+.btn__sub{font-family:'Geist Mono',monospace;font-size:8px;letter-spacing:.08em;color:var(--to-text-4)}
+.btn--shot{height:62px;border-radius:18px}
+.btn--make{background:rgba(200,255,46,.12);border-color:var(--to-accent-frame);color:var(--to-accent)}
+.btn--make .btn__sub{color:rgba(200,255,46,.55)}
+.btn--miss{background:rgba(255,90,103,.10);border-color:var(--to-danger-frame);color:var(--to-danger-text)}
+.btn--miss .btn__sub{color:rgba(255,122,133,.55)}
+.btn__top{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:700}
+.btn--danger{background:rgba(255,90,103,.08);border-color:var(--to-danger-frame);color:var(--to-danger-text)}
+.btn--volt{background:rgba(200,255,46,.08);border-color:var(--to-accent-frame);color:var(--to-accent);
+  flex-direction:row;gap:8px}
+.btn[aria-pressed="true"]{outline:2px solid var(--to-accent);outline-offset:-2px}
+.opp{display:flex;align-items:center;gap:9px;height:58px;padding:0 14px;border-radius:16px;
+  background:rgba(255,90,103,.07);border:1px solid var(--to-danger-frame)}
+.opp__l{flex:1 1 auto;font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;
+  color:var(--to-danger-text)}
+.opp__b{width:58px;height:42px;border-radius:12px;background:rgba(255,90,103,.14);
+  border:1px solid var(--to-danger-frame);color:var(--to-danger-text);font-size:16px;font-weight:700}
+
+/* Bestätigung */
+.confirm{display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px;border-radius:18px;
+  background:var(--to-surface-3);border:1px solid var(--to-border)}
+.confirm__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.confirm__lbl{font-family:'Geist Mono',monospace;font-size:8px;letter-spacing:.12em;color:var(--to-text-4)}
+.confirm__line{display:flex;align-items:center;gap:8px;min-width:0}
+.num{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 6px;
+  border-radius:7px;background:var(--to-surface-2);font-family:'Geist Mono',monospace;font-size:11px;
+  color:var(--to-text-2);flex:none}
+.confirm__txt{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.confirm__pts{font-family:'Geist Mono',monospace;font-size:12px;font-weight:700;flex:none}
+.undo{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:46px;padding:0 16px;
+  border-radius:14px;background:rgba(255,90,103,.10);border:1px solid var(--to-danger-frame);
+  color:var(--to-danger-text);font-size:14px;font-weight:600;flex:none}
+.undo:disabled{opacity:.4;cursor:default}
+
+/* Spielerauswahl */
+.pick{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-accent-frame);
+  padding:13px;display:flex;flex-direction:column;gap:9px}
+.pick__lbl{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-accent);
+  padding:0 3px}
+.ptile{flex:1 1 0;display:flex;align-items:center;gap:10px;height:116px;padding:0 11px;border-radius:18px;
+  background:var(--to-surface-3);border:1px solid var(--to-line);text-align:left}
+.ptile--out{border-color:var(--to-danger-frame)}
+.photo{width:56px;height:56px;flex:none;border-radius:50%;background:var(--to-surface-2);
+  border:1px solid var(--to-border);display:grid;place-items:center;overflow:hidden}
+.photo img{width:100%;height:100%;object-fit:cover}
+.ptile__main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ptile__num{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:26px;line-height:1}
+.ptile--out .ptile__num{color:var(--to-danger-text)}
+.ptile__name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptile__f{font-family:'Geist Mono',monospace;font-size:8px;letter-spacing:.06em;color:var(--to-text-4)}
+.ptile__f--warn{color:var(--to-vacation)} .ptile__f--out{color:var(--to-danger-text)}
+.ptile--cancel{flex-direction:column;justify-content:center;gap:7px;background:transparent;
+  border:1px dashed var(--to-danger-frame);color:var(--to-danger-text);font-size:13px;font-weight:600}
+.ptile[aria-pressed="true"]{border-color:var(--to-accent);background:rgba(200,255,46,.07)}
+
+/* Auf dem Feld */
+.court{border-radius:20px;background:var(--to-surface);border:1px solid var(--to-border);
+  padding:12px 13px;display:flex;flex-direction:column;gap:10px}
+.court__row{display:flex;gap:6px}
+.chip{flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;
+  border-radius:12px;background:var(--to-surface-3);border:1px solid var(--to-border)}
+.chip--out{border-color:var(--to-danger-frame)}
+.chip__num{width:34px;height:34px;border-radius:10px;background:var(--to-surface-2);display:grid;
+  place-items:center;font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:16px}
+.chip--out .chip__num{background:rgba(255,90,103,.14);color:var(--to-danger-text)}
+.chip__name{font-size:10px;color:var(--to-text-2);white-space:nowrap}
+.chip__f{font-family:'Geist Mono',monospace;font-size:8px;color:var(--to-text-4)}
+.chip__f--warn{color:var(--to-vacation)} .chip__f--out{color:var(--to-danger-text)}
+
+/* Verlauf + Box */
+.panel{border-radius:20px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.panel__head{display:flex;align-items:center;gap:10px;padding:11px 15px}
+.lrow{display:flex;align-items:center;gap:10px;padding:10px 15px;border-top:1px solid var(--to-surface-2)}
+.lrow__q{font-family:'Geist Mono',monospace;font-size:9px;color:var(--to-text-4);flex:none}
+.lrow__n{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:20px;padding:0 5px;
+  border-radius:6px;background:var(--to-surface-2);font-family:'Geist Mono',monospace;font-size:10px;
+  color:var(--to-text-3);flex:none}
+.lrow__t{flex:1 1 auto;font-size:13px;color:var(--to-text-2)}
+.lrow__p{font-family:'Geist Mono',monospace;font-size:11px;font-weight:700;flex:none}
+.boxhead{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--to-surface-3)}
+.boxhead span,.boxrow span{font-family:'Geist Mono',monospace;font-size:8px;letter-spacing:.1em;
+  color:var(--to-text-4)}
+.boxrow{display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--to-surface-2)}
+.boxrow--total{background:var(--to-surface-3)}
+.boxrow__n{flex:1 1 auto;min-width:0;font-family:'Geist',sans-serif !important;font-size:12px;font-weight:500;
+  color:var(--to-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0 !important}
+.boxrow--total .boxrow__n{font-weight:700;color:var(--to-accent)}
+.boxrow__v{width:30px;text-align:right;font-family:'Geist Mono',monospace;font-size:11px;font-weight:700;
+  color:var(--to-text);letter-spacing:0}
+.boxrow--total .boxrow__v{color:var(--to-accent)}
+.boxrow__s{width:26px;text-align:right;font-family:'Geist Mono',monospace;font-size:11px;
+  color:var(--to-text-2);letter-spacing:0}
+.big{display:flex;align-items:center;justify-content:center;height:52px;border-radius:999px;
+  font-size:15px;font-weight:600;width:100%}
+.big--end{background:rgba(255,90,103,.08);border:1px solid var(--to-danger-frame);color:var(--to-danger-text)}
+.big--q{background:transparent;border:1px solid var(--to-line);color:var(--to-text-2)}
+.note{font-size:12px;color:var(--to-text-4);line-height:1.5}
+
+/* Blatt */
+.scrim{position:fixed;inset:0;background:rgba(5,6,8,.74);display:flex;flex-direction:column;
+  justify-content:flex-end;z-index:20}
+.sheet{width:390px;margin:0 auto;background:var(--to-surface);border-top:1px solid var(--to-border);
+  border-radius:26px 26px 0 0;padding:12px 20px 22px;display:flex;flex-direction:column;gap:14px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sheet__note{font-size:12px;color:var(--to-text-4);line-height:1.5}
+.sheet__score{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:18px;
+  background:var(--to-surface-3);border:1px solid var(--to-hairline)}
+.sheet__push{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:16px;
+  background:rgba(200,255,46,.06);border:1px solid var(--to-accent-frame);font-size:12px;
+  color:var(--to-text-2);line-height:1.5}
+.sheet__acts{display:flex;flex-direction:column;gap:8px}
+.b1{height:46px;border-radius:999px;background:var(--to-accent);color:var(--to-on-accent);
+  font-size:15px;font-weight:600;width:100%}
+.b2{height:46px;border-radius:999px;border:1px solid var(--to-line);color:var(--to-text-2);
+  font-size:15px;font-weight:600;width:100%}
+.b3{height:24px;color:var(--to-text-3);font-size:13px;width:100%}
+.bd{height:46px;border-radius:999px;background:var(--to-danger);color:#120507;font-size:15px;
+  font-weight:600;width:100%}
+
+/* ===== Querformat ab 900px ===== */
+.deskonly{display:none}
+@media (min-width:900px){
+  .wrap{width:100%;max-width:1024px;padding:16px 20px;gap:12px}
+  .deskonly{display:flex}
+  .mobonly{display:none !important}
+  .cols{display:flex;gap:12px;align-items:flex-start}
+  .col-l{width:330px;flex:none;border-radius:20px;background:var(--to-surface);
+    border:1px solid var(--to-border);padding:14px;display:flex;flex-direction:column;gap:9px}
+  .col-m{flex:1 1 auto;min-width:0;border-radius:20px;background:var(--to-surface);
+    border:1px solid var(--to-accent-frame);padding:14px;display:flex;flex-direction:column;gap:10px}
+  .col-r{width:262px;flex:none;display:flex;flex-direction:column;gap:12px}
+  .head{flex-direction:row;align-items:center;gap:16px}
+  .head__block{display:flex;flex-direction:column;gap:11px;flex:1 1 auto}
+  .ptile{height:100px}
+  .photo{width:48px;height:48px}
+  .btn{height:44px} .btn--shot{height:52px}
+  .opp{height:48px} .opp__b{height:36px;width:52px}
+  .head{padding:11px 14px}
+  .score__val{font-size:34px} .score__sep{font-size:18px;line-height:2.2}
+  .q{padding:6px 0}
+  .confirm{padding:8px 10px 8px 12px}
+  .undo{height:40px;padding:0 13px}
+  .lrow{padding:8px 14px}
+  .boxrow{padding:6px 14px}
+  .col-l,.col-m{padding:12px}
+  .big{height:44px}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="wrap"></div>
+<div class="scrim" id="scrim" hidden><div class="sheet" id="sheet"></div></div>
+
+<script>
+(function(){
+  'use strict';
+
+  var PLAYERS = [
+    { id:'p1', num:'17', name:'Axel F.',    full:'Axel Flaujac',      on:true,  f:1, pts:6, reb:2 },
+    { id:'p2', num:'23', name:'Benaja F.',  full:'Benaja Feuersänger',on:true,  f:0, pts:8, reb:3 },
+    { id:'p3', num:'12', name:'Daniel T.',  full:'Daniel Tekeste',    on:true,  f:4, pts:2, reb:1 },
+    { id:'p4', num:'8',  name:'Eldar Z.',   full:'Eldar Zherokov',    on:true,  f:2, pts:4, reb:4 },
+    { id:'p5', num:'6',  name:'Richard S.', full:'Richard Schneider', on:true,  f:0, pts:4, reb:0 },
+    { id:'p6', num:'4',  name:'Finn W.',    full:'Finn Weidemann',    on:false, f:0, pts:0, reb:1 },
+    { id:'p7', num:'9',  name:'Luca B.',    full:'Luca Bürkle',       on:false, f:1, pts:0, reb:0 },
+    { id:'p8', num:'26', name:'Marc R.',    full:'Marc Rewald',       on:false, f:0, pts:0, reb:2 },
+    { id:'p9', num:'11', name:'Paul H.',    full:'Paul Hauptmann',    on:false, f:0, pts:0, reb:0 },
+    { id:'p10',num:'31', name:'Fin P.',     full:'Fin Petereit',      on:false, f:2, pts:0, reb:1 },
+    { id:'p11',num:'5',  name:'Sven H.',    full:'Sven Hasenpusch',   on:false, f:0, pts:0, reb:0 }
+  ];
+
+  var ACTIONS = {
+    make2: { label:'2er', kind:'make', pts:2, text:'2er ✓' },
+    miss2: { label:'2er', kind:'miss', pts:0, text:'2er ✗' },
+    make3: { label:'3er', kind:'make', pts:3, text:'3er ✓' },
+    miss3: { label:'3er', kind:'miss', pts:0, text:'3er ✗' },
+    makef: { label:'FW',  kind:'make', pts:1, text:'FW ✓' },
+    missf: { label:'FW',  kind:'miss', pts:0, text:'FW ✗' },
+    rebd:  { label:'Reb DEF', text:'Reb DEF' },
+    rebo:  { label:'Reb OFF', text:'Reb OFF' },
+    ast:   { label:'Assist',  text:'Assist' },
+    stl:   { label:'Steal',   text:'Steal' },
+    blk:   { label:'Block',   text:'Block' },
+    tov:   { label:'Turnover',text:'Turnover' },
+    foul:  { label:'Foul',    text:'Foul', foul:true }
+  };
+
+  var S = {
+    us: 24, them: 27, quarter: 2, teamFouls: 3,
+    qScores: ['18:20', null, null, null, null],
+    log: [], pendingAction: null, pendingPlayer: null,
+    view: 'track', subMode: null
+  };
+
+  function el(id){ return document.getElementById(id); }
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function court(){ return PLAYERS.filter(function(p){ return p.on; }); }
+  function bench(){ return PLAYERS.filter(function(p){ return !p.on; }); }
+  function byId(id){ return PLAYERS.filter(function(p){ return p.id === id; })[0]; }
+  function isWide(){ return window.innerWidth >= 900; }
+
+  var PHOTO = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#7C8594" ' +
+    'style="stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true">' +
+    '<circle cx="12" cy="8.6" r="3.7"></circle><path d="M4.8 20.2a7.6 7.6 0 0 1 14.4 0"></path></svg>';
+
+  function foulClass(p){ return p.f >= 5 ? ' ptile__f--out' : (p.f >= 4 ? ' ptile__f--warn' : ''); }
+  function foulText(p){ return p.f + (p.f === 1 ? ' FOUL' : ' FOULS'); }
+
+  /* ---------- Bausteine ---------- */
+  function headHtml(){
+    var qs = ['Q1','Q2','Q3','Q4','OT'].map(function(l, i){
+      var n = i + 1;
+      var cls = n === S.quarter ? 'q q--live' : (n < S.quarter ? 'q q--done' : 'q');
+      var sub = n === S.quarter ? 'LÄUFT' : (S.qScores[i] || '–');
+      return '<span class="'+cls+'"><span class="q__l">'+l+'</span><span class="q__s">'+sub+'</span></span>';
+    }).join('');
+    var dots = [0,1,2,3,4].map(function(i){
+      return '<span class="dot'+(i < S.teamFouls ? ' dot--on' : '')+'"></span>';
+    }).join('');
+    return '<div class="head">'+
+      '<div class="head__block">'+
+        '<div class="score">'+
+          '<span class="score__side score__side--l"><span class="score__tag score__tag--us">TBW</span>'+
+          '<span class="score__val" id="usVal">'+S.us+'</span></span>'+
+          '<span class="score__sep">:</span>'+
+          '<span class="score__side"><span class="score__tag score__tag--them">HSV</span>'+
+          '<span class="score__val score__val--them" id="themVal">'+S.them+'</span></span>'+
+        '</div>'+
+        '<div class="qrow">'+qs+'</div>'+
+        '<div class="foulrow"><span class="lbl">TEAMFOULS Q'+S.quarter+'</span>'+
+          '<span class="dots">'+dots+'</span>'+
+          '<span class="bonus">'+(5 - S.teamFouls)+' BIS BONUS</span></div>'+
+      '</div>'+
+      '<button class="big big--q deskonly" type="button" data-sheet="quarter" '+
+        'style="width:160px;flex:none">Viertel beenden</button>'+
+    '</div>';
+  }
+
+  function padHtml(){
+    function shot(make, miss, label, sub){
+      return '<div class="prow">'+
+        '<button class="btn btn--shot btn--make" type="button" data-act="'+make+'" aria-pressed="'+
+          (S.pendingAction === make)+'">'+
+          '<span class="btn__top">'+label+' <svg viewBox="0 0 24 24" width="17" height="17" fill="none" '+
+          'stroke="currentColor" style="stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round">'+
+          '<path d="M5 13l4 4L19 7"></path></svg></span>'+
+          '<span class="btn__sub">'+sub+'</span></button>'+
+        '<button class="btn btn--shot btn--miss" type="button" data-act="'+miss+'" aria-pressed="'+
+          (S.pendingAction === miss)+'">'+
+          '<span class="btn__top">'+label+' <svg viewBox="0 0 24 24" width="16" height="16" fill="none" '+
+          'stroke="currentColor" style="stroke-width:2.8;stroke-linecap:round">'+
+          '<path d="M6 6l12 12M18 6L6 18"></path></svg></span>'+
+          '<span class="btn__sub">DANEBEN</span></button>'+
+      '</div>';
+    }
+    function b(key, sub){
+      var a = ACTIONS[key];
+      return '<button class="btn'+(a.foul ? ' btn--danger' : '')+'" type="button" data-act="'+key+
+        '" aria-pressed="'+(S.pendingAction === key)+'">'+a.label+
+        (sub ? '<span class="btn__sub">'+sub+'</span>' : '')+'</button>';
+    }
+    return '<div class="pad">'+
+      '<span class="lbl" style="padding-left:2px">WÜLFRATH · WAS IST PASSIERT?</span>'+
+      shot('make2','miss2','2er','2 PUNKTE')+
+      shot('make3','miss3','3er','3 PUNKTE')+
+      shot('makef','missf','FW','1 PUNKT')+
+      '<div class="prow">'+b('rebd','DEFENSIV')+b('rebo','OFFENSIV')+'</div>'+
+      '<div class="prow">'+b('ast')+b('stl')+'</div>'+
+      '<div class="prow">'+b('blk')+b('tov')+'</div>'+
+      '<div class="prow">'+b('foul')+
+        '<button class="btn btn--volt" type="button" data-sub="1">'+
+        '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" '+
+        'style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round">'+
+        '<path d="M17 3l4 4-4 4M21 7H8M7 21l-4-4 4-4M3 17h13"></path></svg>Wechseln</button></div>'+
+      '<div class="opp"><span class="opp__l">GEGNER TRIFFT</span>'+
+        '<button class="opp__b" type="button" data-opp="1">+1</button>'+
+        '<button class="opp__b" type="button" data-opp="2">+2</button>'+
+        '<button class="opp__b" type="button" data-opp="3">+3</button></div>'+
+    '</div>';
+  }
+
+  function confirmHtml(){
+    var last = S.log[0];
+    var txt = last ? last.text : 'Noch nichts getippt';
+    var num = last && last.num ? '<span class="num">'+last.num+'</span>' : '';
+    var pts = last && last.pts ? '<span class="confirm__pts" style="color:'+
+      (last.opp ? 'var(--to-danger-text)' : 'var(--to-accent)')+'">+'+last.pts+'</span>' : '';
+    return '<div class="confirm">'+
+      '<span class="confirm__main"><span class="confirm__lbl">ZULETZT GETIPPT</span>'+
+      '<span class="confirm__line">'+num+'<span class="confirm__txt">'+esc(txt)+'</span>'+pts+'</span></span>'+
+      '<button class="undo" type="button" data-undo="1"'+(S.log.length ? '' : ' disabled')+'>'+
+      '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" '+
+      'style="stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round">'+
+      '<path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"></path></svg>Zurück</button>'+
+    '</div>';
+  }
+
+  function tileHtml(p, pressed){
+    return '<button class="ptile'+(p.f >= 5 ? ' ptile--out' : '')+'" type="button" data-pick="'+p.id+
+      '" aria-pressed="'+(!!pressed)+'">'+
+      '<span class="photo">'+PHOTO+'</span>'+
+      '<span class="ptile__main"><span class="ptile__num">'+p.num+'</span>'+
+      '<span class="ptile__name">'+esc(p.name)+'</span>'+
+      '<span class="ptile__f'+foulClass(p)+'">'+foulText(p)+'</span></span></button>';
+  }
+
+  function rosterHtml(title, list, withCancel){
+    var rows = '', i;
+    for (i = 0; i < list.length; i += 2) {
+      rows += '<div class="prow">' + tileHtml(list[i], S.pendingPlayer === list[i].id);
+      if (list[i+1]) rows += tileHtml(list[i+1], S.pendingPlayer === list[i+1].id);
+      else if (withCancel) rows += '<button class="ptile ptile--cancel" type="button" data-cancel="1">'+
+        '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" '+
+        'style="stroke-width:2.4;stroke-linecap:round"><path d="M6 6l12 12M18 6L6 18"></path></svg>Abbrechen</button>';
+      else rows += '<span class="ptile" style="visibility:hidden"></span>';
+      rows += '</div>';
+    }
+    return '<div class="pick"><span class="pick__lbl">'+title+'</span>'+rows+'</div>';
+  }
+
+  function courtHtml(){
+    var chips = court().map(function(p){
+      return '<span class="chip'+(p.f >= 5 ? ' chip--out' : '')+'">'+
+        '<span class="chip__num">'+p.num+'</span>'+
+        '<span class="chip__name">'+esc(p.name.split(' ')[0])+'</span>'+
+        '<span class="chip__f'+(p.f >= 5 ? ' chip__f--out' : (p.f >= 4 ? ' chip__f--warn' : ''))+'">'+
+        p.f+' F</span></span>';
+    }).join('');
+    return '<div class="court"><span class="lbl" style="padding-left:3px">AUF DEM FELD</span>'+
+      '<div class="court__row">'+chips+'</div></div>';
+  }
+
+  function logHtml(limit){
+    var rows = S.log.slice(0, limit || 4).map(function(l){
+      return '<div class="lrow"><span class="lrow__q">Q'+l.q+'</span>'+
+        '<span class="lrow__n">'+(l.num || '–')+'</span>'+
+        '<span class="lrow__t">'+esc(l.text)+'</span>'+
+        '<span class="lrow__p" style="color:'+(l.pts ? (l.opp ? 'var(--to-danger-text)' : 'var(--to-accent)') :
+          'var(--to-text-4)')+'">'+(l.pts ? '+'+l.pts : '')+'</span></div>';
+    }).join('');
+    return '<div class="panel"><span class="lbl" style="padding:11px 15px 9px">VERLAUF</span>'+
+      (rows || '<div class="lrow"><span class="lrow__t">Noch keine Aktionen.</span></div>')+'</div>';
+  }
+
+  function boxHtml(onlyCourt){
+    var list = PLAYERS.filter(function(p){ return onlyCourt ? p.on : (p.on || p.pts || p.f || p.reb); });
+    var tot = { pts:0, reb:0, f:0 };
+    var rows = list.map(function(p){
+      tot.pts += p.pts; tot.reb += p.reb; tot.f += p.f;
+      return '<div class="boxrow"><span class="boxrow__n">'+esc(p.full)+'</span>'+
+        '<span class="boxrow__v">'+p.pts+'</span><span class="boxrow__s">'+p.reb+'</span>'+
+        '<span class="boxrow__s" style="width:22px">'+p.f+'</span></div>';
+    }).join('');
+    return '<div class="panel">'+
+      '<div class="boxhead"><span style="flex:1 1 auto">SPIELER</span>'+
+      '<span style="width:30px;text-align:right">PKT</span>'+
+      '<span style="width:26px;text-align:right">REB</span>'+
+      '<span style="width:22px;text-align:right">F</span></div>'+
+      rows+
+      '<div class="boxrow boxrow--total"><span class="boxrow__n">Team</span>'+
+      '<span class="boxrow__v">'+tot.pts+'</span><span class="boxrow__s">'+tot.reb+'</span>'+
+      '<span class="boxrow__s" style="width:22px">'+tot.f+'</span></div>'+
+    '</div>';
+  }
+
+  /* ---------- Ansichten ---------- */
+  function render(){
+    if (isWide()) { renderWide(); return; }
+    var body = '';
+    if (S.view === 'who' && S.pendingAction) {
+      body = headHtml() +
+        rosterHtml('WER WAR ES? · ' + ACTIONS[S.pendingAction].text.toUpperCase(), court(), true) +
+        confirmHtml() +
+        '<span class="note">Die Auswahl steht an der Stelle des Tastenfelds – kein Scrollen, ' +
+        'kein Suchen. Nach dem Tipp ist das Tastenfeld sofort wieder da.</span>';
+    } else if (S.view === 'sub') {
+      body = headHtml() +
+        (S.subMode === 'out'
+          ? rosterHtml('WER GEHT RAUS?', court(), true)
+          : rosterHtml('WER KOMMT REIN?', bench(), true));
+    } else if (S.view === 'box') {
+      body = headHtml() + boxHtml() +
+        '<button class="big big--q" type="button" data-view="track">Zurück zum Tracking</button>';
+    } else {
+      body = headHtml() + padHtml() + confirmHtml() + courtHtml() + logHtml(3) +
+        '<button class="big big--q" type="button" data-view="box">Box-Score ansehen</button>' +
+        '<button class="big big--q" type="button" data-sheet="quarter">Viertel beenden</button>' +
+        '<button class="big big--end" type="button" data-sheet="finish">Spiel beenden</button>' +
+        '<span class="note">Keine Spieluhr. Erst die Aktion, dann der Spieler – „Zurück" nimmt den ' +
+        'letzten Eintrag sofort wieder raus.</span>';
+    }
+    el('wrap').innerHTML = body;
+  }
+
+  function renderWide(){
+    var title = S.pendingAction
+      ? 'WER WAR ES? · ' + ACTIONS[S.pendingAction].text.toUpperCase()
+      : (S.view === 'sub' ? (S.subMode === 'out' ? 'WER GEHT RAUS?' : 'WER KOMMT REIN?')
+                          : 'MANNSCHAFT · IMMER ANTIPPBAR');
+    var list = (S.view === 'sub' && S.subMode === 'in') ? bench() : court();
+    var benchChips = bench().map(function(p){
+      return '<span class="chip" style="flex:1 1 0"><span class="chip__num">'+p.num+'</span>'+
+        '<span class="chip__name">'+esc(p.name)+'</span></span>';
+    });
+    var benchRows = '';
+    for (var i = 0; i < benchChips.length; i += 3) {
+      benchRows += '<div class="court__row">'+benchChips.slice(i, i+3).join('')+'</div>';
+    }
+    el('wrap').innerHTML = headHtml() +
+      '<div class="cols">'+
+        '<div class="col-l">'+padHtml()+confirmHtml()+'</div>'+
+        '<div class="col-m"><span class="pick__lbl">'+title+'</span>'+
+          rosterHtml('', list, !!(S.pendingAction || S.pendingPlayer || S.view === 'sub')).replace('<div class="pick"><span class="pick__lbl"></span>', '<div style="display:flex;flex-direction:column;gap:9px">')+
+          '<span class="lbl" style="padding-top:6px">BANK</span>'+benchRows+
+        '</div>'+
+        '<div class="col-r">'+logHtml(4)+boxHtml(true)+
+          '<button class="big big--end" type="button" data-sheet="finish">Spiel beenden</button></div>'+
+      '</div>';
+  }
+
+  /* ---------- Buchen ---------- */
+  function commit(actionKey, playerId){
+    var a = ACTIONS[actionKey];
+    var p = playerId ? byId(playerId) : null;
+    var entry = { q: S.quarter, num: p ? p.num : '', text: (p ? p.name + ' · ' : '') + a.text,
+                  pts: a.pts || 0, action: actionKey, player: playerId };
+    if (a.pts) { S.us += a.pts; if (p) p.pts += a.pts; }
+    if (actionKey === 'rebd' || actionKey === 'rebo') { if (p) p.reb += 1; }
+    if (a.foul && p) {
+      p.f += 1; S.teamFouls += 1;
+      entry.text = p.name + ' · Foul (' + p.f + '.)';
+      if (p.f >= 5) { S.log.unshift(entry); S.pendingAction = null; S.pendingPlayer = null;
+        render(); sheetFoulOut(p); return; }
+    }
+    S.log.unshift(entry);
+    S.pendingAction = null; S.pendingPlayer = null;
+    if (!isWide()) S.view = 'track';
+    render();
+  }
+
+  function undo(){
+    var l = S.log.shift(); if (!l) return;
+    var p = l.player ? byId(l.player) : null;
+    if (l.opp) { S.them -= l.pts; }
+    else {
+      if (l.pts) { S.us -= l.pts; if (p) p.pts -= l.pts; }
+      if (l.action === 'rebd' || l.action === 'rebo') { if (p) p.reb -= 1; }
+      if (l.action === 'foul' && p) { p.f -= 1; S.teamFouls = Math.max(0, S.teamFouls - 1); }
+    }
+    render();
+  }
+
+  /* ---------- Blätter ---------- */
+  function openSheet(html){ el('sheet').innerHTML = '<span class="sheet__grip"></span>'+html; el('scrim').hidden = false; }
+  function closeSheet(){ el('scrim').hidden = true; }
+
+  function sheetQuarter(){
+    openSheet(
+      '<span class="sheet__title">Viertel '+S.quarter+' beenden?</span>'+
+      '<div class="sheet__score">'+
+        '<span style="display:flex;flex-direction:column;gap:3px;flex:1 1 auto">'+
+        '<span class="score__tag score__tag--us">TB WÜLFRATH</span>'+
+        '<span style="font-family:\'Archivo\';font-stretch:62%;font-weight:800;font-size:34px;line-height:.9">'+S.us+'</span></span>'+
+        '<span class="score__sep">:</span>'+
+        '<span style="display:flex;flex-direction:column;gap:3px;flex:1 1 auto;align-items:flex-end">'+
+        '<span class="score__tag score__tag--them">HSV SOLINGEN</span>'+
+        '<span style="font-family:\'Archivo\';font-stretch:62%;font-weight:800;font-size:34px;line-height:.9;color:var(--to-text-2)">'+S.them+'</span></span>'+
+      '</div>'+
+      '<div class="sheet__push"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#C8FF2E" '+
+      'style="stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;margin-top:1px">'+
+      '<path d="M18 8a6 6 0 1 0-12 0c0 7-2.5 8-2.5 8h17S18 15 18 8zM10.5 20a2 2 0 0 0 3 0"></path></svg>'+
+      'Alle im Team bekommen den Zwischenstand als Push: <strong style="color:var(--to-text)">Ende Q'+
+      S.quarter+' · '+S.us+':'+S.them+'</strong></div>'+
+      '<span class="sheet__note">Danach läuft Viertel '+(S.quarter+1)+', die Teamfouls fangen wieder bei '+
+      'null an. Zurückspringen geht über die Viertel-Leiste.</span>'+
+      '<div class="sheet__acts">'+
+        '<button class="b1" type="button" data-q="push">Viertel beenden und Push senden</button>'+
+        '<button class="b2" type="button" data-q="quiet">Beenden ohne Push</button>'+
+        '<button class="b3" type="button" data-sheet="close">Abbrechen</button>'+
+      '</div>');
+  }
+
+  function sheetFinish(){
+    openSheet(
+      '<span class="sheet__title">Spiel beenden?</span>'+
+      '<span class="sheet__note">Endstand '+S.us+':'+S.them+'. Danach wandern Ergebnis und Box-Score in '+
+      'die Statistik, und die Meldung geht an alle. Nachträgliche Korrekturen macht der Trainer im '+
+      'Adminbereich unter „Spiele".</span>'+
+      '<div class="sheet__acts">'+
+        '<button class="b1" type="button" data-sheet="close">Spiel beenden</button>'+
+        '<button class="b2" type="button" data-sheet="close">Weiter tracken</button>'+
+      '</div>');
+  }
+
+  function sheetFoulOut(p){
+    openSheet(
+      '<span class="sheet__title">'+esc(p.name)+' hat 5 Fouls</span>'+
+      '<span class="sheet__note">Nach dem fünften Foul darf '+esc(p.name)+' nicht mehr eingesetzt werden. '+
+      'Wechsle jemanden von der Bank ein – bis dahin steht die Nummer rot auf dem Feld.</span>'+
+      '<div class="sheet__acts">'+
+        '<button class="b1" type="button" data-foulsub="'+p.id+'">Jetzt wechseln</button>'+
+        '<button class="b3" type="button" data-sheet="close">Später</button>'+
+      '</div>');
+  }
+
+  /* ---------- Ereignisse ---------- */
+  document.addEventListener('click', function(e){
+    var t;
+
+    if ((t = e.target.closest('button[data-act]'))) {
+      S.pendingAction = t.dataset.act;
+      if (isWide() && S.pendingPlayer) { commit(S.pendingAction, S.pendingPlayer); return; }
+      if (!isWide()) S.view = 'who';
+      render(); return;
+    }
+
+    if ((t = e.target.closest('button[data-pick]'))) {
+      var id = t.dataset.pick;
+      if (S.view === 'sub') {
+        if (S.subMode === 'out') { S.outId = id; S.subMode = 'in'; render(); return; }
+        var outP = byId(S.outId), inP = byId(id);
+        if (outP && inP) { outP.on = false; inP.on = true;
+          S.log.unshift({ q:S.quarter, num:inP.num, text:inP.name+' kommt für '+outP.name, pts:0, sub:true }); }
+        S.subMode = null; S.view = 'track'; render(); return;
+      }
+      if (S.pendingAction) { commit(S.pendingAction, id); return; }
+      S.pendingPlayer = (S.pendingPlayer === id) ? null : id; render(); return;
+    }
+
+    if ((t = e.target.closest('button[data-opp]'))) {
+      var n = parseInt(t.dataset.opp, 10);
+      S.them += n;
+      S.log.unshift({ q:S.quarter, num:'', text:'Gegner · '+(n===1?'Freiwurf':n+'er'), pts:n, opp:true });
+      render(); return;
+    }
+
+    if (e.target.closest('button[data-undo]')) { undo(); return; }
+    if (e.target.closest('button[data-cancel]')) {
+      S.pendingAction = null; S.pendingPlayer = null; S.subMode = null; S.view = 'track'; render(); return;
+    }
+    if ((t = e.target.closest('button[data-sub]'))) { S.view = 'sub'; S.subMode = 'out'; S.pendingAction = null; render(); return; }
+    if ((t = e.target.closest('button[data-view]'))) { S.view = t.dataset.view; render(); return; }
+
+    if ((t = e.target.closest('button[data-sheet]'))) {
+      var v = t.dataset.sheet;
+      if (v === 'quarter') sheetQuarter();
+      else if (v === 'finish') sheetFinish();
+      else closeSheet();
+      return;
+    }
+    if ((t = e.target.closest('button[data-q]'))) {
+      S.qScores[S.quarter - 1] = S.us + ':' + S.them;
+      S.quarter = Math.min(5, S.quarter + 1); S.teamFouls = 0;
+      closeSheet(); render(); return;
+    }
+    if ((t = e.target.closest('button[data-foulsub]'))) {
+      closeSheet(); S.view = 'sub'; S.subMode = 'in'; S.outId = t.dataset.foulsub; render(); return;
+    }
+    if (e.target === el('scrim')) closeSheet();
+  });
+
+  window.addEventListener('resize', render);
+
+  /* ---------- Zustände ---------- */
+  var state = new URLSearchParams(location.search).get('state') || 'track';
+
+  S.log = [
+    { q:2, num:'23', text:'Benaja F. · 3er ✓', pts:3, action:'make3', player:'p2' },
+    { q:2, num:'',   text:'Gegner · 2er', pts:2, opp:true },
+    { q:2, num:'12', text:'Daniel T. · Foul (4.)', pts:0, action:'foul', player:'p3' },
+    { q:2, num:'17', text:'Axel F. · Reb DEF', pts:0, action:'rebd', player:'p1' },
+    { q:2, num:'8',  text:'Eldar Z. · 2er ✗', pts:0, action:'miss2', player:'p4' }
+  ];
+
+  if (state === 'who' || state === 'padaction') { S.pendingAction = 'make2'; S.view = 'who'; }
+  if (state === 'sub') { S.view = 'sub'; S.subMode = 'out'; }
+  if (state === 'box') { S.view = 'box'; }
+  if (state === 'foulout') { S.view = 'track'; }
+
+  render();
+
+  if (state === 'quarter') sheetQuarter();
+  if (state === 'finish') sheetFinish();
+  if (state === 'foulout') { var d = byId('p3'); d.f = 5; render(); sheetFoulOut(d); }
+})();
+</script>
+</body>
+</html>

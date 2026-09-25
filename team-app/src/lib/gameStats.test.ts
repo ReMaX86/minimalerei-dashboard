@@ -5,6 +5,8 @@ import {
   computeQuarterScores,
   computeTeamScore,
   computeTeamTotals,
+  countPlayerFouls,
+  countTeamFouls,
   fgPct,
   fmtPlusMinus,
   quarterLabel
@@ -196,6 +198,44 @@ describe('fgPct', () => {
 
   it('shows a dash instead of 0% when no attempts were made', () => {
     expect(fgPct(0, 0)).toBe('–');
+  });
+});
+
+describe('computeBoxScore rebounds', () => {
+  it('counts rebound/rebound_def/rebound_off together in the same total', () => {
+    const events: GameStatEvent[] = [
+      ev({ team: 'us', player_id: 'p1', stat_type: 'rebound' }),
+      ev({ team: 'us', player_id: 'p1', stat_type: 'rebound_def' }),
+      ev({ team: 'us', player_id: 'p1', stat_type: 'rebound_off' })
+    ];
+    expect(computeBoxScore(events)[0].rebounds).toBe(3);
+  });
+});
+
+describe('countTeamFouls', () => {
+  it('counts only own fouls in the given quarter', () => {
+    const events: GameStatEvent[] = [
+      ev({ team: 'us', player_id: 'p1', stat_type: 'foul', quarter: 2 }),
+      ev({ team: 'us', player_id: 'p2', stat_type: 'foul', quarter: 2 }),
+      ev({ team: 'us', player_id: 'p1', stat_type: 'foul', quarter: 1 }),
+      ev({ team: 'opponent', stat_type: 'foul' as StatType, quarter: 2 })
+    ];
+    expect(countTeamFouls(events, 2)).toBe(2);
+  });
+
+  it('resets to 0 for a quarter with no fouls yet', () => {
+    expect(countTeamFouls([], 3)).toBe(0);
+  });
+});
+
+describe('countPlayerFouls', () => {
+  it('counts a single player across the whole game, not just one quarter', () => {
+    const events: GameStatEvent[] = [
+      ev({ team: 'us', player_id: 'p1', stat_type: 'foul', quarter: 1 }),
+      ev({ team: 'us', player_id: 'p1', stat_type: 'foul', quarter: 2 }),
+      ev({ team: 'us', player_id: 'p2', stat_type: 'foul', quarter: 2 })
+    ];
+    expect(countPlayerFouls(events, 'p1')).toBe(2);
   });
 });
 
