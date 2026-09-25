@@ -2581,8 +2581,8 @@ hier die getroffenen Entscheidungen samt Begründung:
 - **Element 24 "Live-Tracking": zwei Layouts (Handy/iPad-Querformat), Fouls pro Spieler und
   Team, getrennte Rebounds, manuelles Viertel-Ende mit Push, Box-Score-Bugfix (Migration
   `0074`).** `GameStatsTracker.tsx` komplett neu — dieselbe Seite trägt jetzt zwei Layouts
-  (Handy-Stapel, ab 900px ein Querformat mit drei Spalten für iPad quer), rein per Media
-  Query, keine zweite Route. Vor der Umsetzung sechs Rückfragen aus dem PROMPT geprüft: vier
+  (Handy-Stapel, ein Querformat mit drei Spalten für iPad quer), keine zweite Route. Vor der
+  Umsetzung sechs Rückfragen aus dem PROMPT geprüft: vier
   ließen sich direkt im Code beantworten (Mehrfach-Tracking ist bereits serverseitig weich
   gesperrt, siehe `claim_stat_session`/Migration 0028; +/- rechnete schon korrekt inkl.
   Wechsel über `game_lineup_log`; die Zwischenstand-Push beim Viertelwechsel ging schon an
@@ -2622,6 +2622,25 @@ hier die getroffenen Entscheidungen samt Begründung:
   Stellen in 9 weiteren Dateien. Für `GameStatsTracker.tsx` und die Tokens selbst behoben
   (neues `--to-danger-frame`, analog zu `--to-vacation-frame`/`--to-border-matchday`), die
   übrigen Fundstellen als eigene Aufgabe vorgeschlagen statt hier mit erledigt.
+  **Update (aktualisierte Vorlage, §1):** die Layout-Entscheidung lief bisher rein über eine
+  `min-[900px]:`-Media-Query — laut aktualisiertem PROMPT reicht die Fensterbreite allein
+  nicht, weil ein iPad hochkant (768–834px) sonst im kompakten Layout landet, obwohl der
+  Schirm groß genug wäre. Jetzt ein JS-State (`computeAutoWide()`): "Querformat" greift
+  automatisch ab 900px Breite **oder** ab 700px in echter Querlage (`width > height`), dazu
+  ein neuer Umschalter oben rechts ("Automatisch · Kompakt · Querformat", `10-ipad-hochkant.png`)
+  für alle, die es manuell fest stellen wollen — Wahl pro Gerät in `localStorage` gemerkt
+  (`tipoff-tracking-layout`), Testen per `?layout=wide`/`?layout=compact` in der URL (nicht
+  dauerhaft gemerkt). Auf Rotation reagiert die Seite über `resize`/`orientationchange`/
+  `matchMedia('(orientation: landscape)')`/`visualViewport`, mit zweifachem Nachfassen nach
+  ~120ms/~400ms, weil iOS nach einer Drehung die neuen Maße verzögert meldet. **Bug dabei
+  gefunden und behoben:** die Nachfass-Timer wurden beim Cleanup nie abgeräumt — schaltete man
+  kurz nach einer Drehung (oder einem Resize-Schub, z. B. durch einen Screenshot-Tool) manuell
+  den Modus um, konnte ein noch ausstehender Timer mit dem alten Layout-Stand den gerade neu
+  gesetzten Wert Millisekunden später wieder überschreiben. Jetzt werden die Timer-IDs
+  gesammelt und im Effekt-Cleanup explizit gecancelt. Spalten im Querformat sind bei sehr
+  schmaler erzwungener Breite (Handy quer, `max-width:1000px`) schmaler (288px/236px statt
+  330px/262px); `PlayerTile` bekam dafür `min-w-0`, damit die Spielerkacheln bei starker
+  Verengung sauber schrumpfen statt in die Nachbarspalte zu laufen.
 
 ## Projektstruktur
 

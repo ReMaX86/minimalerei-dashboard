@@ -200,33 +200,46 @@ button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:tran
 .bd{height:46px;border-radius:999px;background:var(--to-danger);color:#120507;font-size:15px;
   font-weight:600;width:100%}
 
-/* ===== Querformat ab 900px ===== */
+/* ===== Querformat: wird per Klasse gesetzt (Breite ODER Querlage ODER manuell) ===== */
 .deskonly{display:none}
-@media (min-width:900px){
-  .wrap{width:100%;max-width:1024px;padding:16px 20px;gap:12px}
-  .deskonly{display:flex}
-  .mobonly{display:none !important}
-  .cols{display:flex;gap:12px;align-items:flex-start}
-  .col-l{width:330px;flex:none;border-radius:20px;background:var(--to-surface);
-    border:1px solid var(--to-border);padding:14px;display:flex;flex-direction:column;gap:9px}
-  .col-m{flex:1 1 auto;min-width:0;border-radius:20px;background:var(--to-surface);
-    border:1px solid var(--to-accent-frame);padding:14px;display:flex;flex-direction:column;gap:10px}
-  .col-r{width:262px;flex:none;display:flex;flex-direction:column;gap:12px}
-  .head{flex-direction:row;align-items:center;gap:16px}
-  .head__block{display:flex;flex-direction:column;gap:11px;flex:1 1 auto}
-  .ptile{height:100px}
-  .photo{width:48px;height:48px}
-  .btn{height:44px} .btn--shot{height:52px}
-  .opp{height:48px} .opp__b{height:36px;width:52px}
-  .head{padding:11px 14px}
-  .score__val{font-size:34px} .score__sep{font-size:18px;line-height:2.2}
-  .q{padding:6px 0}
-  .confirm{padding:8px 10px 8px 12px}
-  .undo{height:40px;padding:0 13px}
-  .lrow{padding:8px 14px}
-  .boxrow{padding:6px 14px}
-  .col-l,.col-m{padding:12px}
-  .big{height:44px}
+.layoutbar{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.layoutbar__l{font-family:'Geist Mono',monospace;font-size:8px;letter-spacing:.12em;color:var(--to-text-4)}
+.seg{display:flex;gap:3px;padding:3px;border-radius:999px;background:var(--to-surface-3);
+  border:1px solid var(--to-hairline)}
+.seg button{height:26px;padding:0 11px;border-radius:999px;color:var(--to-text-3);font-size:11px;
+  font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--to-accent);color:var(--to-on-accent)}
+
+body.wide .wrap{width:100%;max-width:1180px;padding:16px 20px;gap:12px}
+body.wide .deskonly{display:flex}
+body.wide .mobonly{display:none !important}
+body.wide .cols{display:flex;gap:12px;align-items:flex-start}
+body.wide .col-l{width:330px;flex:none;border-radius:20px;background:var(--to-surface);
+  border:1px solid var(--to-border);padding:12px;display:flex;flex-direction:column;gap:9px}
+body.wide .col-m{flex:1 1 auto;min-width:0;border-radius:20px;background:var(--to-surface);
+  border:1px solid var(--to-accent-frame);padding:12px;display:flex;flex-direction:column;gap:10px}
+body.wide .col-r{width:262px;flex:none;display:flex;flex-direction:column;gap:12px}
+body.wide .head{flex-direction:row;align-items:center;gap:16px;padding:11px 14px}
+body.wide .head__block{display:flex;flex-direction:column;gap:11px;flex:1 1 auto}
+body.wide .ptile{height:100px}
+body.wide .photo{width:48px;height:48px}
+body.wide .btn{height:44px}
+body.wide .btn--shot{height:52px}
+body.wide .opp{height:48px}
+body.wide .opp__b{height:36px;width:52px}
+body.wide .score__val{font-size:34px}
+body.wide .score__sep{font-size:18px;line-height:2.2}
+body.wide .q{padding:6px 0}
+body.wide .confirm{padding:8px 10px 8px 12px}
+body.wide .undo{height:40px;padding:0 13px}
+body.wide .lrow{padding:8px 14px}
+body.wide .boxrow{padding:6px 14px}
+body.wide .big{height:44px}
+
+/* Sehr schmales Querformat (Handy quer): Spalten schmaler */
+@media (max-width:1000px){
+  body.wide .col-l{width:288px}
+  body.wide .col-r{width:236px}
 }
 </style>
 </head>
@@ -270,6 +283,7 @@ button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:tran
   };
 
   var S = {
+    layout: 'auto',
     us: 24, them: 27, quarter: 2, teamFouls: 3,
     qScores: ['18:20', null, null, null, null],
     log: [], pendingAction: null, pendingPlayer: null,
@@ -281,7 +295,17 @@ button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:tran
   function court(){ return PLAYERS.filter(function(p){ return p.on; }); }
   function bench(){ return PLAYERS.filter(function(p){ return !p.on; }); }
   function byId(id){ return PLAYERS.filter(function(p){ return p.id === id; })[0]; }
-  function isWide(){ return window.innerWidth >= 900; }
+  function autoWide(){
+    var w = window.innerWidth, h = window.innerHeight;
+    if (w >= 900) return true;                 // großer Schirm
+    if (w >= 700 && w > h) return true;        // Querlage mit genug Breite (iPad, Handy quer)
+    return false;
+  }
+  function isWide(){
+    var want = S.layout === 'auto' ? autoWide() : (S.layout === 'wide');
+    document.body.classList.toggle('wide', want);
+    return want;
+  }
 
   var PHOTO = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#7C8594" ' +
     'style="stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true">' +
@@ -291,6 +315,14 @@ button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:tran
   function foulText(p){ return p.f + (p.f === 1 ? ' FOUL' : ' FOULS'); }
 
   /* ---------- Bausteine ---------- */
+  function layoutBarHtml(){
+    function b(v, l){ return '<button type="button" data-layout="'+v+'" aria-pressed="'+
+      (S.layout === v)+'">'+l+'</button>'; }
+    return '<div class="layoutbar"><span class="layoutbar__l">ANSICHT</span>'+
+      '<span class="seg">'+b('auto','Automatisch')+b('compact','Kompakt')+b('wide','Querformat')+
+      '</span></div>';
+  }
+
   function headHtml(){
     var qs = ['Q1','Q2','Q3','Q4','OT'].map(function(l, i){
       var n = i + 1;
@@ -450,23 +482,23 @@ button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:tran
   /* ---------- Ansichten ---------- */
   function render(){
     if (isWide()) { renderWide(); return; }
-    var body = '';
+    var body = layoutBarHtml();
     if (S.view === 'who' && S.pendingAction) {
-      body = headHtml() +
+      body += headHtml() +
         rosterHtml('WER WAR ES? · ' + ACTIONS[S.pendingAction].text.toUpperCase(), court(), true) +
         confirmHtml() +
         '<span class="note">Die Auswahl steht an der Stelle des Tastenfelds – kein Scrollen, ' +
         'kein Suchen. Nach dem Tipp ist das Tastenfeld sofort wieder da.</span>';
     } else if (S.view === 'sub') {
-      body = headHtml() +
+      body += headHtml() +
         (S.subMode === 'out'
           ? rosterHtml('WER GEHT RAUS?', court(), true)
           : rosterHtml('WER KOMMT REIN?', bench(), true));
     } else if (S.view === 'box') {
-      body = headHtml() + boxHtml() +
+      body += headHtml() + boxHtml() +
         '<button class="big big--q" type="button" data-view="track">Zurück zum Tracking</button>';
     } else {
-      body = headHtml() + padHtml() + confirmHtml() + courtHtml() + logHtml(3) +
+      body += headHtml() + padHtml() + confirmHtml() + courtHtml() + logHtml(3) +
         '<button class="big big--q" type="button" data-view="box">Box-Score ansehen</button>' +
         '<button class="big big--q" type="button" data-sheet="quarter">Viertel beenden</button>' +
         '<button class="big big--end" type="button" data-sheet="finish">Spiel beenden</button>' +
@@ -490,7 +522,7 @@ button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:tran
     for (var i = 0; i < benchChips.length; i += 3) {
       benchRows += '<div class="court__row">'+benchChips.slice(i, i+3).join('')+'</div>';
     }
-    el('wrap').innerHTML = headHtml() +
+    el('wrap').innerHTML = layoutBarHtml() + headHtml() +
       '<div class="cols">'+
         '<div class="col-l">'+padHtml()+confirmHtml()+'</div>'+
         '<div class="col-m"><span class="pick__lbl">'+title+'</span>'+
@@ -618,6 +650,11 @@ button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:tran
       render(); return;
     }
 
+    if ((t = e.target.closest('button[data-layout]'))) {
+      S.layout = t.dataset.layout; S.pendingAction = null; S.pendingPlayer = null;
+      if (S.view === 'who') S.view = 'track';
+      render(); return;
+    }
     if (e.target.closest('button[data-undo]')) { undo(); return; }
     if (e.target.closest('button[data-cancel]')) {
       S.pendingAction = null; S.pendingPlayer = null; S.subMode = null; S.view = 'track'; render(); return;
@@ -643,10 +680,28 @@ button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:tran
     if (e.target === el('scrim')) closeSheet();
   });
 
-  window.addEventListener('resize', render);
+  /* Drehen erkennen: iOS meldet die neuen Maße verzögert, darum mehrfach nachfassen.
+     resize allein reicht auf dem iPad nicht. */
+  var lastWide = null;
+  function relayout(){
+    var w = (S.layout === 'auto') ? autoWide() : (S.layout === 'wide');
+    if (w !== lastWide) { lastWide = w; render(); }
+  }
+  function onRotate(){ relayout(); setTimeout(relayout, 120); setTimeout(relayout, 400); }
+  window.addEventListener('resize', onRotate);
+  window.addEventListener('orientationchange', onRotate);
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(orientation: landscape)');
+    if (mq.addEventListener) mq.addEventListener('change', onRotate);
+    else if (mq.addListener) mq.addListener(onRotate);
+  }
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', onRotate);
 
   /* ---------- Zustände ---------- */
-  var state = new URLSearchParams(location.search).get('state') || 'track';
+  var params = new URLSearchParams(location.search);
+  var state = params.get('state') || 'track';
+  var forced = params.get('layout');
+  if (forced === 'wide' || forced === 'compact') S.layout = forced;
 
   S.log = [
     { q:2, num:'23', text:'Benaja F. · 3er ✓', pts:3, action:'make3', player:'p2' },
@@ -662,6 +717,7 @@ button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:tran
   if (state === 'foulout') { S.view = 'track'; }
 
   render();
+  lastWide = document.body.classList.contains('wide');
 
   if (state === 'quarter') sheetQuarter();
   if (state === 'finish') sheetFinish();

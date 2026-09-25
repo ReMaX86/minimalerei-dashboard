@@ -5,7 +5,9 @@ Verbindliche 1:1-Vorlage: docs/design/tipoff-design/elements/24-tracking/
   Breite der Handy-Stapel, ab 900px das Querformat mit drei Spalten. Zustände über ?state=…
   track · who · sub · foulout · box · quarter · finish · pad · padaction
 - 1-tracking.png · 2-wer-war-es.png · 3-wechseln.png · 4-fuenftes-foul.png · 5-box-score.png ·
-  6-viertel-beenden.png · 7-spiel-beenden.png · 8-ipad-quer.png · 9-ipad-aktion.png
+  6-viertel-beenden.png · 7-spiel-beenden.png · 8-ipad-quer.png · 9-ipad-aktion.png ·
+  10-ipad-hochkant.png
+- Layout erzwingen zum Testen: ?layout=wide bzw. ?layout=compact
 
 ## WICHTIG – Rahmen für diese Aufgabe
 **An der Logik erstmal nichts ändern. Nur die neuen Designs übernehmen. Ansonsten nachfragen.**
@@ -22,9 +24,28 @@ zusätzlich jederzeit über den Adminreiter „Spiele".
 ## 1 · Zwei Layouts, ein Bildschirm
 **Handy hochkant** (1-tracking.png): Kopf mit Punktestand, darunter das Tastenfeld, darunter die
 Bestätigungszeile, dann „Auf dem Feld", Verlauf und die drei großen Knöpfe.
-**Ab 900px Breite** (8-ipad-quer.png): drei Spalten – links das Tastenfeld, in der Mitte die
-Mannschaft, rechts Verlauf und Box-Score. Der Umbruch passiert per Media Query, es ist **dieselbe
-Seite**, keine zweite Route. Beim iPad quer ist das die vorgesehene Nutzung.
+**Querformat** (8-ipad-quer.png): drei Spalten – links das Tastenfeld, in der Mitte die
+Mannschaft, rechts Verlauf und Box-Score. Es ist **dieselbe Seite**, keine zweite Route.
+
+**Wann welches Layout – wichtig, hier steckt der Fehler von heute:**
+Es reicht **nicht**, nur auf die Fensterbreite zu schauen. Ein iPad hochkant hat 768–834px und
+landet damit in der kompakten Ansicht, obwohl der Schirm groß ist; gedreht wird es erst breit
+genug. Die Regel lautet:
+- Fenster ≥ 900px breit → Querformat,
+- **oder** Fenster ≥ 700px breit **und** breiter als hoch (also Querlage) → Querformat,
+- sonst kompakt.
+Umgesetzt wird das über eine Klasse am `body` (nicht über eine reine Media Query), damit dieselbe
+Entscheidung auch im JavaScript gilt.
+
+**Drehen muss sofort greifen.** `resize` allein reicht auf dem iPad nicht – iOS meldet die neuen
+Maße verzögert. Deshalb zusätzlich auf `orientationchange`, auf
+`matchMedia('(orientation: landscape)')` und auf `visualViewport.resize` hören und nach der
+Drehung zweimal nachfassen (nach ~120ms und ~400ms). Umgebaut wird nur, wenn sich das Layout
+tatsächlich ändert – nicht bei jedem Scroll-Resize.
+
+**Umschalter oben rechts:** „Automatisch · Kompakt · Querformat" (10-ipad-hochkant.png). Wer auf
+dem iPad hochkant trotzdem die drei Spalten will oder am Laptop lieber die schmale Ansicht, stellt
+es selbst ein. Die Wahl soll pro Gerät gemerkt werden (localStorage), Standard ist „Automatisch".
 
 Maße, die eingehalten werden müssen: Wurfknöpfe 62px hoch (Querformat 52), alle übrigen Aktionen
 58px (Querformat 44), nichts ist schmaler als die halbe Bildschirmbreite, Seitenrand 16px.

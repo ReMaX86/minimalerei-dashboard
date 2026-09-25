@@ -28,13 +28,34 @@ import {
 } from '../types/database';
 
 // Element 24 "Live-Tracking" — Vorlage: docs/design/tipoff-design/elements/
-// 24-tracking/tracking.html. Eine Datei, zwei Layouts (Handy-Stapel unter
-// 900px, Querformat mit drei Spalten ab 900px), per Media Query statt
-// zweier Routen — dieselben Unterkomponenten (Keypad/Bestätigung/
+// 24-tracking/tracking.html. Eine Datei, zwei Layouts (Handy-Stapel, Querformat
+// mit drei Spalten) — dieselben Unterkomponenten (Keypad/Bestätigung/
 // Spielerauswahl/Verlauf/Box-Score) werden in beiden Layouts wiederverwendet.
+// Welches Layout läuft, entscheidet ein JS-State (nicht mehr nur eine
+// min-[900px]:-Media-Query): "auto" zählt ab 900px Breite ODER ab 700px in
+// echter Querlage als Querformat (ein iPad hochkant bei 768–834px landet
+// sonst fälschlich im kompakten Layout), plus ein Umschalter oben rechts
+// (LayoutSwitcher) für "Kompakt"/"Querformat" fest, gemerkt pro Gerät in
+// localStorage. Siehe computeAutoWide() weiter unten.
 
 const COURT_SIZE = 5;
 const HEARTBEAT_MS = 15_000;
+
+// §1 (Update): reine Fensterbreite reicht nicht — ein iPad hochkant (768–834px)
+// landet sonst in der kompakten Ansicht, obwohl der Schirm groß ist. "auto"
+// zählt deshalb auch echte Querlage ab 700px als Querformat; zusätzlich kann
+// die Wahl über den Umschalter (LayoutSwitcher) fest auf "compact"/"wide"
+// gestellt werden — gemerkt pro Gerät in localStorage.
+type LayoutMode = 'auto' | 'compact' | 'wide';
+const LAYOUT_STORAGE_KEY = 'tipoff-tracking-layout';
+
+function computeAutoWide(): boolean {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  if (w >= 900) return true;
+  if (w >= 700 && w > h) return true;
+  return false;
+}
 
 const SHOT_BUTTONS: { made: StatType; miss: StatType; label: string; sub: string }[] = [
   { made: 'fg2_made', miss: 'fg2_miss', label: '2er', sub: '2 PUNKTE' },
@@ -237,7 +258,7 @@ function PlayerTile({
       type="button"
       onClick={onClick}
       style={{ height: size }}
-      className={`flex flex-1 items-center gap-2.5 rounded-to-lg border px-2.5 text-left ${
+      className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-to-lg border px-2.5 text-left ${
         selected
           ? 'border-to-accent bg-to-accentWash'
           : tone === 'danger'
@@ -320,6 +341,70 @@ export function GameStatsTracker() {
   const showLockLoader = useTipoffLoader(lockState.kind === 'loading');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // ?layout=wide|compact erzwingt zum Testen einen Modus, ohne ihn dauerhaft
+  // zu merken (siehe Persistenz-Effekt unten, skipInitialPersist).
+  const [layoutFromQuery] = useState<LayoutMode | null>(() => {
+    const forced = new URLSearchParams(window.location.search).get('layout');
+    return forced === 'wide' || forced === 'compact' ? forced : null;
+  });
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => {
+    if (layoutFromQuery) return layoutFromQuery;
+    try {
+      const saved = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
+      if (saved === 'auto' || saved === 'compact' || saved === 'wide') return saved;
+    } catch {
+      // localStorage kann blockiert sein (privates Fenster) — dann eben nicht merken.
+    }
+    return 'auto';
+  });
+  const [wide, setWide] = useState<boolean>(() => (layoutMode === 'auto' ? computeAutoWide() : layoutMode === 'wide'));
+  const skipInitialPersist = useRef(layoutFromQuery !== null);
+
+  useEffect(() => {
+    function recompute() {
+      const next = layoutMode === 'auto' ? computeAutoWide() : layoutMode === 'wide';
+      setWide((prev) => (prev === next ? prev : next));
+    }
+    recompute();
+    // Drehen muss sofort greifen: iOS meldet die neuen Maße nach
+    // orientationchange verzögert, darum zweimal nachfassen (~120ms/~400ms)
+    // statt uns auf ein einzelnes resize zu verlassen. Die Timer-IDs merken
+    // wir uns, damit ein Moduswechsel (layoutMode ändert sich, dieser Effekt
+    // läuft neu) noch ausstehende Timer aus der alten Closure abräumt — sonst
+    // könnte ein Timer mit dem alten layoutMode kurz nach einem manuellen
+    // Umschalten den gerade gesetzten Wert wieder überschreiben.
+    const pendingTimers: number[] = [];
+    function onRotate() {
+      recompute();
+      pendingTimers.push(window.setTimeout(recompute, 120));
+      pendingTimers.push(window.setTimeout(recompute, 400));
+    }
+    window.addEventListener('resize', onRotate);
+    window.addEventListener('orientationchange', onRotate);
+    const mq = window.matchMedia?.('(orientation: landscape)');
+    mq?.addEventListener?.('change', onRotate);
+    window.visualViewport?.addEventListener('resize', onRotate);
+    return () => {
+      pendingTimers.forEach((id) => window.clearTimeout(id));
+      window.removeEventListener('resize', onRotate);
+      window.removeEventListener('orientationchange', onRotate);
+      mq?.removeEventListener?.('change', onRotate);
+      window.visualViewport?.removeEventListener('resize', onRotate);
+    };
+  }, [layoutMode]);
+
+  useEffect(() => {
+    if (skipInitialPersist.current) {
+      skipInitialPersist.current = false;
+      return;
+    }
+    try {
+      window.localStorage.setItem(LAYOUT_STORAGE_KEY, layoutMode);
+    } catch {
+      // localStorage kann blockiert sein (privates Fenster) — dann eben nicht merken.
+    }
+  }, [layoutMode]);
 
   // Erst Aktion, dann Spieler — oder umgekehrt (Querformat, §2): sobald
   // beide gesetzt sind, wird sofort gebucht. Bleibt pendingPlayer nach einem
@@ -786,20 +871,64 @@ export function GameStatsTracker() {
 
   if (error && !game) return <ErrorNote message={error} />;
 
-  // ============ Kopf ============
-  function Header({ withEndButton }: { withEndButton: boolean }) {
+  // ============ Ansicht-Umschalter ============
+  const LAYOUT_OPTIONS: { value: LayoutMode; label: string }[] = [
+    { value: 'auto', label: 'Automatisch' },
+    { value: 'compact', label: 'Kompakt' },
+    { value: 'wide', label: 'Querformat' }
+  ];
+
+  function LayoutSwitcher() {
     return (
-      <div className="flex flex-col gap-2.5 rounded-to-xl border border-to-border bg-to-surface p-3.5 min-[900px]:flex-row min-[900px]:items-center min-[900px]:gap-4">
+      <div className="flex items-center justify-end gap-2">
+        <span className="to-data text-[8px] tracking-[0.12em] text-to-textDisabled">ANSICHT</span>
+        <span className="flex gap-[3px] rounded-to-pill border border-to-divider bg-to-surface2 p-[3px]">
+          {LAYOUT_OPTIONS.map((opt) => {
+            const active = layoutMode === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => {
+                  setLayoutMode(opt.value);
+                  setPendingAction(null);
+                  setPendingPlayer(null);
+                }}
+                className={`h-[26px] rounded-to-pill px-[11px] text-[11px] font-semibold ${
+                  active ? 'bg-to-accent text-to-onAccent' : 'text-to-text3'
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </span>
+      </div>
+    );
+  }
+
+  // ============ Kopf ============
+  // "wide" statt einer reinen min-[900px]:-Media-Query, weil der Umschalter
+  // (LayoutSwitcher) das Layout auch unabhängig von der Fensterbreite fest
+  // auf "compact"/"wide" stellen kann (§1).
+  function Header({ withEndButton, wide: headerWide }: { withEndButton: boolean; wide: boolean }) {
+    return (
+      <div
+        className={`flex flex-col gap-2.5 rounded-to-xl border border-to-border bg-to-surface p-3.5 ${
+          headerWide ? 'flex-row items-center gap-4' : ''
+        }`}
+      >
         <div className="flex flex-1 flex-col gap-2.5">
           <div className="flex items-end justify-center gap-2.5">
             <span className="flex flex-col items-end gap-0.5">
               <span className="to-data text-[9px] tracking-[0.1em] text-to-accent">TBW</span>
-              <span className="to-number text-[64px] leading-none text-to-text min-[900px]:text-[44px]">{teamScore.us}</span>
+              <span className={`to-number leading-none text-to-text ${headerWide ? 'text-[44px]' : 'text-[64px]'}`}>{teamScore.us}</span>
             </span>
-            <span className="to-number pb-2 text-2xl text-to-textDisabled min-[900px]:pb-1 min-[900px]:text-xl">:</span>
+            <span className={`to-number text-to-textDisabled ${headerWide ? 'pb-1 text-xl' : 'pb-2 text-2xl'}`}>:</span>
             <span className="flex flex-col gap-0.5">
               <span className="to-data text-[9px] tracking-[0.1em] text-to-text3">{game?.opponent?.slice(0, 3).toUpperCase() ?? 'GEG'}</span>
-              <span className="to-number text-[64px] leading-none text-to-text2 min-[900px]:text-[44px]">{teamScore.opponent}</span>
+              <span className={`to-number leading-none text-to-text2 ${headerWide ? 'text-[44px]' : 'text-[64px]'}`}>{teamScore.opponent}</span>
             </span>
           </div>
           {/* Nur noch Anzeige, nicht mehr antippbar — Viertel wechseln geht
@@ -853,11 +982,11 @@ export function GameStatsTracker() {
             <span className="to-data ml-auto text-[9px] text-to-vacation">{teamFouls >= 5 ? 'IM BONUS' : `${5 - teamFouls} BIS BONUS`}</span>
           </div>
         </div>
-        {withEndButton && (
+        {withEndButton && headerWide && (
           <button
             type="button"
             onClick={() => setSheet('quarter')}
-            className="hidden h-11 shrink-0 rounded-to-pill border border-to-line px-5 text-sm font-semibold text-to-text2 min-[900px]:block"
+            className="h-11 shrink-0 rounded-to-pill border border-to-line px-5 text-sm font-semibold text-to-text2"
           >
             Viertel beenden
           </button>
@@ -1364,7 +1493,7 @@ export function GameStatsTracker() {
 
     return (
       <div className="flex items-start gap-3">
-        <div className="flex w-[330px] shrink-0 flex-col gap-2.5 rounded-to-xl border border-to-border bg-to-surface p-3.5">
+        <div className="flex w-[330px] shrink-0 flex-col gap-2.5 rounded-to-xl border border-to-border bg-to-surface p-3.5 max-[1000px]:w-[288px]">
           <Keypad shotHeight={52} actionHeight={44} />
           <ConfirmBar />
         </div>
@@ -1435,7 +1564,7 @@ export function GameStatsTracker() {
             </div>
           )}
         </div>
-        <div className="flex w-[262px] shrink-0 flex-col gap-3">
+        <div className="flex w-[262px] shrink-0 flex-col gap-3 max-[1000px]:w-[236px]">
           <HistoryPanel limit={4} />
           <SimpleBoxScore onlyCourt />
           <button
@@ -1466,7 +1595,7 @@ export function GameStatsTracker() {
         </p>
       )}
 
-      <div className="mx-auto flex max-w-[1024px] flex-col gap-3 px-4 py-4 min-[900px]:px-5">
+      <div className={`mx-auto flex flex-col gap-3 px-4 py-4 ${wide ? 'max-w-[1180px] px-5' : 'max-w-[1024px]'}`}>
         {error && <ErrorNote message={error} />}
         {showLockLoader && <LoadingSpinner label />}
 
@@ -1515,18 +1644,18 @@ export function GameStatsTracker() {
 
         {lockState.kind === 'held' && game && (
           <>
-            <div className="min-[900px]:hidden">
+            <LayoutSwitcher />
+            {wide ? (
               <div className="flex flex-col gap-3">
-                <Header withEndButton={false} />
-                <TrackingBody wide={false} />
-              </div>
-            </div>
-            <div className="hidden min-[900px]:block">
-              <div className="flex flex-col gap-3">
-                <Header withEndButton />
+                <Header withEndButton wide />
                 <WideBody />
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <Header withEndButton={false} wide={false} />
+                <TrackingBody wide={false} />
+              </div>
+            )}
             <Sheets />
           </>
         )}
