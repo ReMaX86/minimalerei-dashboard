@@ -21,11 +21,14 @@ import { nextTrainingOccurrences } from '../lib/trainingSchedule';
 import { computeReminders, type ReminderItem } from '../lib/reminders';
 import { pendingWasherFor } from '../lib/trikots';
 import { computeBoxScore } from '../lib/gameStats';
+import { ANNOUNCEMENT_KIND_LABELS, isAnnouncementOpen, sortAnnouncements } from '../lib/announcements';
 import {
   OFFICIATING_TASK_LABELS,
   STAT_POINT_VALUES,
   officiatingGameLabel,
   type Announcement,
+  type AnnouncementKind,
+  type AnnouncementReadRow,
   type CarpoolClaim,
   type CarpoolOffer,
   type DeclineReason,
@@ -74,6 +77,11 @@ interface DashboardData {
   trikotWashLog: TrikotWashLogRow[];
   players: Record<string, Player>;
   announcements: Announcement[];
+  // Für die aktuelle Sitzung sichtbare announcement_reads — bei einem
+  // Spieler nur die eigenen Zeilen, beim Trainer alle (RLS), bei einem
+  // Betrachter keine (siehe Kommentar bei isOpenForViewer unten).
+  announcementReads: AnnouncementReadRow[];
+  activePlayerCount: number;
   carpoolOffers: CarpoolOffer[];
   carpoolClaims: CarpoolClaim[];
   absencesOverview: PlayerAbsence[];
@@ -89,6 +97,46 @@ interface DashboardData {
   lastScoreEvent: { team: 'us' | 'opponent'; playerId: string | null; points: number } | null;
   liveScore: { us: number; opponent: number } | null;
   liveQuarter: number | null;
+}
+
+function BellIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 8a6 6 0 1 0-12 0c0 7-2.5 8-2.5 8h17S18 15 18 8zM10.5 20a2 2 0 0 0 3 0" />
+    </svg>
+  );
+}
+function AnnouncementCheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
+// "MARC REWALD · HEUTE 18:40" für heute, "MARC REWALD · 20.09." ohne
+// Uhrzeit für ältere Meldungen (Element 22 §7, Vorlage 10-startseite.png).
+function announcementMetaTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) return `HEUTE ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`;
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + '.';
+}
+
+function announcementDotClass(kind: AnnouncementKind): string {
+  return kind === 'dringend' ? 'bg-to-danger' : kind === 'wichtig' ? 'bg-to-accent' : 'bg-to-line';
+}
+function announcementKindTextClass(kind: AnnouncementKind): string {
+  return kind === 'dringend' ? 'text-to-dangerText' : kind === 'wichtig' ? 'text-to-accent' : 'text-to-text3';
+}
+function announcementRowToneClass(kind: AnnouncementKind): string {
+  return kind === 'dringend' ? 'bg-to-dangerSoft/60' : kind === 'wichtig' ? 'bg-to-accentWash' : '';
+}
+function announcementCheckButtonClass(kind: AnnouncementKind): string {
+  if (kind === 'dringend') return 'border-to-danger/40 bg-to-dangerSoft text-to-dangerText';
+  if (kind === 'wichtig') return 'border-to-borderMatchday bg-to-accentSoft text-to-accent';
+  return 'border-to-line text-to-text3';
 }
 
 export function Dashboard() {
@@ -122,7 +170,7 @@ export function Dashboard() {
       setError(null);
       const today = localTodayIso();
 
-      const [gameRes, trikotRes, trikotWashRes, playersRes, announcementsRes] = await Promise.all([
+      const [gameRes, trikotRes, trikotWashRes, playersRes, announcementsRes, announcementReadsRes] = await Promise.all([
         supabase
           .from('games')
           .select('*')
@@ -136,13 +184,11 @@ export function Dashboard() {
         supabase.from('trikot_wash_log').select('*'),
         supabase.from('players').select('*').eq('is_active', true),
         flags.announcements
-          ? supabase
-              .from('announcements')
-              .select('*')
-              .order('pinned', { ascending: false })
-              .order('created_at', { ascending: false })
-              .limit(5)
-          : Promise.resolve({ data: [] as Announcement[], error: null })
+          ? supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(20)
+          : Promise.resolve({ data: [] as Announcement[], error: null }),
+        flags.announcements
+          ? supabase.from('announcement_reads').select('*')
+          : Promise.resolve({ data: [] as AnnouncementReadRow[], error: null })
       ]);
       const trikotWashLog = (trikotWashRes.data as TrikotWashLogRow[]) ?? [];
 
@@ -569,6 +615,8 @@ export function Dashboard() {
         trikotWashLog,
         players: playersById,
         announcements: (announcementsRes.data as Announcement[]) ?? [],
+        announcementReads: (announcementReadsRes.data as AnnouncementReadRow[]) ?? [],
+        activePlayerCount: ((playersRes.data as Player[] | null) ?? []).length,
         carpoolOffers,
         carpoolClaims,
         absencesOverview,
@@ -702,6 +750,51 @@ export function Dashboard() {
   if (showLoader) return <LoadingSpinner />;
   if (!data) return null;
 
+  // "FÜR DICH" (Element 22 §7) — ob eine Meldung für DIESE Sitzung noch
+  // offen ist. Bei einem Spieler genügt "habe ich selbst noch nicht
+  // bestätigt": announcement_reads' RLS lässt einen Spieler ohnehin nur
+  // seine eigenen Zeilen lesen, und wenn er selbst noch nicht bestätigt
+  // hat, kann per Definition nicht "schon von allen gelesen" gelten (er
+  // gehört ja zu "allen") — die volle isAnnouncementOpen()-Regel (inkl.
+  // Auto-Ende bei 'hinweis', sobald alle gelesen haben) ist für einen
+  // einzelnen unbestätigten Spieler always äquivalent zu dieser einfacheren
+  // Prüfung. Trainer sehen dagegen alle reads (is_trainer()-Policy) und
+  // bekommen die volle Regel inkl. echtem Lesefortschritt. Ein Betrachter
+  // hat weder player_id noch is_trainer() — für ihn bleibt eine 'hinweis'-
+  // Meldung dadurch bis zum Ablauf sichtbar, auch wenn längst alle Spieler
+  // bestätigt haben (kleine, bewusste Vereinfachung, siehe Chat-Antwort).
+  const myReadAnnouncementIds = new Set(
+    role === 'player' && player ? data.announcementReads.filter((r) => r.player_id === player.id).map((r) => r.announcement_id) : []
+  );
+  function isOpenForViewer(a: Announcement): boolean {
+    const now = new Date();
+    if (a.ended_at) return false;
+    if (a.expires_at && new Date(a.expires_at) <= now) return false;
+    if (role === 'player') return !myReadAnnouncementIds.has(a.id);
+    const readCount = data!.announcementReads.filter((r) => r.announcement_id === a.id).length;
+    return isAnnouncementOpen(a, readCount, data!.activePlayerCount, now);
+  }
+  const openAnnouncements = sortAnnouncements(data.announcements.filter(isOpenForViewer));
+  const showKaderAbsage = isAdmin && !!data.nextGame?.squad_decline_pending && data.declinedNames.length > 0;
+  const taskCount = (role === 'player' ? data.reminders.length : 0) + (showKaderAbsage ? 1 : 0);
+  const forDichCount = openAnnouncements.length + taskCount;
+
+  async function confirmAnnouncement(id: string) {
+    if (!player) return;
+    const before = data;
+    setData((d) =>
+      d
+        ? { ...d, announcementReads: [...d.announcementReads, { id: `optimistic-${id}`, announcement_id: id, player_id: player.id, created_at: new Date().toISOString() }] }
+        : d
+    );
+    try {
+      const { error: rpcError } = await supabase.rpc('confirm_announcement_read', { p_announcement_id: id });
+      if (rpcError) throw rpcError;
+    } catch {
+      setData(before);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <StartHeader nextGameDate={data.nextGame?.game_date ?? null} pushStatus={pushStatus} onPushChange={refreshPushStatus} />
@@ -802,54 +895,80 @@ export function Dashboard() {
         <PushNotificationCard status={pushStatus} onChange={refreshPushStatus} />
       )}
 
-      {((role === 'player' && data.reminders.length > 0) ||
-        (flags.announcements && data.announcements.length > 0) ||
-        (isAdmin && data.nextGame?.squad_decline_pending && data.declinedNames.length > 0)) && (
-        <section className="sheet">
-          <div className="sheet-header">Für dich</div>
+      {forDichCount > 0 && (
+        <section className={`overflow-hidden rounded-to-xl border bg-to-surface ${openAnnouncements.length > 0 ? 'border-to-borderMatchday' : 'border-to-border'}`}>
+          <div className={`flex min-h-10 items-center gap-2.5 px-4 ${openAnnouncements.length > 0 ? 'bg-to-accent' : ''}`}>
+            <span className={openAnnouncements.length > 0 ? 'text-to-onAccent' : 'text-to-text3'}>
+              <BellIcon />
+            </span>
+            <span
+              className={`to-data flex-1 text-[10px] tracking-[0.12em] ${
+                openAnnouncements.length > 0 ? 'font-bold text-to-onAccent' : 'font-normal text-to-text3'
+              }`}
+            >
+              FÜR DICH
+            </span>
+            <span
+              className={`to-data flex h-5 min-w-5 items-center justify-center rounded-to-pill px-1.5 text-[10px] font-bold ${
+                openAnnouncements.length > 0 ? 'bg-to-onAccent text-to-accent' : 'bg-to-surface2 text-to-text2'
+              }`}
+            >
+              {forDichCount}
+            </span>
+          </div>
+
+          {openAnnouncements.map((a) => (
+            <div key={a.id} className={`flex items-start gap-2.5 border-t border-to-surface2 px-4 py-3 ${announcementRowToneClass(a.kind)}`}>
+              <span className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${announcementDotClass(a.kind)}`} />
+              <div className="min-w-0 flex-1">
+                <span className={`to-data block text-[9px] tracking-[0.1em] ${announcementKindTextClass(a.kind)}`}>
+                  {ANNOUNCEMENT_KIND_LABELS[a.kind].toUpperCase()}
+                </span>
+                <p className={`text-sm leading-relaxed text-to-text ${a.kind === 'hinweis' ? 'font-medium' : 'font-semibold'}`}>{a.message}</p>
+                <p className="to-data mt-1 text-[9px] tracking-[0.06em] text-to-textDisabled">
+                  {a.author_name.toUpperCase()} · {announcementMetaTime(a.created_at)}
+                </p>
+              </div>
+              {role === 'player' && (
+                <button
+                  type="button"
+                  onClick={() => confirmAnnouncement(a.id)}
+                  aria-label="Meldung bestätigen"
+                  className={`flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-to-md border ${announcementCheckButtonClass(a.kind)}`}
+                >
+                  <AnnouncementCheckIcon />
+                </button>
+              )}
+            </div>
+          ))}
 
           {role === 'player' &&
             data.reminders.map((r) =>
               r.to.startsWith('#') ? (
-                <a key={r.key} href={r.to} className="sheet-row-link">
-                  <span className="led-dot bg-to-accent" />
+                <a key={r.key} href={r.to} className="flex min-h-[52px] items-center gap-2.5 border-t border-to-surface2 px-4 py-3">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-to-accent" />
                   <span className="flex-1 text-sm font-medium text-to-text">{r.text}</span>
-                  <IconChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-to-text3" />
+                  <IconChevronRight className="h-4 w-4 shrink-0 text-to-textDisabled" />
                 </a>
               ) : (
-                <Link key={r.key} to={r.to} className="sheet-row-link">
-                  <span className="led-dot bg-to-accent" />
+                <Link key={r.key} to={r.to} className="flex min-h-[52px] items-center gap-2.5 border-t border-to-surface2 px-4 py-3">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-to-accent" />
                   <span className="flex-1 text-sm font-medium text-to-text">{r.text}</span>
-                  <IconChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-to-text3" />
+                  <IconChevronRight className="h-4 w-4 shrink-0 text-to-textDisabled" />
                 </Link>
               )
             )}
 
-          {isAdmin && data.nextGame?.squad_decline_pending && data.declinedNames.length > 0 && (
-            <Link to="/spiele?kader=1" className="sheet-row-link">
-              <span className="led-dot bg-to-danger" />
+          {showKaderAbsage && data.nextGame && (
+            <Link to="/spiele?kader=1" className="flex min-h-[52px] items-center gap-2.5 border-t border-to-surface2 px-4 py-3">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-to-danger" />
               <span className="flex-1 text-sm text-to-text">
-                <span className="font-semibold">Kader-Absage:</span>{' '}
-                {declinedNamesText(data.declinedNames)} leider am Spiel vs. {data.nextGame.opponent} nicht
-                teilnehmen.
+                <span className="font-semibold">Kader-Absage:</span> {declinedNamesText(data.declinedNames)} leider am Spiel vs. {data.nextGame.opponent}{' '}
+                nicht teilnehmen.
               </span>
-              <IconChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-to-text3" />
+              <IconChevronRight className="h-4 w-4 shrink-0 text-to-textDisabled" />
             </Link>
           )}
-
-          {flags.announcements &&
-            data.announcements.map((a) => (
-              <div key={a.id} className="sheet-row">
-                <span className={`led-dot ${a.pinned ? 'bg-to-accent' : 'bg-to-text3'}`} />
-                <div>
-                  {a.pinned && <p className="text-[10px] font-semibold uppercase tracking-wide text-to-accent">Angeheftet</p>}
-                  <p className="text-sm text-to-text">{a.message}</p>
-                  <p className="mt-1 text-xs text-to-text3">
-                    {a.author_name} · {fmtDate(a.created_at.slice(0, 10))}
-                  </p>
-                </div>
-              </div>
-            ))}
         </section>
       )}
 

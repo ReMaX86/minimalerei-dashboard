@@ -116,11 +116,30 @@ export const SKILL_ICONS: Record<Skill, string> = {
   'Post-Play (Tank)': '💪'
 };
 
+export type AnnouncementKind = 'hinweis' | 'wichtig' | 'dringend';
+
 export interface Announcement {
   id: string;
   message: string;
-  pinned: boolean;
+  kind: AnnouncementKind;
   author_name: string;
+  created_at: string;
+  // Migration 0071: hinweis +7 Tage, wichtig +14 Tage ab created_at,
+  // dringend null (läuft nie automatisch ab, nur über ended_at).
+  expires_at: string | null;
+  // Vom Trainer aktiv per "Beenden" gesetzt — unabhängig von expires_at.
+  ended_at: string | null;
+  // Ob beim Veröffentlichen ein Push angefordert wurde (bei 'dringend'
+  // immer true) — bestimmt, ob api/notify.ts den Versand tatsächlich
+  // auslöst, siehe dortigen Kommentar.
+  push_requested: boolean;
+}
+
+// Migration 0071 — eine Zeile pro Spieler, der eine Meldung bestätigt hat.
+export interface AnnouncementReadRow {
+  id: string;
+  announcement_id: string;
+  player_id: string;
   created_at: string;
 }
 

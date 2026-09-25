@@ -177,6 +177,13 @@ select status_code, content, created from net._http_response order by created de
 ```
 im SQL-Editor die letzten Aufrufe von Schritt 6 inkl. etwaiger Fehlermeldungen.
 
+**Element 22 "Meldungen":** der Trigger aus Schritt 6 feuert weiterhin bei jeder neuen Meldung —
+`api/notify.ts` entscheidet seitdem selbst, ob wirklich versendet wird: nur wenn beim
+Veröffentlichen der Push-Schalter an war oder die Sorte "Dringend" ist (`announcements.push_requested`),
+sonst `skipped: "push_not_requested"`. Empfänger sind außerdem nur noch aktive Spieler (über
+`player_auth_links`), nicht mehr jede vorhandene `push_subscriptions`-Zeile — Trainer/Betrachter mit
+aktivierten Benachrichtigungen bekommen Meldungs-Pushes seitdem nicht mehr mit.
+
 **Weitere Benachrichtigungsart: Training-Erinnerung.** Erinnert Spieler per Push, die für den
 nächsten Trainingstermin noch nicht geantwortet haben — zu bis zu drei Zeitpunkten vor
 Trainingsbeginn (Default: 1 Tag, 1 Stunde, 30 Minuten vorher; **im Admin unter Funktionen ->

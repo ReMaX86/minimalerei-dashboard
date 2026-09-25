@@ -270,17 +270,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   switch (kind) {
     // Erste Benachrichtigungsart: neue Meldung (Announcement).
+    //
+    // Element 22 "Meldungen": der bestehende, von Hand angelegte Datenbank-
+    // Trigger (siehe README) feuert weiterhin bei JEDEM Insert und schickt
+    // die volle neue Zeile mit — vorher wurde deshalb IMMER an ALLE
+    // push_subscriptions gesendet (auch Trainer/Betrachter). Jetzt: nur
+    // senden, wenn beim Veröffentlichen tatsächlich ein Push angefordert
+    // wurde (record.push_requested, bei 'dringend' clientseitig immer
+    // true), und nur an aktive Spieler (players.is_active, über
+    // player_auth_links) statt an jede vorhandene Subscription — dieselbe
+    // Zielgruppen-Definition wie training-reminders/officiating-reminders
+    // weiter unten in dieser Datei.
     case 'announcement': {
       const message = record.message as string | undefined;
+      const pushRequested = record.push_requested as boolean | undefined;
+      const announcementKind = record.kind as string | undefined;
       if (!message) {
         res.status(400).json({ error: 'Kein Announcement-Text im Webhook-Payload.' });
         return;
       }
+      if (!pushRequested && announcementKind !== 'dringend') {
+        res.status(200).json({ skipped: 'push_not_requested' });
+        return;
+      }
       const authorName = record.author_name as string | undefined;
+
+      const playersRes = await supabase.from('players').select('id').eq('is_active', true);
+      if (playersRes.error) {
+        // eslint-disable-next-line no-console
+        console.error('notify[announcement] query error', playersRes.error);
+        res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: playersRes.error.message, code: playersRes.error.code });
+        return;
+      }
+      const playerIds = ((playersRes.data as { id: string }[] | null) ?? []).map((p) => p.id);
+      if (playerIds.length === 0) {
+        res.status(200).json({ sent: 0, reason: 'no_active_players' });
+        return;
+      }
+
+      const linkRes = await supabase.from('player_auth_links').select('auth_user_id').in('player_id', playerIds);
+      if (linkRes.error) {
+        // eslint-disable-next-line no-console
+        console.error('notify[announcement] query error', linkRes.error);
+        res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: linkRes.error.message, code: linkRes.error.code });
+        return;
+      }
+      const authUserIds = ((linkRes.data as { auth_user_id: string }[] | null) ?? []).map((r) => r.auth_user_id);
+      if (authUserIds.length === 0) {
+        res.status(200).json({ sent: 0, reason: 'no_linked_players' });
+        return;
+      }
 
       const { data: subs, error: loadError } = await supabase
         .from('push_subscriptions')
-        .select('id, user_id, endpoint, p256dh, auth_key');
+        .select('id, user_id, endpoint, p256dh, auth_key')
+        .in('user_id', authUserIds);
       if (loadError) {
         // eslint-disable-next-line no-console
         console.error('notify[announcement] load error', loadError);

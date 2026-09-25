@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Meldungen</title>
+<!--
+  REFERENZ-UMSETZUNG Element 22 · Meldungen
+  Zwei Seiten in einer Datei: der Admin-Reiter „Meldungen" und der Meldungs-Block auf der Startseite.
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=list       Adminreiter, Standard (Formular „Hinweis" + laufende Meldungen)
+    ?state=wichtig    Sorte „Wichtig" gewählt, Text eingegeben
+    ?state=dringend   Sorte „Dringend" gewählt, Push fest an
+    ?state=published  Blatt nach dem Veröffentlichen
+    ?state=edit       Meldung bearbeiten
+    ?state=end        Blatt „Meldung beenden?"
+    ?state=delete     Blatt „Meldung löschen?"
+    ?state=ended      Abschnitt „Beendet" aufgeklappt
+    ?state=empty      noch keine Meldung
+    ?state=home       Startseite: Block mit Volt-Kopf
+    ?state=homeread   Startseite: eine Meldung bestätigt, Zähler runter
+    ?state=homeplain  Startseite: keine Meldung offen, Kopf ohne Volt
+  Die Seite ist echt klickbar: Sorte wechseln, tippen, veröffentlichen, beenden, löschen,
+  auf der Startseite Meldungen mit dem Haken bestätigen.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.10);
+  --to-danger-frame:#5A2027;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer}
+textarea{font-family:inherit;color:var(--to-text)}
+.wrap{width:390px;margin:0 auto;padding:22px 0 28px;display:flex;flex-direction:column;gap:14px}
+.pad{padding-left:20px;padding-right:20px}
+.view{display:flex;flex-direction:column;gap:14px}
+
+/* Reiterleiste */
+.tabswrap{position:relative}
+.tabs{display:flex;gap:6px;padding:2px 20px 8px;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;white-space:nowrap;display:inline-flex;align-items:center;height:34px;padding:0 14px;
+  border-radius:999px;background:var(--to-surface);border:1px solid var(--to-border);
+  color:var(--to-text-2);font-size:13px;font-weight:500}
+.tab[aria-current="page"]{background:var(--to-accent);border-color:var(--to-accent);
+  color:var(--to-on-accent);font-weight:600}
+.tabsfade{position:absolute;right:0;top:0;bottom:8px;width:44px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(10,12,15,0),var(--to-bg) 72%)}
+
+/* Formular */
+.form{margin:0 20px;border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  padding:16px;display:flex;flex-direction:column;gap:13px}
+.form__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:var(--to-surface-3);
+  border:1px solid var(--to-hairline)}
+.seg__btn{flex:1 1 0;height:38px;border:0;border-radius:10px;background:transparent;
+  color:var(--to-text-2);font-size:13px;font-weight:500}
+.seg__btn[aria-pressed="true"]{background:var(--to-accent);color:var(--to-on-accent);font-weight:600}
+.seg__btn[aria-pressed="true"][data-kind="dringend"]{background:var(--to-danger);color:#120507}
+.explain{font-size:11px;color:var(--to-text-4);line-height:1.5}
+.ta{min-height:84px;padding:13px 14px;border-radius:14px;background:#0F1216;border:1px solid var(--to-line);
+  font-size:14px;line-height:1.5;resize:none;outline:none}
+.ta::placeholder{color:var(--to-text-4)}
+.ta:focus{border-color:var(--to-accent-frame)}
+.pushrow{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 14px;border-radius:14px;
+  background:var(--to-surface-3);border:1px solid var(--to-hairline);width:100%;text-align:left;border-width:1px}
+.pushrow__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pushrow__label{font-size:13px;color:var(--to-text-2)}
+.pushrow__sub{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--to-text-4)}
+.track{width:44px;height:26px;flex:none;border-radius:999px;background:var(--to-surface-2);
+  border:1px solid var(--to-line);display:flex;align-items:center;justify-content:flex-start;padding:0 3px}
+.knob{width:18px;height:18px;border-radius:50%;background:var(--to-text-4)}
+[aria-pressed="true"] > .track{background:var(--to-accent);border-color:var(--to-accent);justify-content:flex-end}
+[aria-pressed="true"] > .track > .knob{background:var(--to-on-accent)}
+.pushrow[aria-disabled="true"]{opacity:.9}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;
+  font-family:inherit;font-weight:600}
+.btn--primary{height:48px;border-radius:999px;background:var(--to-accent);color:var(--to-on-accent);
+  font-size:15px;width:100%}
+.btn--primary:disabled{background:var(--to-surface-2);color:var(--to-text-4);cursor:default}
+.btn--danger{height:46px;border-radius:999px;background:var(--to-danger);color:#120507;font-size:15px;width:100%}
+.btn--ghost{height:46px;border-radius:999px;background:transparent;border-color:var(--to-line);
+  color:var(--to-text-2);font-size:15px;width:100%}
+.btn--text{height:24px;border:0;background:transparent;color:var(--to-text-3);font-size:13px;
+  font-weight:400;width:100%}
+.formfoot{display:flex;flex-direction:column;gap:8px}
+
+/* Abschnittsköpfe */
+.sechead{display:flex;align-items:center;gap:12px;padding-top:2px}
+.sechead__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sechead__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4)}
+.sechead__rule{flex:1 1 auto;height:1px;background:var(--to-hairline)}
+.foldbtn{display:flex;align-items:center;gap:12px;width:100%;border:0;background:transparent;padding:0;
+  text-align:left}
+.foldbtn svg{flex:none;transition:transform .16s ease}
+.foldbtn[aria-expanded="true"] svg{transform:rotate(180deg)}
+
+/* Liste laufender Meldungen */
+.panel{margin:0 20px;border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.mrow{display:flex;gap:12px;padding:13px 16px;border-top:1px solid var(--to-surface-2)}
+.mrow:first-child{border-top:0}
+.mrow--volt{background:rgba(200,255,46,.04)}
+.mrow--danger{background:rgba(255,90,103,.05)}
+.mbar{width:4px;flex:none;border-radius:2px;background:var(--to-line)}
+.mrow--volt .mbar{background:var(--to-accent)}
+.mrow--danger .mbar{background:var(--to-danger)}
+.mmain{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:7px}
+.mtop{display:flex;align-items:center;gap:8px}
+.mkind{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--to-text-3)}
+.mrow--volt .mkind{color:var(--to-accent)}
+.mrow--danger .mkind{color:var(--to-danger-text)}
+.mleft{margin-left:auto;font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.06em;
+  color:var(--to-text-4);white-space:nowrap}
+.mtext{font-size:14px;font-weight:500;line-height:1.45}
+.progrow{display:flex;align-items:center;gap:8px}
+.prog{flex:1 1 auto;height:4px;border-radius:2px;background:var(--to-surface-2);overflow:hidden}
+.prog__fill{display:block;height:4px;border-radius:2px;background:var(--to-line)}
+.mrow--volt .prog__fill{background:var(--to-accent)}
+.mrow--danger .prog__fill{background:var(--to-danger)}
+.mread{font-family:'Geist Mono',monospace;font-size:9px;color:var(--to-text-3);white-space:nowrap}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding-top:1px}
+.chip{display:inline-flex;align-items:center;height:28px;padding:0 11px;border-radius:999px;
+  background:transparent;border:1px solid var(--to-line);color:var(--to-text-2);
+  font-size:12px;font-weight:600}
+.chip--danger{border-color:var(--to-danger-frame);color:var(--to-danger-text)}
+.mrow--editing{box-shadow:inset 0 0 0 1px var(--to-accent-frame)}
+.mrow--editing .mtext{color:var(--to-text-3)}
+
+/* Beendet */
+.erow{display:flex;gap:12px;padding:12px 16px;border-top:1px solid var(--to-surface-2)}
+.erow:first-child{border-top:0}
+.emain{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px}
+.etext{font-size:13px;color:var(--to-text-3);line-height:1.45}
+.emeta{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.06em;color:var(--to-text-4)}
+.panel--off{background:#0F1216}
+
+.empty{margin:0 20px;border-radius:20px;background:var(--to-surface);border:1px dashed var(--to-line);
+  padding:26px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.empty__title{font-size:14px;font-weight:600}
+.empty__sub{font-size:12px;color:var(--to-text-4);line-height:1.5}
+
+/* ===== Startseite: Block mit Volt-Kopf ===== */
+.hint{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--to-text-4);
+  padding:0 20px}
+.hpanel{margin:0 20px;border-radius:22px;background:var(--to-surface);border:1px solid var(--to-accent-frame);
+  overflow:hidden;display:flex;flex-direction:column}
+.hpanel--plain{border-color:var(--to-border)}
+.hhead{display:flex;align-items:center;gap:9px;min-height:40px;padding:0 16px;background:var(--to-accent)}
+.hhead__label{flex:1 1 auto;font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;
+  font-weight:700;color:var(--to-on-accent)}
+.hcount{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;
+  padding:0 7px;border-radius:999px;background:var(--to-on-accent);color:var(--to-accent);
+  font-family:'Geist Mono',monospace;font-size:10px;font-weight:700}
+.hpanel--plain .hhead{background:transparent;min-height:46px}
+.hpanel--plain .hhead__label{color:var(--to-text-3);font-weight:400}
+.hpanel--plain .hcount{background:var(--to-surface-2);color:var(--to-text-2)}
+.hpanel--plain .hhead svg{stroke:var(--to-text-3)}
+.hrow{display:flex;align-items:flex-start;gap:11px;padding:12px 16px;border-top:1px solid var(--to-surface-2)}
+.hrow--volt{background:rgba(200,255,46,.06)}
+.hrow--danger{background:rgba(255,90,103,.06)}
+.hdot{width:8px;height:8px;flex:none;border-radius:50%;background:var(--to-line);margin-top:5px}
+.hrow--volt .hdot{background:var(--to-accent)}
+.hrow--danger .hdot{background:var(--to-danger)}
+.hmain{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+.hkind{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--to-text-3)}
+.hrow--volt .hkind{color:var(--to-accent)}
+.hrow--danger .hkind{color:var(--to-danger-text)}
+.htext{font-size:14px;font-weight:500;line-height:1.45}
+.hrow--volt .htext,.hrow--danger .htext{font-weight:600}
+.hmeta{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.06em;color:var(--to-text-4)}
+.hbtn{width:30px;height:30px;flex:none;border-radius:10px;background:transparent;
+  border:1px solid var(--to-line);display:grid;place-items:center}
+.hrow--volt .hbtn,.hrow--danger .hbtn{border-color:var(--to-accent-frame);background:rgba(200,255,46,.08)}
+.hrow--danger .hbtn{border-color:var(--to-danger-frame);background:rgba(255,90,103,.08)}
+.cut{margin:0 20px;padding:16px;border-radius:18px;border:1px dashed var(--to-hairline);
+  text-align:center;font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;
+  color:var(--to-text-4)}
+
+/* Blatt */
+.scrim{position:fixed;inset:0;background:rgba(5,6,8,.74);display:flex;flex-direction:column;
+  justify-content:flex-end;z-index:20}
+.sheet{width:390px;margin:0 auto;background:var(--to-surface);border-top:1px solid var(--to-border);
+  border-radius:26px 26px 0 0;padding:12px 20px 22px;display:flex;flex-direction:column;gap:14px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sheet__sub{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-accent)}
+.sheet__note{font-size:12px;color:var(--to-text-4);line-height:1.5}
+.sheet__quote{padding:13px 15px;border-radius:16px;background:var(--to-surface-3);
+  border:1px solid var(--to-hairline);font-size:13px;line-height:1.45;color:var(--to-text-2)}
+.sheet__actions{display:flex;flex-direction:column;gap:8px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ==================== ADMINREITER ==================== -->
+  <div class="view" id="vAdmin">
+
+    <div class="tabswrap">
+      <div class="tabs" id="tabs"></div>
+      <span class="tabsfade"></span>
+    </div>
+
+    <div class="form">
+      <span class="form__label" id="formLabel">NEUE MELDUNG</span>
+
+      <div class="seg" id="seg" role="group" aria-label="Sorte">
+        <button class="seg__btn" type="button" data-kind="hinweis" aria-pressed="true">Hinweis</button>
+        <button class="seg__btn" type="button" data-kind="wichtig" aria-pressed="false">Wichtig</button>
+        <button class="seg__btn" type="button" data-kind="dringend" aria-pressed="false">Dringend</button>
+      </div>
+      <span class="explain" id="explain"></span>
+
+      <label class="explain" for="msgText" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Text der Meldung</label>
+      <textarea class="ta" id="msgText" placeholder="z. B. Training am Freitag fällt aus – Halle belegt"></textarea>
+
+      <button class="pushrow" type="button" id="pushBtn" aria-pressed="false">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#7C8594" style="stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-2.5 8-2.5 8h17S18 15 18 8zM10.5 20a2 2 0 0 0 3 0"></path></svg>
+        <span class="pushrow__main">
+          <span class="pushrow__label">Push an 12 Spieler</span>
+          <span class="pushrow__sub" id="pushSub">NUR IN DER APP</span>
+        </span>
+        <span class="track"><span class="knob"></span></span>
+      </button>
+
+      <div class="formfoot">
+        <button class="btn btn--primary" type="button" id="publishBtn" disabled>Veröffentlichen</button>
+        <button class="btn--text" type="button" id="cancelEdit" hidden>Bearbeiten abbrechen</button>
+      </div>
+    </div>
+
+    <div class="sechead pad" id="runHead">
+      <span class="sechead__title">Läuft gerade</span>
+      <span class="sechead__rule"></span>
+      <span class="sechead__label" id="runCount">3</span>
+    </div>
+
+    <section class="panel" id="runList"></section>
+
+    <div class="empty" id="emptyBox" hidden>
+      <span class="empty__title">Keine Meldung läuft</span>
+      <span class="empty__sub">Schreib eine Meldung, wenn alle etwas wissen müssen. Sie steht bei allen
+        ganz oben auf der Startseite, bis sie gelesen ist oder abläuft.</span>
+    </div>
+
+    <div class="pad" id="endHeadWrap">
+      <button class="foldbtn" type="button" id="endFold" aria-expanded="false">
+        <span class="sechead__title">Beendet</span>
+        <span class="sechead__rule"></span>
+        <span class="sechead__label" id="endCount">2</span>
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#7C8594" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+      </button>
+    </div>
+
+    <section class="panel panel--off" id="endList" hidden></section>
+  </div>
+
+  <!-- ==================== STARTSEITE ==================== -->
+  <div class="view" id="vHome" hidden>
+    <span class="hint">STARTSEITE · AUSZUG</span>
+
+    <section class="hpanel" id="hpanel">
+      <div class="hhead" id="hhead">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#0A0C0F" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-2.5 8-2.5 8h17S18 15 18 8zM10.5 20a2 2 0 0 0 3 0"></path></svg>
+        <span class="hhead__label">FÜR DICH</span>
+        <span class="hcount" id="hcount">3</span>
+      </div>
+      <div id="hrows"></div>
+    </section>
+
+    <span class="explain pad" id="homeNote">Der Haken bestätigt die Meldung – sie verschwindet für dich,
+      und der Trainer sieht dich als Leser. Offene Aufgaben bleiben stehen, bis du sie erledigt hast.</span>
+
+    <div class="cut">… HIER GEHT DIE STARTSEITE WEITER (NÄCHSTES SPIEL, TRAINING, …)</div>
+  </div>
+
+</div>
+
+<!-- ==================== BLÄTTER ==================== -->
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var TABS = ['Spieler','Spiele','Kampfgericht','Training','Trikots','Betrachter','Meldungen','Funktionen'];
+
+  var KINDS = {
+    hinweis: {
+      label:'HINWEIS', name:'Hinweis', tone:'', left:'LÄUFT IN 7 TAGEN AB',
+      explain:'Steht 7 Tage oben – oder verschwindet früher, sobald alle sie gelesen haben.',
+      push:false, pushLock:false
+    },
+    wichtig: {
+      label:'WICHTIG', name:'Wichtig', tone:'volt', left:'LÄUFT IN 14 TAGEN AB',
+      explain:'Volt hervorgehoben, bleibt 14 Tage oder bis du sie beendest – auch wenn schon alle gelesen haben.',
+      push:true, pushLock:false
+    },
+    dringend: {
+      label:'DRINGEND', name:'Dringend', tone:'danger', left:'BIS DU SIE BEENDEST',
+      explain:'Rot hervorgehoben, bleibt bis du sie beendest. Push geht immer raus.',
+      push:true, pushLock:true
+    }
+  };
+
+  var TOTAL = 12;
+
+  var msgs = [
+    {id:'m1', kind:'dringend', text:'Training am Freitag fällt aus – Halle belegt.',
+     left:'BIS DU SIE BEENDEST', read:9, meta:'MARC REWALD · HEUTE 18:40'},
+    {id:'m2', kind:'wichtig', text:'Hallenschlüssel liegt ab Freitag im Vereinsheim, nicht mehr beim Hausmeister.',
+     left:'LÄUFT IN 11 TAGEN AB', read:5, meta:'MARC REWALD · HEUTE 09:12'},
+    {id:'m3', kind:'hinweis', text:'Neue Trikots sind bestellt, Lieferung Mitte Oktober.',
+     left:'LÄUFT MORGEN AB', read:11, meta:'MARC REWALD · 20.09.'}
+  ];
+
+  var endedMsgs = [
+    {kind:'hinweis', text:'Fahrgemeinschaft nach Solingen: Treffpunkt 17:30 am Vereinsheim.',
+     meta:'BEENDET AM 18.09. · 12 VON 12 GELESEN'},
+    {kind:'wichtig', text:'Bitte Trikots bis Mittwoch abgeben.',
+     meta:'ABGELAUFEN AM 12.09. · 10 VON 12 GELESEN'}
+  ];
+
+  var feed = [
+    {type:'msg', id:'m1', kind:'dringend'},
+    {type:'msg', id:'m2', kind:'wichtig'},
+    {type:'task', text:'Training am Fr., 25.09. noch nicht beantwortet', meta:'ZU- ODER ABSAGEN'}
+  ];
+
+  var ui = { kind:'hinweis', push:false, editing:null, endOpen:false };
+
+  var CHECK = 'M5 13l4 4L19 7';
+  var ARROW = 'M9 6l6 6-6 6';
+
+  function el(id){ return document.getElementById(id); }
+  function svg(path, stroke, w, sw){
+    return '<svg viewBox="0 0 24 24" width="'+w+'" height="'+w+'" fill="none" stroke="'+stroke+
+      '" style="stroke-width:'+sw+';stroke-linecap:round;stroke-linejoin:round" aria-hidden="true">'+
+      '<path d="'+path+'"></path></svg>';
+  }
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  /* ---------- Reiterleiste ---------- */
+  function renderTabs(){
+    el('tabs').innerHTML = TABS.map(function(t){
+      var cur = t === 'Meldungen' ? ' aria-current="page"' : '';
+      return '<button class="tab" type="button"'+cur+'>'+t+'</button>';
+    }).join('');
+  }
+
+  /* ---------- Formular ---------- */
+  function renderForm(){
+    var k = KINDS[ui.kind];
+    Array.prototype.forEach.call(el('seg').children, function(b){
+      b.setAttribute('aria-pressed', b.dataset.kind === ui.kind ? 'true' : 'false');
+    });
+    el('explain').textContent = k.explain;
+
+    var on = k.pushLock ? true : ui.push;
+    el('pushBtn').setAttribute('aria-pressed', on ? 'true' : 'false');
+    el('pushBtn').setAttribute('aria-disabled', k.pushLock ? 'true' : 'false');
+    el('pushSub').textContent = k.pushLock ? 'BEI DRINGEND IMMER AN'
+      : (on ? 'MITTEILUNG AUFS HANDY' : 'NUR IN DER APP');
+
+    var hasText = el('msgText').value.trim().length > 0;
+    el('publishBtn').disabled = !hasText;
+    el('publishBtn').textContent = ui.editing ? 'Änderungen speichern' : 'Veröffentlichen';
+    el('formLabel').textContent = ui.editing ? 'MELDUNG BEARBEITEN' : 'NEUE MELDUNG';
+    el('cancelEdit').hidden = !ui.editing;
+  }
+
+  /* ---------- Liste ---------- */
+  function toneClass(kind){
+    var t = KINDS[kind].tone;
+    return t ? ' mrow--'+t : '';
+  }
+
+  function renderList(){
+    el('runCount').textContent = String(msgs.length);
+    el('runList').hidden = msgs.length === 0;
+    el('runHead').hidden = msgs.length === 0;
+    el('emptyBox').hidden = msgs.length !== 0;
+
+    el('runList').innerHTML = msgs.map(function(m){
+      var k = KINDS[m.kind];
+      var pct = Math.round(m.read / TOTAL * 100);
+      var editing = ui.editing === m.id;
+      return '<div class="mrow'+toneClass(m.kind)+(editing ? ' mrow--editing' : '')+'">'+
+        '<span class="mbar"></span>'+
+        '<span class="mmain">'+
+          '<span class="mtop">'+
+            '<span class="mkind">'+k.label+'</span>'+
+            '<span class="mleft"'+(editing ? ' style="color:#C8FF2E"' : '')+'>'+
+              (editing ? 'WIRD OBEN BEARBEITET' : m.left)+'</span>'+
+          '</span>'+
+          '<span class="mtext">'+esc(m.text)+'</span>'+
+          '<span class="progrow">'+
+            '<span class="prog"><span class="prog__fill" style="width:'+pct+'%"></span></span>'+
+            '<span class="mread">'+m.read+' VON '+TOTAL+'</span>'+
+          '</span>'+
+          '<span class="chips">'+
+            '<button class="chip" type="button" data-act="edit" data-id="'+m.id+'">Bearbeiten</button>'+
+            '<button class="chip" type="button" data-act="end" data-id="'+m.id+'">Beenden</button>'+
+            '<button class="chip chip--danger" type="button" data-act="del" data-id="'+m.id+'">Löschen</button>'+
+          '</span>'+
+        '</span>'+
+      '</div>';
+    }).join('');
+
+    el('endCount').textContent = String(endedMsgs.length);
+    el('endFold').setAttribute('aria-expanded', ui.endOpen ? 'true' : 'false');
+    el('endList').hidden = !ui.endOpen || endedMsgs.length === 0;
+    el('endHeadWrap').hidden = endedMsgs.length === 0;
+    el('endList').innerHTML = endedMsgs.map(function(m){
+      return '<div class="erow">'+
+        '<span class="emain">'+
+          '<span class="etext">'+esc(m.text)+'</span>'+
+          '<span class="emeta">'+m.meta+'</span>'+
+        '</span>'+
+        '<button class="chip chip--danger" type="button" data-act="delended" data-text="'+esc(m.text)+'">Löschen</button>'+
+      '</div>';
+    }).join('');
+  }
+
+  /* ---------- Startseite ---------- */
+  function renderHome(){
+    var openMsgs = feed.filter(function(f){ return f.type === 'msg'; });
+    var hasMsg = openMsgs.length > 0;
+
+    el('hpanel').className = 'hpanel' + (hasMsg ? '' : ' hpanel--plain');
+    el('hcount').textContent = String(feed.length);
+    el('hhead').querySelector('svg').setAttribute('stroke', hasMsg ? '#0A0C0F' : '#7C8594');
+
+    el('hrows').innerHTML = feed.map(function(f, i){
+      if (f.type === 'task') {
+        return '<div class="hrow">'+
+          '<span class="hdot" style="background:#C8FF2E"></span>'+
+          '<span class="hmain">'+
+            '<span class="htext">'+esc(f.text)+'</span>'+
+            '<span class="hmeta">'+f.meta+'</span>'+
+          '</span>'+
+          '<button class="hbtn" type="button" aria-label="Öffnen">'+svg(ARROW,'#7C8594',13,2.4)+'</button>'+
+        '</div>';
+      }
+      var m = msgs.filter(function(x){ return x.id === f.id; })[0];
+      var k = KINDS[f.kind];
+      var cls = k.tone ? ' hrow--'+k.tone : '';
+      var stroke = k.tone === 'danger' ? '#FF7A85' : (k.tone === 'volt' ? '#C8FF2E' : '#7C8594');
+      return '<div class="hrow'+cls+'">'+
+        '<span class="hdot"></span>'+
+        '<span class="hmain">'+
+          '<span class="hkind">'+k.label+'</span>'+
+          '<span class="htext">'+esc(m ? m.text : '')+'</span>'+
+          '<span class="hmeta">'+(m ? m.meta : '')+'</span>'+
+        '</span>'+
+        '<button class="hbtn" type="button" data-read="'+f.id+'" aria-label="Gelesen">'+
+          svg(CHECK, stroke, 13, 2.4)+'</button>'+
+      '</div>';
+    }).join('');
+
+    el('homeNote').textContent = hasMsg
+      ? 'Der Haken bestätigt die Meldung – sie verschwindet für dich, und der Trainer sieht dich als Leser. Offene Aufgaben bleiben stehen, bis du sie erledigt hast.'
+      : 'Keine Meldung offen: der Kopf ist wieder ruhig, der Block zeigt nur noch offene Aufgaben.';
+  }
+
+  /* ---------- Blätter ---------- */
+  function openSheet(html){
+    el('sheet').innerHTML = '<span class="sheet__grip"></span>' + html;
+    el('scrim').hidden = false;
+  }
+  function closeSheet(){ el('scrim').hidden = true; }
+
+  function sheetPublished(kind, push){
+    var k = KINDS[kind];
+    openSheet(
+      '<span class="sheet__title">Meldung ist online</span>'+
+      (push ? '<span class="sheet__sub">PUSH AN 12 SPIELER GESENDET</span>'
+            : '<span class="sheet__sub" style="color:#7C8594">OHNE PUSH VERÖFFENTLICHT</span>')+
+      '<span class="sheet__note">Sie steht ab jetzt bei allen ganz oben auf der Startseite. '+
+      k.explain+' Wer sie gelesen hat, siehst du hier in der Liste.</span>'+
+      '<div class="sheet__actions">'+
+        '<button class="btn btn--primary" type="button" data-sheet="close">Fertig</button>'+
+      '</div>'
+    );
+  }
+
+  function sheetEnd(id){
+    var m = msgs.filter(function(x){ return x.id === id; })[0];
+    openSheet(
+      '<span class="sheet__title">Meldung beenden?</span>'+
+      '<span class="sheet__quote">'+esc(m.text)+'</span>'+
+      '<span class="sheet__note">Sie verschwindet sofort von allen Startseiten und rutscht hier unter '+
+      '„Beendet". Wer sie gelesen hat, bleibt gespeichert. Löschen kannst du sie danach immer noch.</span>'+
+      '<div class="sheet__actions">'+
+        '<button class="btn btn--primary" type="button" data-confirm="end" data-id="'+id+'">Beenden</button>'+
+        '<button class="btn btn--ghost" type="button" data-sheet="close">Abbrechen</button>'+
+      '</div>'
+    );
+  }
+
+  function sheetDelete(id, text){
+    openSheet(
+      '<span class="sheet__title">Meldung löschen?</span>'+
+      '<span class="sheet__quote">'+esc(text)+'</span>'+
+      '<span class="sheet__note">Die Meldung und die Info, wer sie gelesen hat, sind danach weg. '+
+      'Das lässt sich nicht zurückholen – zum Ausblenden reicht „Beenden".</span>'+
+      '<div class="sheet__actions">'+
+        '<button class="btn btn--danger" type="button" data-confirm="del" data-id="'+(id||'')+
+        '" data-text="'+esc(text)+'">Endgültig löschen</button>'+
+        '<button class="btn btn--ghost" type="button" data-sheet="close">Abbrechen</button>'+
+      '</div>'
+    );
+  }
+
+  /* ---------- Ereignisse ---------- */
+  el('seg').addEventListener('click', function(e){
+    var b = e.target.closest('.seg__btn'); if (!b) return;
+    ui.kind = b.dataset.kind;
+    if (KINDS[ui.kind].pushLock) ui.push = true;
+    else if (ui.kind === 'wichtig') ui.push = true;
+    renderForm();
+  });
+
+  el('pushBtn').addEventListener('click', function(){
+    if (KINDS[ui.kind].pushLock) return;
+    ui.push = !ui.push;
+    renderForm();
+  });
+
+  el('msgText').addEventListener('input', renderForm);
+
+  el('publishBtn').addEventListener('click', function(){
+    var text = el('msgText').value.trim();
+    if (!text) return;
+    var k = KINDS[ui.kind];
+    var push = k.pushLock ? true : ui.push;
+
+    if (ui.editing) {
+      var m = msgs.filter(function(x){ return x.id === ui.editing; })[0];
+      if (m) { m.text = text; m.kind = ui.kind; m.left = k.left; }
+      ui.editing = null;
+      el('msgText').value = '';
+      renderForm(); renderList();
+      return;
+    }
+    msgs.unshift({ id:'n'+Date.now(), kind:ui.kind, text:text, left:k.left, read:0,
+      meta:'MARC REWALD · GERADE EBEN' });
+    el('msgText').value = '';
+    renderForm(); renderList();
+    sheetPublished(ui.kind, push);
+  });
+
+  el('cancelEdit').addEventListener('click', function(){
+    ui.editing = null; el('msgText').value = ''; renderForm();
+  });
+
+  el('endFold').addEventListener('click', function(){
+    ui.endOpen = !ui.endOpen; renderList();
+  });
+
+  el('runList').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-act]'); if (!b) return;
+    var id = b.dataset.id;
+    var m = msgs.filter(function(x){ return x.id === id; })[0];
+    if (b.dataset.act === 'edit') {
+      ui.editing = id; ui.kind = m.kind; ui.push = false;
+      el('msgText').value = m.text;
+      renderForm();
+      window.scrollTo(0, 0);
+    } else if (b.dataset.act === 'end') {
+      sheetEnd(id);
+    } else if (b.dataset.act === 'del') {
+      sheetDelete(id, m.text);
+    }
+  });
+
+  el('endList').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-act="delended"]'); if (!b) return;
+    sheetDelete(null, b.dataset.text);
+  });
+
+  el('scrim').addEventListener('click', function(e){
+    if (e.target === el('scrim')) { closeSheet(); return; }
+    var c = e.target.closest('button[data-sheet="close"]');
+    if (c) { closeSheet(); return; }
+    var k = e.target.closest('button[data-confirm]');
+    if (!k) return;
+    if (k.dataset.confirm === 'end') {
+      var id = k.dataset.id;
+      var m = msgs.filter(function(x){ return x.id === id; })[0];
+      if (m) {
+        endedMsgs.unshift({ kind:m.kind, text:m.text,
+          meta:'BEENDET AM 25.09. · '+m.read+' VON '+TOTAL+' GELESEN' });
+        msgs = msgs.filter(function(x){ return x.id !== id; });
+        feed = feed.filter(function(f){ return f.id !== id; });
+      }
+    } else if (k.dataset.confirm === 'del') {
+      var did = k.dataset.id, dtext = k.dataset.text;
+      if (did) {
+        msgs = msgs.filter(function(x){ return x.id !== did; });
+        feed = feed.filter(function(f){ return f.id !== did; });
+      } else {
+        endedMsgs = endedMsgs.filter(function(x){ return x.text !== dtext; });
+      }
+    }
+    closeSheet(); renderList(); renderHome();
+  });
+
+  el('hrows').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-read]'); if (!b) return;
+    var id = b.dataset.read;
+    var m = msgs.filter(function(x){ return x.id === id; })[0];
+    if (m && m.read < TOTAL) m.read += 1;
+    feed = feed.filter(function(f){ return f.id !== id; });
+    renderHome(); renderList();
+  });
+
+  /* ---------- Zustände ---------- */
+  function showView(which){
+    el('vAdmin').hidden = which !== 'admin';
+    el('vHome').hidden = which !== 'home';
+  }
+
+  function applyState(state){
+    switch (state) {
+      case 'wichtig':
+        ui.kind = 'wichtig'; ui.push = true;
+        el('msgText').value = 'Sonntag Heimspiel gegen Solingen – bitte 45 Minuten vorher in der Halle sein.';
+        break;
+      case 'dringend':
+        ui.kind = 'dringend'; ui.push = true;
+        el('msgText').value = 'Training heute fällt aus – Halle ist gesperrt.';
+        break;
+      case 'edit':
+        ui.editing = 'm2'; ui.kind = 'wichtig'; ui.push = false;
+        el('msgText').value = msgs.filter(function(x){ return x.id === 'm2'; })[0].text;
+        break;
+      case 'ended':
+        ui.endOpen = true;
+        break;
+      case 'empty':
+        msgs = []; endedMsgs = []; feed = feed.filter(function(f){ return f.type !== 'msg'; });
+        break;
+      case 'published':
+        ui.kind = 'wichtig'; ui.push = true;
+        break;
+      case 'homeread':
+        feed = feed.filter(function(f){ return f.id !== 'm1'; });
+        break;
+      case 'homeplain':
+        feed = feed.filter(function(f){ return f.type !== 'msg'; });
+        break;
+      default: break;
+    }
+
+    showView(state.indexOf('home') === 0 ? 'home' : 'admin');
+    renderTabs(); renderForm(); renderList(); renderHome();
+
+    if (state === 'published') sheetPublished('wichtig', true);
+    if (state === 'end') sheetEnd('m2');
+    if (state === 'delete') sheetDelete('m2', msgs.filter(function(x){ return x.id === 'm2'; })[0].text);
+  }
+
+  var state = (new URLSearchParams(location.search).get('state') || 'list');
+  applyState(state);
+})();
+</script>
+</body>
+</html>

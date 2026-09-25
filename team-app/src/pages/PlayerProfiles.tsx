@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { useTipoffLoader } from '../hooks/useTipoffLoader';
 import { PlayerProfileSheet } from '../components/PlayerProfileSheet';
 import { BestenlisteBoard } from '../components/BestenlisteBoard';
-import { type Player, type PlayerPosition } from '../types/database';
+import { fmtDateShort } from '../lib/format';
+import { ANNOUNCEMENT_KIND_LABELS } from '../lib/announcements';
+import { type Announcement, type AnnouncementReadRow, type Player, type PlayerPosition } from '../types/database';
 
 function initialsOf(name: string): string {
   return name
@@ -35,9 +38,15 @@ const GRID_POSITION: Record<PlayerPosition, string> = {
 };
 
 export function PlayerProfiles() {
+  const { role, player: me } = useAuth();
   const [players, setPlayers] = useState<Player[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Player | null>(null);
+  // Element 22 §"Archiv für Spieler" — bestätigte Meldungen bleiben hier
+  // nachlesbar, statt nach dem Haken auf der Startseite endgültig weg zu
+  // sein. Nur für role==='player' relevant: announcement_reads kennt nur
+  // player_id, ein Trainer/Betrachter hat dort nie eigene Zeilen.
+  const [readAnnouncements, setReadAnnouncements] = useState<{ announcement: Announcement; readAt: string }[] | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -51,7 +60,23 @@ export function PlayerProfiles() {
       return;
     }
     setPlayers((data as Player[]) ?? []);
-  }, []);
+
+    if (role === 'player' && me) {
+      const { data: readRows } = await supabase.from('announcement_reads').select('*').eq('player_id', me.id);
+      const ids = ((readRows as AnnouncementReadRow[] | null) ?? []).map((r) => r.announcement_id);
+      if (ids.length > 0) {
+        const { data: announcementRows } = await supabase.from('announcements').select('*').in('id', ids);
+        const byId = new Map(((announcementRows as Announcement[] | null) ?? []).map((a) => [a.id, a] as const));
+        const combined = ((readRows as AnnouncementReadRow[] | null) ?? [])
+          .map((r) => ({ announcement: byId.get(r.announcement_id), readAt: r.created_at }))
+          .filter((x): x is { announcement: Announcement; readAt: string } => !!x.announcement)
+          .sort((a, b) => b.readAt.localeCompare(a.readAt));
+        setReadAnnouncements(combined);
+      } else {
+        setReadAnnouncements([]);
+      }
+    }
+  }, [role, me]);
 
   useEffect(() => {
     load().catch(() => setError('Fehler beim Laden der Spielerprofile.'));
@@ -115,6 +140,31 @@ export function PlayerProfiles() {
       )}
 
       <BestenlisteBoard />
+
+      {readAnnouncements && readAnnouncements.length > 0 && (
+        <>
+          <div className="flex items-center gap-3">
+            <span className="to-display-sm text-to-text">Frühere Meldungen</span>
+            <span className="h-px flex-1 bg-to-divider" />
+            <span className="to-data text-[10px] tracking-[0.12em] text-to-textDisabled">{readAnnouncements.length}</span>
+          </div>
+          <section className="overflow-hidden rounded-to-xl border border-to-border bg-to-surface">
+            {readAnnouncements.map(({ announcement: a, readAt }, i) => (
+              <div key={a.id} className={`flex flex-col gap-1 px-4 py-3 ${i === 0 ? '' : 'border-t border-to-surface2'}`}>
+                <span
+                  className={`to-data w-fit text-[9px] tracking-[0.1em] ${
+                    a.kind === 'dringend' ? 'text-to-dangerText' : a.kind === 'wichtig' ? 'text-to-accent' : 'text-to-text3'
+                  }`}
+                >
+                  {ANNOUNCEMENT_KIND_LABELS[a.kind].toUpperCase()}
+                </span>
+                <p className="text-sm leading-relaxed text-to-text2">{a.message}</p>
+                <span className="to-data text-[9px] tracking-[0.06em] text-to-textDisabled">BESTÄTIGT AM {fmtDateShort(readAt.slice(0, 10))}</span>
+              </div>
+            ))}
+          </section>
+        </>
+      )}
 
       {selected && <PlayerProfileSheet player={selected} onClose={() => setSelected(null)} />}
     </div>
