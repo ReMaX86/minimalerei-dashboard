@@ -6,11 +6,13 @@ import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { fmtDateBadge, fmtDateShort, fmtTime, mapsUrl } from '../lib/format';
 import { EMPTY_MEETING_POINT, type MeetingPointFormValue } from './MeetingPointFields';
+import { SquadDeclineSheet, SquadReconfirmSheet } from './SquadResponseSheets';
 import {
   meetingPoints,
   playerAbsenceOn,
   type CarpoolClaim,
   type CarpoolOffer,
+  type DeclineReason,
   type Game,
   type GameSquadRow,
   type Player,
@@ -75,6 +77,13 @@ function CheckIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
       <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+function PenIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden="true">
+      <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z" />
     </svg>
   );
 }
@@ -155,6 +164,8 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
   const [publishing, setPublishing] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [responding, setResponding] = useState(false);
+  const [selfDeclineSheetOpen, setSelfDeclineSheetOpen] = useState(false);
+  const [selfReconfirmSheetOpen, setSelfReconfirmSheetOpen] = useState(false);
   const [rideOfferOpen, setRideOfferOpen] = useState(false);
   const [rideSeats, setRideSeats] = useState(3);
   const [rideNote, setRideNote] = useState('');
@@ -292,15 +303,19 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
     }
   }
 
-  async function respond(confirmed: boolean) {
+  async function respond(confirmed: boolean, reason?: DeclineReason | null, note?: string) {
     setResponding(true);
     setError(null);
     try {
       const { error: rpcError } = await supabase.rpc('respond_to_squad', {
         p_game_id: game.id,
-        p_confirmed: confirmed
+        p_confirmed: confirmed,
+        p_decline_reason: reason ?? null,
+        p_decline_note: note?.trim() || null
       });
       if (rpcError) throw rpcError;
+      setSelfDeclineSheetOpen(false);
+      setSelfReconfirmSheetOpen(false);
       await load();
     } catch {
       setError('Rückmeldung konnte nicht gespeichert werden.');
@@ -580,7 +595,11 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
                 const blocked = !selected && !!absence;
                 const locked = !selected && atCap;
                 const status = statusFor(row, absence);
+                // Nur die eigene, bereits abgesagte Zeile bekommt den
+                // zusätzlichen "Trainer informiert"-Hinweis — bei allen
+                // anderen Spielern bleibt "ABGESAGT" wie bisher.
                 const isMe = player?.id === p.id;
+                const displayStatus = isMe && row?.confirmation === 'declined' ? { ...status, text: 'ABGESAGT · TRAINER INFORMIERT' } : status;
                 return (
                   <li key={p.id}>
                     <button
@@ -598,7 +617,7 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
                           {p.name}
                           {isMe && ' (Du)'}
                         </span>
-                        <span className={`to-data text-[10px] tracking-[0.08em] ${TONE_CLASS[status.tone]}`}>{status.text}</span>
+                        <span className={`to-data text-[10px] tracking-[0.08em] ${TONE_CLASS[displayStatus.tone]}`}>{displayStatus.text}</span>
                       </span>
                       <span
                         className={`flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border-[1.5px] ${
@@ -608,6 +627,30 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
                         {selected && <CheckIcon className="text-to-onAccent" />}
                       </span>
                     </button>
+                    {isMe && selected && myConfirmation === 'confirmed' && (
+                      <div className="mb-2 flex items-center gap-2 pl-[44px]">
+                        <button
+                          type="button"
+                          onClick={() => setSelfDeclineSheetOpen(true)}
+                          className="inline-flex h-[34px] items-center gap-1.5 rounded-to-pill border border-to-line px-3.5 text-[13px] font-semibold text-to-text2"
+                        >
+                          <PenIcon />
+                          Zusage ändern
+                        </button>
+                      </div>
+                    )}
+                    {isMe && myConfirmation === 'declined' && (
+                      <div className="mb-2 flex items-center gap-2 pl-[44px]">
+                        <button
+                          type="button"
+                          onClick={() => setSelfReconfirmSheetOpen(true)}
+                          className="inline-flex h-[34px] items-center gap-1.5 rounded-to-pill border border-to-borderMatchday px-3.5 text-[13px] font-semibold text-to-accent"
+                        >
+                          <CheckIcon className="h-[13px] w-[13px]" />
+                          Doch dabei
+                        </button>
+                      </div>
+                    )}
                     {isMe && selected && myConfirmation === 'pending' && (
                       <div className="mb-2 flex items-center gap-2 pl-[44px]">
                         <span className="text-xs text-to-text3">Kannst du selbst?</span>
@@ -771,17 +814,37 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
                     const status = statusFor(squadByPlayer[p.id], undefined);
                     const isMe = player?.id === p.id;
                     return (
-                      <li key={p.id} className="flex items-center gap-2.5">
-                        <span className="to-data flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-to-surface text-[11px] text-to-text2">
-                          {initialsOf(p.name)}
-                        </span>
-                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span className="truncate text-[15px] font-semibold -tracking-[0.01em] text-to-text">
-                            {p.name}
-                            {isMe && ' (Du)'}
+                      <li key={p.id} className="flex flex-col">
+                        <div className="flex items-center gap-2.5">
+                          <span className="to-data flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-to-surface text-[11px] text-to-text2">
+                            {initialsOf(p.name)}
                           </span>
-                          <span className={`to-data text-[10px] tracking-[0.08em] ${TONE_CLASS[status.tone]}`}>{status.text}</span>
-                        </span>
+                          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                            <span className="truncate text-[15px] font-semibold -tracking-[0.01em] text-to-text">
+                              {p.name}
+                              {isMe && ' (Du)'}
+                            </span>
+                            <span className={`to-data text-[10px] tracking-[0.08em] ${TONE_CLASS[status.tone]}`}>{status.text}</span>
+                          </span>
+                        </div>
+                        {/* Nur die eigene Zeile bekommt die Änderungs-Zeile — solange
+                            eine Absage den Platz automatisch räumt (siehe respond_to_squad()
+                            Migration 0075), verschwindet die eigene Zeile bei einer Absage
+                            selbst aus dieser Liste (sie zeigt nur aktuell Nominierte); die
+                            Rücknahme läuft dann über die Startseitenkarte weiter, siehe
+                            NextGameCard.tsx. */}
+                        {isMe && myConfirmation === 'confirmed' && (
+                          <div className="flex items-center gap-2 py-1.5 pl-[44px]">
+                            <button
+                              type="button"
+                              onClick={() => setSelfDeclineSheetOpen(true)}
+                              className="inline-flex h-[34px] items-center gap-1.5 rounded-to-pill border border-to-line px-3.5 text-[13px] font-semibold text-to-text2"
+                            >
+                              <PenIcon />
+                              Zusage ändern
+                            </button>
+                          </div>
+                        )}
                       </li>
                     );
                   })
@@ -910,6 +973,24 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
           busy={ridesBusyKey === 'new-offer'}
           onSubmit={createRideOffer}
           onCancel={() => setRideOfferOpen(false)}
+        />
+      )}
+
+      {selfDeclineSheetOpen && (
+        <SquadDeclineSheet
+          busy={responding}
+          error={error}
+          published={g.squad_published}
+          onCancel={() => setSelfDeclineSheetOpen(false)}
+          onSend={(reason, note) => respond(false, reason, note)}
+        />
+      )}
+      {selfReconfirmSheetOpen && (
+        <SquadReconfirmSheet
+          busy={responding}
+          error={error}
+          onCancel={() => setSelfReconfirmSheetOpen(false)}
+          onConfirm={() => respond(true)}
         />
       )}
     </section>

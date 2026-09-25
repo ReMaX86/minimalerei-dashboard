@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { fmtDateBadge, fmtTime, hasKickedOff, mapsUrl } from '../lib/format';
 import { DECLINE_REASON_LABELS, benoetigterSatz, meetingPoints, type DeclineReason, type Game, type SquadConfirmation } from '../types/database';
+import { SquadDeclineSheet, SquadReconfirmSheet } from './SquadResponseSheets';
 
 const MAX_SQUAD_SIZE = 12;
 
@@ -78,6 +78,23 @@ function ArrowLinkIcon() {
   );
 }
 
+function SmallCheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden="true">
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+function SmallCrossIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" className="shrink-0" aria-hidden="true">
+      <path d="M6 6l12 12" />
+      <path d="M18 6L6 18" />
+    </svg>
+  );
+}
+
 function KaderAnsehenLink() {
   return (
     <Link to="/spiele?kader=1" className="inline-flex items-center gap-1 text-sm font-semibold text-to-accent">
@@ -119,6 +136,7 @@ export function NextGameCard({
   onResponded: () => void;
 }) {
   const [declineSheetOpen, setDeclineSheetOpen] = useState(false);
+  const [reconfirmSheetOpen, setReconfirmSheetOpen] = useState(false);
   const [responding, setResponding] = useState(false);
   const [respondError, setRespondError] = useState<string | null>(null);
 
@@ -161,6 +179,7 @@ export function NextGameCard({
       });
       if (error) throw error;
       setDeclineSheetOpen(false);
+      setReconfirmSheetOpen(false);
       onResponded();
     } catch {
       setRespondError('Konnte nicht gespeichert werden. Bitte nochmal versuchen.');
@@ -170,7 +189,11 @@ export function NextGameCard({
   }
 
   return (
-    <section className={`card relative overflow-hidden ${isMatchday ? '!border-to-borderMatchday' : ''}`}>
+    <section
+      className={`card relative overflow-hidden ${
+        isDeclined ? '!border-to-dangerFrame' : isMatchday ? '!border-to-borderMatchday' : ''
+      }`}
+    >
       <svg viewBox="0 0 260 260" width="260" height="260" className="pointer-events-none absolute -right-[120px] -top-20" aria-hidden="true">
         <circle cx="130" cy="130" r="120" fill="none" stroke="var(--to-text)" strokeWidth="1" opacity="0.07" />
         <circle cx="130" cy="130" r="46" fill="none" stroke="var(--to-accent)" strokeWidth="1.5" opacity="0.45" />
@@ -236,6 +259,16 @@ export function NextGameCard({
           </div>
         </div>
 
+        {isDeclined && (
+          <div className="flex items-start gap-2.5 rounded-to-lg border border-to-dangerFrame bg-to-dangerSoft px-3.5 py-3 text-[12px] leading-relaxed text-to-text2">
+            <SmallCrossIcon />
+            <span>
+              <strong className="text-to-text">Du bist abgesagt.</strong> Dein Trainer wurde informiert. Solange der
+              Kader noch offen ist, kannst du jederzeit wieder zusagen.
+            </span>
+          </div>
+        )}
+
         <div className="flex flex-col gap-3.5 border-t border-to-border pt-4">
           {/* Sobald das Spiel läuft, tritt die Live-Anzeigetafel unten an die
               Stelle der Kader-Rückmeldung — die ist dann nicht mehr die
@@ -290,44 +323,42 @@ export function NextGameCard({
           )}
 
           {!live && isAccepted && (
-            <>
-              <div className="flex items-center justify-between gap-2.5">
-                <span className="inline-flex h-8 items-center gap-2 rounded-to-pill bg-to-accentSoft px-3 text-sm font-semibold text-to-accent">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M5 12.5l4.5 4.5L19 7.5" />
-                  </svg>
+            <div className="flex items-center justify-between gap-2.5">
+              {matchdayPreKickoff ? (
+                <span className="to-data inline-flex h-[46px] items-center gap-2 rounded-to-pill border border-to-borderMatchday bg-to-accentSoft px-4 text-sm font-semibold text-to-accent">
+                  <SmallCheckIcon />
                   Zugesagt
                 </span>
-                <KaderAnsehenLink />
-              </div>
-              {!matchdayPreKickoff && (
+              ) : (
                 <button
                   type="button"
-                  className="self-start text-sm text-to-text2 underline"
                   onClick={() => setDeclineSheetOpen(true)}
+                  className="inline-flex h-[46px] items-center gap-2 rounded-to-pill border border-to-borderMatchday bg-to-accentSoft px-4 text-sm font-semibold text-to-accent"
                 >
-                  Doch nicht dabei?
+                  <SmallCheckIcon />
+                  Zugesagt
+                  <span className="to-data ml-0.5 text-[8px] tracking-[0.1em] text-to-text3">ÄNDERN</span>
                 </button>
               )}
-            </>
+              <KaderAnsehenLink />
+            </div>
           )}
 
           {!live && isDeclined && (
             <>
               <div className="flex items-center justify-between gap-2.5">
-                <span className="inline-flex h-8 items-center gap-2 rounded-to-pill bg-to-dangerSoft px-3 text-sm font-semibold text-to-dangerText">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M6 6l12 12" />
-                    <path d="M18 6L6 18" />
-                  </svg>
+                <button
+                  type="button"
+                  onClick={() => setReconfirmSheetOpen(true)}
+                  className="inline-flex h-[46px] items-center gap-2 rounded-to-pill border border-to-dangerFrame bg-to-dangerSoft px-4 text-sm font-semibold text-to-dangerText"
+                >
+                  <SmallCrossIcon />
                   Abgesagt{myDeclineReason ? ` · ${DECLINE_REASON_LABELS[myDeclineReason]}` : ''}
-                </span>
-                <button type="button" disabled={responding} className="text-sm font-semibold text-to-text2 underline" onClick={() => respond(true)}>
-                  Doch dabei?
+                  <span className="to-data ml-0.5 text-[8px] tracking-[0.1em] text-to-text3">DOCH DABEI?</span>
                 </button>
+                <KaderAnsehenLink />
               </div>
               {respondError && <p className="text-xs text-to-dangerText">{respondError}</p>}
-              <p className="text-[13px] text-to-text3">Der Trainer wurde informiert.</p>
             </>
           )}
 
@@ -417,79 +448,22 @@ export function NextGameCard({
       </div>
 
       {declineSheetOpen && (
-        <DeclineSheet
+        <SquadDeclineSheet
           busy={responding}
           error={respondError}
+          published={game.squad_published}
           onCancel={() => setDeclineSheetOpen(false)}
           onSend={(reason, note) => respond(false, reason, note)}
         />
       )}
-    </section>
-  );
-}
-
-const DECLINE_REASONS: DeclineReason[] = ['krank', 'arbeit_schule', 'urlaub', 'anderer_grund'];
-
-function DeclineSheet({
-  busy,
-  error,
-  onCancel,
-  onSend
-}: {
-  busy: boolean;
-  error: string | null;
-  onCancel: () => void;
-  onSend: (reason: DeclineReason | null, note: string) => void;
-}) {
-  const [reason, setReason] = useState<DeclineReason | null>(null);
-  const [note, setNote] = useState('');
-
-  return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 sm:items-center" onClick={onCancel}>
-      <div
-        className="w-full max-w-lg rounded-t-[24px] border border-to-line bg-to-surface2 p-5 sm:rounded-b-[24px]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-[19px] font-semibold -tracking-[0.01em] text-to-text">Für dieses Spiel absagen?</h2>
-        <p className="mt-1 text-sm text-to-text2">
-          Der Trainer bekommt eine Nachricht. Ein Grund hilft ihm beim Planen, ist aber freiwillig.
-        </p>
-
-        <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Grund (optional)">
-          {DECLINE_REASONS.map((r) => (
-            <button
-              key={r}
-              type="button"
-              aria-pressed={reason === r}
-              onClick={() => setReason((prev) => (prev === r ? null : r))}
-              className={`h-[38px] rounded-to-pill border px-3.5 text-sm ${
-                reason === r ? 'border-to-accent bg-to-accent font-semibold text-to-onAccent' : 'border-to-line text-to-text'
-              }`}
-            >
-              {DECLINE_REASON_LABELS[r]}
-            </button>
-          ))}
-        </div>
-
-        <textarea
-          className="mt-4 min-h-16 w-full resize-none rounded-to-lg border border-to-line bg-to-bg p-3.5 text-[15px] text-to-text placeholder:text-to-text3"
-          placeholder="Notiz für den Trainer (optional)"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
+      {reconfirmSheetOpen && (
+        <SquadReconfirmSheet
+          busy={responding}
+          error={respondError}
+          onCancel={() => setReconfirmSheetOpen(false)}
+          onConfirm={() => respond(true)}
         />
-
-        {error && <p className="mt-3 text-xs text-to-dangerText">{error}</p>}
-
-        <div className="mt-4 grid grid-cols-2 gap-2.5">
-          <button type="button" disabled={busy} className="btn-primary !h-[50px] !px-2 text-[15px]" onClick={() => onSend(reason, note)}>
-            {busy ? 'Sende…' : 'Absage senden'}
-          </button>
-          <button type="button" disabled={busy} className="btn-secondary !h-[50px] !px-2 text-[15px]" onClick={onCancel}>
-            Abbrechen
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
+      )}
+    </section>
   );
 }

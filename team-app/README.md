@@ -2733,6 +2733,58 @@ hier die getroffenen Entscheidungen samt Begründung:
   greift. Migration 0076 entfernt den alten Overload ganz, damit es nur noch eine gepflegte
   Version gibt. Nur auf Staging angewendet — Produktion (`pvnhwzarjwhplrcdjbfr`) noch offen,
   bitte vor dem nächsten Live-Release freigeben.
+- **Bugfix "Zusage lässt sich nicht mehr zurücknehmen" (`docs/.../09-spiel-kader/bugfix-zusage-zuruecknehmen/`).**
+  Die Übergabe ging davon aus, `✓ Zugesagt` sei ein reines, totes Etikett. Bei der
+  Untersuchung von `NextGameCard.tsx` zeigte sich: die Rücknahme-Funktion existierte auf der
+  Startseite technisch bereits (separater Unterlink „Doch nicht dabei?" unter dem Chip, mit
+  Absage-Blatt inkl. Grund-Auswahl) — sie sah nur nicht mehr wie ein Knopf aus und hatte kein
+  Pendant für „doch wieder zusagen" oder für die eigene Zeile unter „Spiele & Kader". Umgesetzt
+  wurde deshalb eine Redesign- und Ergänzungsarbeit, keine Reparatur einer komplett toten
+  Funktion:
+  - `✓ Zugesagt`/`✗ Abgesagt` sind jetzt ein einzelner 46px-Knopf (Chip + `ÄNDERN`/`DOCH DABEI?`
+    in Geist Mono 8px), Kartenrahmen wechselt bei Absage auf `--to-danger-frame`, roter
+    Hinweis darüber ("Du bist abgesagt…"). Ein „Doch wieder dabei?"-Blatt wurde neu ergänzt
+    (gab es vorher nicht) statt weiter direkt zu bestätigen.
+  - Neue gemeinsame Komponente `src/components/SquadResponseSheets.tsx`
+    (`SquadDeclineSheet`/`SquadReconfirmSheet`) für Startseite **und** die eigene Zeile unter
+    „Spiele & Kader" — beide hängen an `respond_to_squad()`/`DeclineReason`. Das beantwortet
+    die Rückfrage aus der Übergabe, ob beide Stellen dieselbe Komponente nutzen können: **ja**.
+    Fürs Training (`TrainingCard.tsx`) wurde bewusst **nicht** mitgezogen — eigene Tabelle
+    (`training_rsvps`), eigenes Grund-Vokabular (`TrainingDeclineReason`), keine
+    `respond_to_squad()`-RPC; eine gemeinsame Komponente hätte dort nur unnötig abstrahiert.
+  - **Rückfrage „Bis wann absagen?"**: übernommen wie vorgeschlagen — immer möglich, sobald der
+    Kader veröffentlicht ist (Vorbedingung für den Zugesagt-Zustand überhaupt) erscheint der
+    gelbe Hinweis „Der Kader steht schon" automatisch im Blatt.
+  - **Rückfrage „Bleibt der Platz beim Absagen erhalten?"**: die Übergabe schlug vor, der Spieler
+    bleibe im Kader, nur rot markiert. Das widerspricht der zuletzt explizit getroffenen
+    Entscheidung (Migration `0075`/`0076`, s. o.): der Platz wird weiterhin automatisch
+    freigegeben. Die neuere, ausdrückliche Anweisung wiegt hier schwerer als der ältere
+    Übergabe-Vorschlag — entsprechend zeigt `zusage.html`s eigener Screenshot
+    `6-kaderzeile-abgesagt.png` auch einen Widerspruch zu seinem eigenen CSS (`.check--off`
+    sollte grau sein, das Bild zeigt noch Grün), der sich so von selbst auflöst.
+  - **Rückfrage „Ping-Pong begrenzen/protokollieren?"**: kein Limit umgesetzt (war ohnehin nie
+    beschränkt). Das vorgeschlagene Protokoll ("jeder Wechsel im Verlauf des Spiels") wurde
+    **nicht** gebaut — es gibt in der App keinen generischen Änderungsverlauf für
+    Kader-Zusagen, und „Verlauf" bezeichnet an anderer Stelle (`GameStatsTracker.tsx`) etwas
+    völlig anderes (Live-Tracking-Ereignisse). Ein neues Protokoll-Feature wäre eine erhebliche
+    Erweiterung über die Übergabe hinaus gewesen.
+  - **Eigene Zeile unter „Spiele & Kader" — zwei Fundorte, nicht einer.** `NextGameSquadCard.tsx`
+    zeigt je nach Rolle zwei unterschiedliche Listen: die admin-only Kaderblock-Liste (alle
+    Spieler, inkl. Nicht-Nominierter) und die für jeden Spieler sichtbare Liste "Kader ansehen"
+    (nur aktuell Nominierte). Ein Spieler mit `is_admin`-Flag (Spieler-Trainer, Migration
+    `0006`) sieht **nur** die erste — `isPlayerOnly` (`role === 'player' && !isAdmin`) ist für
+    ihn `false`. Die Änderungs-Zeile („✎ Zusage ändern" / „✓ Doch dabei") wurde deshalb an
+    **beiden** Stellen ergänzt. In der Kaderblock-Liste funktioniert auch die
+    Absage→Wieder-zusagen-Rückrichtung vollständig (sie zeigt ohnehin alle Spieler, auch
+    abgesagte). In "Kader ansehen" dagegen verschwindet die eigene Zeile nach einer Absage
+    automatisch aus der Liste (sie filtert auf `is_selected` — direkte Folge der oben gehaltenen
+    Auto-Entfernung), daher gibt es dort **nur** „Zusage ändern", keine Rücknahme — die läuft für
+    diese Spieler ausschließlich über die Startseitenkarte, die unabhängig vom Kaderstatus
+    funktioniert.
+  - Playwright-verifiziert für beide Rollen-Kombinationen (reiner Spieler via "Kader ansehen",
+    Spieler-Trainer via Kaderblock) inkl. RPC-Aufrufen, Sheet-Inhalten und Statuswechseln. Keine
+    neue Migration nötig — nutzt ausschließlich die bereits vorhandene, seit `0060` bestehende
+    4-Parameter-`respond_to_squad()`-RPC (Grund/Notiz).
 
 ## Projektstruktur
 

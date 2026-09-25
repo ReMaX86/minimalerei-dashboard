@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Zusage zurücknehmen</title>
+<!--
+  BUGFIX-VORLAGE · Zusage nachträglich zurücknehmen
+  Zustände über die URL:
+    ?state=card      Startseite · zugesagt (Knopf ist antippbar)
+    ?state=sheet     Blatt „Doch nicht dabei?"
+    ?state=off       Startseite · abgesagt, Trainer informiert
+    ?state=late      Blatt nach Kaderveröffentlichung (Warnhinweis)
+    ?state=row       Spiele & Kader · eigene Zeile mit „Ändern"
+    ?state=rowoff    Spiele & Kader · eigene Zeile nach Absage
+  Echt bedienbar: zusagen, absagen, zurücknehmen.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.10);
+  --to-danger-frame:#5A2027;
+  --to-vacation:#E9B949; --to-vacation-soft:rgba(233,185,73,.12); --to-vacation-frame:rgba(233,185,73,.32);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:transparent;padding:0}
+textarea{font-family:inherit;color:var(--to-text)}
+.wrap{width:390px;margin:0 auto;padding:22px 16px 24px;display:flex;flex-direction:column;gap:14px}
+.lbl{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-text-3)}
+
+/* Startseitenkarte */
+.card{border-radius:26px;background:var(--to-surface);border:1px solid var(--to-accent-frame);
+  padding:18px;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden}
+.card--off{border-color:var(--to-danger-frame)}
+.card__top{display:flex;align-items:center;gap:10px}
+.pill{display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:999px;
+  background:var(--to-accent);color:var(--to-on-accent);font-family:'Geist Mono',monospace;
+  font-size:9px;font-weight:700;letter-spacing:.1em}
+.countdown{margin-left:auto;display:inline-flex;align-items:center;height:26px;padding:0 11px;
+  border-radius:999px;background:var(--to-surface-2);color:var(--to-text-2);
+  font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.08em}
+.card__day{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:40px;letter-spacing:-.04em;line-height:.92;text-transform:uppercase}
+.card__meta{font-family:'Geist Mono',monospace;font-size:12px;color:var(--to-text-2);letter-spacing:.02em}
+.card__opp{font-size:16px;font-weight:600}
+.card__rule{height:1px;background:var(--to-hairline)}
+.row{display:flex;align-items:center;gap:10px}
+.row__txt{flex:1 1 auto;font-size:14px;color:var(--to-text-2)}
+
+/* Zusage-Block */
+.status{display:flex;align-items:center;gap:10px}
+.statusbtn{display:inline-flex;align-items:center;gap:9px;height:46px;padding:0 16px;border-radius:999px;
+  background:rgba(200,255,46,.12);border:1px solid var(--to-accent-frame);color:var(--to-accent);
+  font-size:14px;font-weight:600}
+.statusbtn--off{background:var(--to-danger-soft);border-color:var(--to-danger-frame);color:var(--to-danger-text)}
+.statusbtn--open{background:transparent;border-color:var(--to-line);color:var(--to-text-2)}
+.statusbtn__hint{font-family:'Geist Mono',monospace;font-size:8px;letter-spacing:.1em;
+  color:var(--to-text-4);margin-left:2px}
+.link{margin-left:auto;font-size:14px;font-weight:600;color:var(--to-accent)}
+.link--quiet{color:var(--to-text-2)}
+.btn--track{display:flex;align-items:center;justify-content:center;gap:9px;height:56px;border-radius:999px;
+  background:var(--to-accent);color:var(--to-on-accent);font-size:16px;font-weight:600;width:100%}
+.note{font-size:12px;color:var(--to-text-4);line-height:1.5;text-align:center}
+.notice{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:16px;
+  background:var(--to-danger-soft);border:1px solid var(--to-danger-frame);font-size:12px;
+  color:var(--to-text-2);line-height:1.5}
+.notice--warn{background:var(--to-vacation-soft);border-color:var(--to-vacation-frame)}
+
+/* Kaderliste */
+.panel{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.prow{display:flex;align-items:center;gap:11px;padding:12px 15px;border-top:1px solid var(--to-surface-2)}
+.prow:first-child{border-top:0}
+.prow--me{background:rgba(200,255,46,.04)}
+.prow--me.prow--off{background:rgba(255,90,103,.05)}
+.av{width:36px;height:36px;flex:none;border-radius:50%;background:var(--to-surface-2);display:grid;
+  place-items:center;font-family:'Geist Mono',monospace;font-size:11px;color:var(--to-text-3)}
+.pmain{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.pname{font-size:15px;font-weight:600}
+.pstate{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--to-text-4)}
+.pstate--yes{color:var(--to-accent)}
+.pstate--no{color:var(--to-danger-text)}
+.check{width:34px;height:34px;flex:none;border-radius:50%;background:var(--to-accent);display:grid;
+  place-items:center}
+.check--off{background:var(--to-surface-2)}
+.changerow{display:flex;align-items:center;gap:9px;padding:0 15px 12px 62px}
+.change{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:999px;
+  border:1px solid var(--to-line);color:var(--to-text-2);font-size:13px;font-weight:600}
+.change--off{border-color:var(--to-accent-frame);color:var(--to-accent)}
+
+/* Blatt */
+.scrim{position:fixed;inset:0;background:rgba(5,6,8,.74);display:flex;flex-direction:column;
+  justify-content:flex-end;z-index:20}
+.sheet{width:390px;margin:0 auto;background:var(--to-surface);border-top:1px solid var(--to-border);
+  border-radius:26px 26px 0 0;padding:12px 20px 22px;display:flex;flex-direction:column;gap:14px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sheet__note{font-size:12px;color:var(--to-text-4);line-height:1.5}
+.ta{min-height:70px;padding:12px 14px;border-radius:14px;background:#0F1216;border:1px solid var(--to-line);
+  font-size:14px;line-height:1.5;resize:none;outline:none}
+.ta::placeholder{color:var(--to-text-4)}
+.ta:focus{border-color:var(--to-accent-frame)}
+.sheet__acts{display:flex;flex-direction:column;gap:8px}
+.bd{height:48px;border-radius:999px;background:var(--to-danger);color:#120507;font-size:15px;
+  font-weight:600;width:100%}
+.b1{height:48px;border-radius:999px;background:var(--to-accent);color:var(--to-on-accent);
+  font-size:15px;font-weight:600;width:100%}
+.b2{height:48px;border-radius:999px;border:1px solid var(--to-line);color:var(--to-text-2);
+  font-size:15px;font-weight:600;width:100%}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="wrap"></div>
+<div class="scrim" id="scrim" hidden><div class="sheet" id="sheet"></div></div>
+
+<script>
+(function(){
+  'use strict';
+
+  var S = { state:'yes', reason:'', published:false, view:'card' };
+
+  function el(id){ return document.getElementById(id); }
+  var CHECK = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+    'style="stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round"><path d="M5 13l4 4L19 7"></path></svg>';
+  var CROSS = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" ' +
+    'style="stroke-width:2.8;stroke-linecap:round"><path d="M6 6l12 12M18 6L6 18"></path></svg>';
+  var PEN = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" ' +
+    'style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round">' +
+    '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"></path></svg>';
+
+  /* ---------- Startseitenkarte ---------- */
+  function statusBlock(){
+    if (S.state === 'yes') {
+      return '<div class="status">'+
+        '<button class="statusbtn" type="button" data-open="1">'+CHECK+'Zugesagt'+
+        '<span class="statusbtn__hint">ÄNDERN</span></button>'+
+        '<button class="link" type="button">Kader ansehen →</button></div>';
+    }
+    if (S.state === 'no') {
+      return '<div class="status">'+
+        '<button class="statusbtn statusbtn--off" type="button" data-again="1">'+CROSS+'Abgesagt'+
+        '<span class="statusbtn__hint">DOCH DABEI?</span></button>'+
+        '<button class="link link--quiet" type="button">Kader ansehen →</button></div>';
+    }
+    return '<div class="status">'+
+      '<button class="statusbtn statusbtn--open" type="button" data-again="1">Noch nicht geantwortet</button>'+
+      '<button class="link" type="button">Kader ansehen →</button></div>';
+  }
+
+  function cardHtml(){
+    var off = S.state === 'no';
+    return '<span class="lbl">STARTSEITE</span>'+
+      '<section class="card'+(off ? ' card--off' : '')+'">'+
+        '<div class="card__top"><span class="pill">HEIM</span>'+
+          '<span class="countdown">IN 3 STD 13 MIN</span></div>'+
+        '<span class="card__day">Heute</span>'+
+        '<span class="card__meta">20:00 Uhr · Treffpunkt 19:00</span>'+
+        '<span class="card__opp">vs. HSV Solingen-Gräfrath 2</span>'+
+        (off ? '<div class="notice">'+CROSS+'<span><strong style="color:var(--to-text)">Du bist abgesagt.</strong> '+
+               'Dein Trainer wurde informiert. Solange der Kader noch offen ist, kannst du jederzeit '+
+               'wieder zusagen.</span></div>' : '')+
+        '<span class="card__rule"></span>'+
+        statusBlock()+
+        '<button class="btn--track" type="button">Statistiken tracken</button>'+
+        '<span class="note">Eine Person trackt – alle anderen sehen den Live-Ticker.</span>'+
+      '</section>'+
+      '<span class="note" style="text-align:left">Der Knopf „Zugesagt" ist jetzt ein Knopf, kein Etikett: '+
+      'ein Tipp öffnet die Rücknahme.</span>';
+  }
+
+  /* ---------- Kaderliste ---------- */
+  function rowHtml(){
+    var off = S.state === 'no';
+    var others = [
+      { ini:'BF', name:'Benaja Feuersänger', st:'ZUGESAGT', cls:'pstate--yes' },
+      { ini:'DT', name:'Daniel Tekeste', st:'ZUGESAGT', cls:'pstate--yes' },
+      { ini:'EZ', name:'Eldar Zherokov', st:'WARTE AUF ZU-/ABSAGE', cls:'' }
+    ].map(function(p){
+      return '<div class="prow"><span class="av">'+p.ini+'</span>'+
+        '<span class="pmain"><span class="pname">'+p.name+'</span>'+
+        '<span class="pstate '+p.cls+'">'+p.st+'</span></span>'+
+        '<span class="check">'+'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#0A0C0F" '+
+        'style="stroke-width:3;stroke-linecap:round;stroke-linejoin:round"><path d="M5 13l4 4L19 7"></path></svg>'+
+        '</span></div>';
+    }).join('');
+
+    var me = '<div class="prow prow--me'+(off ? ' prow--off' : '')+'">'+
+      '<span class="av" style="background:rgba(200,255,46,.14);color:var(--to-accent)">MR</span>'+
+      '<span class="pmain"><span class="pname">Marc Rewald (Du)</span>'+
+      '<span class="pstate '+(off ? 'pstate--no' : 'pstate--yes')+'">'+
+      (off ? 'ABGESAGT · TRAINER INFORMIERT' : 'ZUGESAGT')+'</span></span>'+
+      '<span class="check'+(off ? ' check--off' : '')+'">'+
+      (off ? '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#7C8594" '+
+             'style="stroke-width:2.8;stroke-linecap:round"><path d="M6 6l12 12M18 6L6 18"></path></svg>'
+           : '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#0A0C0F" '+
+             'style="stroke-width:3;stroke-linecap:round;stroke-linejoin:round"><path d="M5 13l4 4L19 7"></path></svg>')+
+      '</span></div>'+
+      '<div class="changerow">'+
+        (off ? '<button class="change change--off" type="button" data-again="1">'+CHECK+'Doch dabei</button>'
+             : '<button class="change" type="button" data-open="1">'+PEN+'Zusage ändern</button>')+
+      '</div>';
+
+    return '<span class="lbl">SPIELE &amp; KADER · DEINE ZEILE</span>'+
+      '<section class="panel">'+me+others+'</section>'+
+      '<span class="note" style="text-align:left">Nur die eigene Zeile bekommt die Änderungs-Zeile. '+
+      'Bei allen anderen bleibt die Liste wie sie ist.</span>';
+  }
+
+  function render(){
+    el('wrap').innerHTML = S.view === 'row' ? rowHtml() : cardHtml();
+  }
+
+  /* ---------- Blätter ---------- */
+  function openSheet(html){ el('sheet').innerHTML = '<span class="sheet__grip"></span>'+html; el('scrim').hidden = false; }
+  function closeSheet(){ el('scrim').hidden = true; }
+
+  function sheetOff(){
+    openSheet(
+      '<span class="sheet__title">Doch nicht dabei?</span>'+
+      (S.published
+        ? '<div class="notice notice--warn">'+
+          '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#E9B949" '+
+          'style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none;margin-top:1px">'+
+          '<path d="M12 8v5M12 16.5v.01M10.3 3.9L2.5 18a1.7 1.7 0 0 0 1.5 2.5h16a1.7 1.7 0 0 0 1.5-2.5L13.7 3.9a1.7 1.7 0 0 0-3 0z"></path></svg>'+
+          '<span><strong style="color:var(--to-text)">Der Kader steht schon.</strong> Dein Trainer muss '+
+          'jemanden nachnominieren – schreib kurz dazu, warum es nicht klappt.</span></div>'
+        : '<span class="sheet__note">Dein Trainer bekommt sofort eine Meldung. Solange der Kader offen '+
+          'ist, kannst du danach wieder zusagen.</span>')+
+      '<textarea class="ta" id="reason" placeholder="Grund (optional) – z. B. krank, Arbeit, Verletzung"></textarea>'+
+      '<div class="sheet__acts">'+
+        '<button class="bd" type="button" data-confirm="no">Absagen und Trainer informieren</button>'+
+        '<button class="b2" type="button" data-sheet="close">Doch, ich bin dabei</button>'+
+      '</div>');
+  }
+
+  function sheetBack(){
+    openSheet(
+      '<span class="sheet__title">Doch wieder dabei?</span>'+
+      '<span class="sheet__note">Du stehst danach wieder als zugesagt in der Liste, dein Trainer wird '+
+      'informiert. Ob du im Kader landest, entscheidet weiterhin er.</span>'+
+      '<div class="sheet__acts">'+
+        '<button class="b1" type="button" data-confirm="yes">Wieder zusagen</button>'+
+        '<button class="b2" type="button" data-sheet="close">Abbrechen</button>'+
+      '</div>');
+  }
+
+  document.addEventListener('click', function(e){
+    if (e.target.closest('button[data-open]')) { sheetOff(); return; }
+    if (e.target.closest('button[data-again]')) { sheetBack(); return; }
+    var c = e.target.closest('button[data-confirm]');
+    if (c) { S.state = c.dataset.confirm; closeSheet(); render(); return; }
+    if (e.target.closest('button[data-sheet="close"]') || e.target === el('scrim')) closeSheet();
+  });
+
+  var state = new URLSearchParams(location.search).get('state') || 'card';
+  if (state === 'off' || state === 'rowoff') S.state = 'no';
+  if (state === 'row' || state === 'rowoff') S.view = 'row';
+  if (state === 'late') S.published = true;
+  render();
+  if (state === 'sheet' || state === 'late') sheetOff();
+})();
+</script>
+</body>
+</html>
