@@ -2524,6 +2524,60 @@ hier die getroffenen Entscheidungen samt Begründung:
   hier noch einmal passiert. **Lehre für uns:** nach jedem Merge den tatsächlichen
   Produktions-Deployment-Status in Vercel prüfen (nicht nur den GitHub-Merge als "live" werten) —
   jetzt möglich, weil dieser Claude-Code-Sitzung inzwischen ein Vercel-Connector zur Seite steht.
+- **Element 23 "Funktionen": aus Karten werden Zeilen, vier weitere Bereiche werden schaltbar,
+  Erinnerungen werden eine Liste statt drei fester Felder (Migration `0072`/`0073`).**
+  `FeatureFlagsAdmin.tsx` komplett neu: drei Gruppen (SPIELBETRIEB/TEAM/KOMMUNIKATION) mit
+  kompakten Zeilen statt großer Karten mit Fließtext, jede Zeile mit einer Statuszeile, die sagt,
+  was die Funktion gerade tut (`"14 VON 16 SPIELERN AKTIV"`, `"5 ERINNERUNGEN AKTIV"` usw.) statt
+  nur was sie könnte. "Spiele & Kader" und "Training" bleiben FEST (kein Schalter, wie in der
+  Vorlage) — alle anderen elf Funktionen sind jetzt schaltbar, darunter vier, die es bisher gar
+  nicht waren: **Kampfgericht** (`officiating`) und **Trikots** (`kits`) waren bisher ungated
+  Pflichtreiter in `Admin.tsx`/`App.tsx`/`BottomNav.tsx` — haben jetzt eigene `feature_flags`-
+  Einträge, Routen-Guards für `/kampfgericht`/`/trikots` (Redirect auf `/` analog zu `/team`) und
+  eine Nav-/Admin-Tab-Ausblendung; **Teamstatistik** (`team_stats`) macht die bisher unbedingt in
+  `PlayerProfiles.tsx` gerenderte `BestenlisteBoard` erstmals abschaltbar; **Erinnerungen**
+  (`reminders`) ersetzt die bisherige `reminder_settings.enabled`-Spalte als globaler Schalter.
+  Alle vier neuen Flags wurden beim Anlegen auf `true` gesetzt (bzw. bei `reminders` auf den
+  bisherigen `enabled`-Wert übernommen) — sonst hätte der Deploy diese längst laufenden
+  Kernfunktionen für jedes bestehende Team sofort ausgeblendet. Ausschalten blendet nur aus
+  (nichts löschen), mit Bestätigungs-Blatt (`"<Funktion> ausschalten?"` + volt Häkchen-Zeile, was
+  erhalten bleibt) — Einschalten passiert ohne Nachfrage, genau wie vorher.
+  **Abhängigkeiten (neu, siehe Rückfrage 2/4 im PROMPT):** Erinnerungen ohne aktives Push und
+  Teamstatistik ohne "Punkte & Ergebnisse" zeigen einen gelb getönten Status
+  (`"BRAUCHT PUSH · ZURZEIT OHNE WIRKUNG"`/`"BRAUCHT PUNKTE & ERGEBNISSE"`) und einen gesperrten
+  Schalter, ohne den gespeicherten Wert zu verändern — sobald die Abhängigkeit wieder da ist,
+  springt die Funktion von selbst zurück in ihren vorherigen Zustand. Liga-Tabelle gilt als
+  "eingerichtet", sobald mindestens einmal erfolgreich synchronisiert wurde
+  (`standings_sync_status.last_success_at`); ist das nie der Fall, steht oben über der ersten
+  Gruppe ein gelber "BRAUCHT EINRICHTUNG"-Kasten. `api/notify.ts`s `officiating-reminders`-Fall
+  prüft jetzt zusätzlich das `officiating`-Feature-Flag, bevor er Pushes verschickt — sonst hätte
+  ein ausgeschaltetes Kampfgericht weiter Erinnerungen an eine ausgeblendete Funktion geschickt.
+  **Erinnerungen als Liste (Migration `0073_reminder_offsets.sql`):** die neun festen Spalten
+  (`training_push_offset_1/2/3_min` usw.) sind einer neuen Tabelle `reminder_offsets(area,
+  minutes_before)` gewichen — bis zu drei frei hinzufüg-/entfernbare Zeilen pro Bereich
+  (Training/Kampfgericht/Kader-Zusage) statt drei Pflichtfeldern, `0` fällt dabei weg (ein fehlender
+  Zeitpunkt hat einfach keine Zeile mehr). Die drei Dedup-Log-Tabellen
+  (`training_reminder_log`/`officiating_reminder_log`/`squad_reminder_log`) speicherten den
+  Zeitpunkt bisher als festes `reminder_type in ('slot_1','slot_2','slot_3')` — bei einer frei
+  veränderbaren Liste ist "Slot 2" aber nicht mehr stabil demselben Zeitpunkt zugeordnet, deshalb
+  steht dort jetzt die tatsächliche Minutenzahl als Text; die drei `send-*-reminders`-Fälle in
+  `api/notify.ts` lesen die Zeitpunkte entsprechend aus `reminder_offsets` statt aus
+  `reminder_settings`-Spalten. Die "Wann erinnern?"-Auswahl bleibt wie in der Vorlage auf feste
+  Vorschläge beschränkt (z. B. "1 Tag vorher"/"2 Std vorher"), keine freie Zeiteingabe — schon
+  belegte Vorschläge sind ausgegraut. **Umzug (§6 im PROMPT):** "Mindesteinsätze pro Saison" +
+  der erklärende U18-Text sind aus dem Funktionen-Reiter in die Einstellungen-Unterseite von
+  `OfficiatingAdmin.tsx` gezogen, direkt über der schon dort sitzenden Meldefrist-Karte (gleiche
+  `reminder_settings.officiating_season_min`-Spalte, rein clientseitige Verschiebung). Im
+  Funktionen-Reiter bleibt bei Kampfgericht nur der Schalter mit der Statuszeile
+  `"EINSTELLUNGEN IM REITER KAMPFGERICHT"`, ohne Chevron.
+  Push- und Erinnerungen-Detailseiten sind neu: Push zeigt zwei Zahlenkacheln
+  ("14 haben Push an"/"2 noch nicht") plus "Ohne Push"/"Mit Push"-Listen — ausschließlich aktive
+  Spieler (nicht Trainer/Betrachter, passend zur Statuszeile `"X VON Y SPIELERN AKTIV"`),
+  Namensabgleich zwischen `players` und der bestehenden `admin_push_subscribers()`-RPC (dieselbe
+  Geräte-Deduplizierung wie in `PushSubscribersList.tsx`, hier nur für Push aufbereitet). Für
+  Kampfgericht/Trikots gibt es weiterhin keine eigene Detailseite — nur die Zeile mit Schalter.
+  Liga-Tabelle-Detailseite übernimmt Liga-ID-Feld und Sync-Status/"Jetzt holen" 1:1 aus der
+  bisherigen `StandingsSyncSettings.tsx`-Logik.
 
 ## Projektstruktur
 

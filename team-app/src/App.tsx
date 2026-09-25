@@ -127,7 +127,7 @@ export default function App() {
         <Route
           path="/trikots"
           element={
-            role === 'viewer' ? (
+            role === 'viewer' || !flags.kits ? (
               <Navigate to="/" replace />
             ) : (
               <Shell title="Trikots">
@@ -139,9 +139,13 @@ export default function App() {
         <Route
           path="/kampfgericht"
           element={
-            <Shell title="Kampfgericht">
-              <Kampfgericht />
-            </Shell>
+            flags.officiating ? (
+              <Shell title="Kampfgericht">
+                <Kampfgericht />
+              </Shell>
+            ) : (
+              <Navigate to="/" replace />
+            )
           }
         />
         <Route

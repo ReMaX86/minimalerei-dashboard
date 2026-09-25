@@ -153,7 +153,7 @@ export function Dashboard() {
   // plan; a read-only Betrachter (e.g. Abteilungsleiter) gets to see the
   // same overview, just with no way to assign/edit anything. Captains/
   // Co-Captains get it too so they can remind teammates who's up next.
-  const showOfficiatingOverview = isAdmin || role === 'viewer' || !!player?.is_captain || !!player?.is_co_captain;
+  const showOfficiatingOverview = (isAdmin || role === 'viewer' || !!player?.is_captain || !!player?.is_co_captain) && flags.officiating;
   // Trainer/Captains (ohne Betrachter) — Sichtbarkeits-Gate für die
   // Kampfgericht- und Abwesend-Abschnitte im Team-Board unten (siehe
   // docs/design/tipoff-design/elements/07-teaminfos/PROMPT.md "Sichtbarkeit").
@@ -313,9 +313,9 @@ export function Dashboard() {
         const { data: settingsRow } = await supabase.from('reminder_settings').select('*').limit(1).maybeSingle();
         const settings = settingsRow as ReminderSettings | null;
 
-        if (settings?.enabled) {
+        if (flags.reminders && settings) {
           let hasOpenFutureOfficiatingSlot = false;
-          if (!player.officiating_exempt && myOfficiatingCount < settings.officiating_season_min) {
+          if (flags.officiating && !player.officiating_exempt && myOfficiatingCount < settings.officiating_season_min) {
             const { data: futureGames } = await supabase.from('officiating_games').select('id').gte('game_date', today);
             const futureGameIds = ((futureGames as { id: string }[] | null) ?? []).map((g) => g.id);
             if (futureGameIds.length > 0) {
@@ -425,8 +425,10 @@ export function Dashboard() {
                 }
               : null,
             trainingReminder,
-            { exempt: player.officiating_exempt, count: myOfficiatingCount, hasOpenFutureSlot: hasOpenFutureOfficiatingSlot },
-            trikotReminder
+            flags.officiating
+              ? { exempt: player.officiating_exempt, count: myOfficiatingCount, hasOpenFutureSlot: hasOpenFutureOfficiatingSlot }
+              : null,
+            flags.kits ? trikotReminder : null
           );
         }
       }
@@ -647,6 +649,9 @@ export function Dashboard() {
     flags.carpool,
     flags.absences,
     flags.stats,
+    flags.officiating,
+    flags.kits,
+    flags.reminders,
     absenceVersion,
     trainingVersion,
     squadResponseVersion,
@@ -883,7 +888,7 @@ export function Dashboard() {
 
       {/* Kampfgericht — Karte "Dein Kampfgericht-Einsatz", siehe
           docs/design/tipoff-design/elements/05-kampfgericht/PROMPT.md. */}
-      {role === 'player' && (
+      {role === 'player' && flags.officiating && (
         <OfficiatingDutyCard task={data.playerNextTask} teammates={data.playerNextTaskTeammates} players={data.players} />
       )}
 
@@ -1018,6 +1023,8 @@ export function Dashboard() {
 
       <TeamBoard
         showLocked={showTeamLocked}
+        showDuty={showTeamLocked && flags.officiating}
+        showKits={flags.kits}
         showAbsences={flags.absences}
         absencesOverview={data.absencesOverview}
         trikotSets={data.trikotSets}

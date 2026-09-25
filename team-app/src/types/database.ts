@@ -11,7 +11,11 @@ export type FeatureKey =
   | 'absences'
   | 'stats'
   | 'push_notifications'
-  | 'standings';
+  | 'standings'
+  | 'officiating'
+  | 'kits'
+  | 'team_stats'
+  | 'reminders';
 
 export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: string }> = {
   push_notifications: {
@@ -32,7 +36,7 @@ export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: st
     description: 'Team-Übersicht mit Foto, Position, Größe, Alter und Skills pro Spieler.'
   },
   absences: {
-    label: 'Urlaub/Abwesenheit',
+    label: 'Urlaub & Abwesenheit',
     description:
       'Spieler tragen eigene Abwesenheiten ein — Training wird automatisch abgesagt, beim Kader wird ein Hinweis angezeigt.'
   },
@@ -44,37 +48,53 @@ export const FEATURE_LABELS: Record<FeatureKey, { label: string; description: st
     label: 'Liga-Tabelle',
     description:
       'Zeigt die aktuelle Tabelle vom DBB unter "Spiele" an. Erst einschalten, wenn der tägliche Sync-Job eingerichtet ist (siehe README) — sonst bleibt die Karte leer.'
+  },
+  officiating: {
+    label: 'Kampfgericht',
+    description: 'Einteilung und Selbstverwaltung der Kampfgericht-Aufgaben pro Spiel.'
+  },
+  kits: {
+    label: 'Trikots',
+    description: 'Rotation der Trikotsätze inklusive Waschzähler.'
+  },
+  team_stats: {
+    label: 'Teamstatistik',
+    description: 'Bestenliste aus den getrackten Spielen — braucht "Punkte & Ergebnisse".'
+  },
+  reminders: {
+    label: 'Erinnerungen',
+    description: 'Push-Erinnerungen für Kader-Zusage, Training und Kampfgericht — braucht "Push-Benachrichtigungen".'
   }
 };
 
 // Konfigurierbare Fristen für die "Für dich zu erledigen"-Erinnerungen auf
 // der Spieler-Startseite (Admin -> Funktionen -> Erinnerungen). Singleton-
-// Zeile, siehe Migration 0031_reminder_settings.sql.
+// Zeile, siehe Migration 0031_reminder_settings.sql. Ob Erinnerungen
+// grundsätzlich aktiv sind, steht seit Element 23 im feature_flags-Eintrag
+// "reminders" (ersetzt die frühere enabled-Spalte hier, siehe Migration
+// 0072/0073); die drei Push-Zeitpunkte je Bereich stehen seitdem als Liste
+// in reminder_offsets statt als feste Spalten hier (siehe ReminderOffset).
 export interface ReminderSettings {
-  enabled: boolean;
   squad_reminder_days_before: number;
   training_reminder_days_before: number;
   officiating_season_min: number;
-  // Zeitpunkte der Push-Erinnerung fürs Training (Minuten vor Beginn, siehe
-  // api/send-training-reminders.ts) — 0 schaltet den Zeitpunkt ab.
-  training_push_offset_1_min: number;
-  training_push_offset_2_min: number;
-  training_push_offset_3_min: number;
-  // Dasselbe fürs Kampfgericht (siehe api/send-officiating-reminders.ts).
-  officiating_push_offset_1_min: number;
-  officiating_push_offset_2_min: number;
-  officiating_push_offset_3_min: number;
   // Bis zu diesem Datum können Spieler ihre Kampfgericht-Zuteilungen selbst
   // übernehmen/abwählen (siehe Migration 0050); danach sind sie fix und
   // Änderungen laufen nur noch über Trainer/Kapitän. null = unbegrenzt.
   officiating_signup_deadline: string | null;
-  // Dasselbe fürs Kader-Zusage/Absage-Erinnerung (siehe
-  // api/send-squad-reminders.ts) — trotz "_min"-Namen (Minuten in der DB,
-  // konsistent mit den anderen Push-Offsets) im Admin als ganze Tage
-  // gedacht (Default 5/3/1 Tage vorher).
-  squad_push_offset_1_min: number;
-  squad_push_offset_2_min: number;
-  squad_push_offset_3_min: number;
+}
+
+// Ein einzelner Erinnerungs-Zeitpunkt (bis zu drei pro Bereich, siehe
+// Migration 0073_reminder_offsets.sql). minutes_before ist weiterhin in
+// Minuten gespeichert (konsistent mit den früheren *_push_offset_N_min-
+// Spalten), auch wenn die Admin-Oberfläche in Stunden/Tagen anzeigt.
+export type ReminderArea = 'training' | 'officiating' | 'squad';
+
+export interface ReminderOffset {
+  id: string;
+  area: ReminderArea;
+  minutes_before: number;
+  created_at: string;
 }
 
 export type PlayerPosition = 'pg' | 'sg' | 'sf' | 'pf' | 'c';

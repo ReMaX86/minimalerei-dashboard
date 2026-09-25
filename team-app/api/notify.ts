@@ -5,7 +5,6 @@ import type {
   OfficiatingTaskType,
   Player,
   PlayerAbsence,
-  ReminderSettings,
   Training,
   TrainingOverride
 } from '../src/types/database';
@@ -234,7 +233,28 @@ function officiatingGameLabel(game: { opponent_teams: string; opponent: string |
   return game.opponent ? `${game.opponent_teams} vs. ${game.opponent}` : game.opponent_teams;
 }
 
-type ReminderSlot = 'slot_1' | 'slot_2' | 'slot_3';
+// Bis Element 23 ein festes 'slot_1'|'slot_2'|'slot_3'-Label je Bereich —
+// jetzt (Migration 0073) die tatsächliche Minutenzahl als Text, weil die
+// Erinnerungen pro Bereich eine frei veränderbare Liste statt drei fester
+// Felder sind (ein "Slot 2" wäre nach Löschen/Hinzufügen nicht mehr
+// eindeutig demselben Zeitpunkt zuzuordnen).
+type ReminderSlot = string;
+
+interface ReminderOffsetRow {
+  area: 'training' | 'officiating' | 'squad';
+  minutes_before: number;
+}
+
+async function fetchReminderOffsets(
+  supabase: SupabaseClient,
+  area: ReminderOffsetRow['area']
+): Promise<{ type: ReminderSlot; minutes: number }[]> {
+  const { data } = await withRetry(() => supabase.from('reminder_offsets').select('minutes_before').eq('area', area));
+  return ((data as { minutes_before: number }[] | null) ?? []).map((r) => ({
+    type: String(r.minutes_before),
+    minutes: r.minutes_before
+  }));
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -740,15 +760,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Zweite Benachrichtigungsart: Trainings-Erinnerung, per pg_cron.
     case 'training-reminders': {
-      const [settingsRes, trainingsRes, overridesRes, playersRes, absencesFlagRes] = await Promise.all([
-        withRetry(() => supabase.from('reminder_settings').select('*').limit(1).maybeSingle()),
+      const [remindersFlagRes, trainingsRes, overridesRes, playersRes, absencesFlagRes] = await Promise.all([
+        withRetry(() => supabase.from('feature_flags').select('enabled').eq('key', 'reminders').maybeSingle()),
         withRetry(() => supabase.from('trainings').select('*')),
         withRetry(() => supabase.from('training_overrides').select('*')),
         withRetry(() => supabase.from('players').select('*').eq('is_active', true)),
         withRetry(() => supabase.from('feature_flags').select('enabled').eq('key', 'absences').maybeSingle())
       ]);
 
-      const queryError = settingsRes.error ?? trainingsRes.error ?? overridesRes.error ?? playersRes.error ?? absencesFlagRes.error;
+      const queryError = remindersFlagRes.error ?? trainingsRes.error ?? overridesRes.error ?? playersRes.error ?? absencesFlagRes.error;
       if (queryError) {
         // eslint-disable-next-line no-console
         console.error('notify[training-reminders] query error', queryError);
@@ -756,8 +776,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
-      const settings = settingsRes.data as ReminderSettings | null;
-      if (!settings?.enabled) {
+      if (!remindersFlagRes.data?.enabled) {
         res.status(200).json({ skipped: 'reminders_disabled' });
         return;
       }
@@ -782,13 +801,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
-      const offsets = (
-        [
-          { type: 'slot_1', minutes: settings.training_push_offset_1_min },
-          { type: 'slot_2', minutes: settings.training_push_offset_2_min },
-          { type: 'slot_3', minutes: settings.training_push_offset_3_min }
-        ] satisfies { type: ReminderSlot; minutes: number }[]
-      ).filter((o) => o.minutes > 0);
+      const offsets = await fetchReminderOffsets(supabase, 'training');
       const dueTypes = offsets.map((o) => ({ type: o.type, ms: o.minutes * 60_000 })).filter((o) => startsAt.getTime() - o.ms <= now.getTime());
       if (dueTypes.length === 0) {
         res.status(200).json({ skipped: 'not_due_yet', date: occurrence.date, startsAt: startsAt.toISOString() });
@@ -934,13 +947,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Kampfgericht-Erinnerung, per pg_cron.
     case 'officiating-reminders': {
-      const [settingsRes, gamesRes, tasksRes, playersRes] = await Promise.all([
-        withRetry(() => supabase.from('reminder_settings').select('*').limit(1).maybeSingle()),
+      const [remindersFlagRes, officiatingFlagRes, gamesRes, tasksRes, playersRes] = await Promise.all([
+        withRetry(() => supabase.from('feature_flags').select('enabled').eq('key', 'reminders').maybeSingle()),
+        withRetry(() => supabase.from('feature_flags').select('enabled').eq('key', 'officiating').maybeSingle()),
         withRetry(() => supabase.from('officiating_games').select('*').not('game_time', 'is', null)),
         withRetry(() => supabase.from('officiating_tasks').select('*').not('assigned_player_id', 'is', null)),
         withRetry(() => supabase.from('players').select('*').eq('is_active', true))
       ]);
-      const queryError = settingsRes.error ?? gamesRes.error ?? tasksRes.error ?? playersRes.error;
+      const queryError = remindersFlagRes.error ?? officiatingFlagRes.error ?? gamesRes.error ?? tasksRes.error ?? playersRes.error;
       if (queryError) {
         // eslint-disable-next-line no-console
         console.error('notify[officiating-reminders] query error', queryError);
@@ -948,19 +962,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
-      const settings = settingsRes.data as ReminderSettings | null;
-      if (!settings?.enabled) {
+      if (!remindersFlagRes.data?.enabled) {
         res.status(200).json({ skipped: 'reminders_disabled' });
         return;
       }
+      // Kampfgericht ist seit Element 23 selbst abschaltbar (Migration
+      // 0072) — ohne das keine Erinnerung mehr verschicken, sonst würde ein
+      // ausgeschaltetes Kampfgericht weiter Pushes auf eine ausgeblendete
+      // Funktion schicken (siehe Rückfrage 2 der Vorlage).
+      if (!officiatingFlagRes.data?.enabled) {
+        res.status(200).json({ skipped: 'officiating_disabled' });
+        return;
+      }
 
-      const offsets = (
-        [
-          { type: 'slot_1', minutes: settings.officiating_push_offset_1_min },
-          { type: 'slot_2', minutes: settings.officiating_push_offset_2_min },
-          { type: 'slot_3', minutes: settings.officiating_push_offset_3_min }
-        ] satisfies { type: ReminderSlot; minutes: number }[]
-      ).filter((o) => o.minutes > 0);
+      const offsets = await fetchReminderOffsets(supabase, 'officiating');
       if (offsets.length === 0) {
         res.status(200).json({ skipped: 'offsets_disabled' });
         return;
@@ -1112,13 +1127,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Kader-Zu-/Absage-Erinnerung, per pg_cron.
     case 'squad-reminders': {
-      const [settingsRes, gamesRes, squadRes, playersRes] = await Promise.all([
-        withRetry(() => supabase.from('reminder_settings').select('*').limit(1).maybeSingle()),
+      const [remindersFlagRes, gamesRes, squadRes, playersRes] = await Promise.all([
+        withRetry(() => supabase.from('feature_flags').select('enabled').eq('key', 'reminders').maybeSingle()),
         withRetry(() => supabase.from('games').select('id, game_date, game_time, opponent, squad_published').eq('squad_published', true)),
         withRetry(() => supabase.from('game_squad').select('*').eq('is_selected', true).eq('confirmation', 'pending')),
         withRetry(() => supabase.from('players').select('*').eq('is_active', true))
       ]);
-      const queryError = settingsRes.error ?? gamesRes.error ?? squadRes.error ?? playersRes.error;
+      const queryError = remindersFlagRes.error ?? gamesRes.error ?? squadRes.error ?? playersRes.error;
       if (queryError) {
         // eslint-disable-next-line no-console
         console.error('notify[squad-reminders] query error', queryError);
@@ -1126,19 +1141,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
-      const settings = settingsRes.data as ReminderSettings | null;
-      if (!settings?.enabled) {
+      if (!remindersFlagRes.data?.enabled) {
         res.status(200).json({ skipped: 'reminders_disabled' });
         return;
       }
 
-      const offsets = (
-        [
-          { type: 'slot_1', minutes: settings.squad_push_offset_1_min },
-          { type: 'slot_2', minutes: settings.squad_push_offset_2_min },
-          { type: 'slot_3', minutes: settings.squad_push_offset_3_min }
-        ] satisfies { type: ReminderSlot; minutes: number }[]
-      ).filter((o) => o.minutes > 0);
+      const offsets = await fetchReminderOffsets(supabase, 'squad');
       if (offsets.length === 0) {
         res.status(200).json({ skipped: 'offsets_disabled' });
         return;

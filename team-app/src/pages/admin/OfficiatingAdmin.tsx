@@ -146,17 +146,22 @@ export function OfficiatingAdmin() {
   const [teamBusy, setTeamBusy] = useState(false);
   const [signupDeadline, setSignupDeadline] = useState('');
   const [savingDeadline, setSavingDeadline] = useState(false);
+  // Element 23 §6 "Umzug": "Mindesteinsätze pro Saison" kam bisher aus dem
+  // Adminreiter Funktionen (FeatureFlagsAdmin) — zieht hierher, gemeinsam
+  // mit der Meldefrist auf derselben reminder_settings-Zeile gespeichert.
+  const [seasonMin, setSeasonMin] = useState('2');
+  const [savingSeasonMin, setSavingSeasonMin] = useState(false);
 
   useEffect(() => {
     supabase
       .from('reminder_settings')
-      .select('officiating_signup_deadline')
+      .select('officiating_signup_deadline, officiating_season_min')
       .limit(1)
       .maybeSingle()
       .then(({ data }) => {
-        setSignupDeadline(
-          (data as { officiating_signup_deadline: string | null } | null)?.officiating_signup_deadline ?? ''
-        );
+        const row = data as { officiating_signup_deadline: string | null; officiating_season_min: number } | null;
+        setSignupDeadline(row?.officiating_signup_deadline ?? '');
+        if (row) setSeasonMin(String(row.officiating_season_min));
       });
   }, []);
 
@@ -412,6 +417,21 @@ export function OfficiatingAdmin() {
     }
   }
 
+  async function saveSeasonMin() {
+    const value = Math.max(0, Number(seasonMin) || 0);
+    setSavingSeasonMin(true);
+    setActionError(null);
+    try {
+      const { error: updError } = await supabase.from('reminder_settings').update({ officiating_season_min: value }).eq('id', 1);
+      if (updError) throw updError;
+      setSeasonMin(String(value));
+    } catch {
+      setActionError('Mindesteinsätze konnten nicht gespeichert werden.');
+    } finally {
+      setSavingSeasonMin(false);
+    }
+  }
+
   const showLoader = useTipoffLoader(!games);
 
   if (error) return <ErrorNote message={error} />;
@@ -437,6 +457,34 @@ export function OfficiatingAdmin() {
             <BackIcon />
           </button>
           <span className="to-display-sm text-to-text">Einstellungen</span>
+        </div>
+
+        <div className="rounded-to-xl border border-to-border bg-to-surface p-4">
+          <div className="flex flex-col gap-2.5">
+            <span className="to-data text-[10px] tracking-[0.12em] text-to-text3">MINDESTEINSÄTZE PRO SAISON</span>
+            <p className="text-[12px] leading-relaxed text-to-text3">
+              Ab wie vielen Einsätzen gilt ein Spieler als erfüllt — wirkt sich auf die Erinnerung auf der
+              Startseite aus. U18-Spieler, die schon über ihre eigene Mannschaft eingeteilt werden, lassen sich
+              unter „Admin → Spieler" von der Erinnerung ausnehmen.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min={0}
+                className="input !w-24 text-center"
+                value={seasonMin}
+                onChange={(e) => setSeasonMin(e.target.value)}
+              />
+              <button
+                type="button"
+                disabled={savingSeasonMin}
+                onClick={saveSeasonMin}
+                className="h-[46px] shrink-0 rounded-to-md bg-to-accent px-4.5 text-sm font-semibold text-to-onAccent disabled:opacity-60"
+              >
+                Speichern
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="rounded-to-xl border border-to-border bg-to-surface p-4">

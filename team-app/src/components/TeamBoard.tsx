@@ -82,12 +82,16 @@ function ChevronRightIcon() {
 
 export function TeamBoard({
   showLocked,
+  showDuty,
+  showKits,
   showAbsences,
   absencesOverview,
   trikotSets,
   players
 }: {
   showLocked: boolean;
+  showDuty: boolean;
+  showKits: boolean;
   showAbsences: boolean;
   absencesOverview: PlayerAbsence[];
   trikotSets: TrikotSet[];
@@ -107,7 +111,7 @@ export function TeamBoard({
     // wenn der komplett einem anderen Team gehört (officiating_games ist
     // Verein-weit). Deshalb ein eigener, enger gefasster Fetch statt
     // Wiederverwendung jenes Felds.
-    const dutyPromise = showLocked
+    const dutyPromise = showDuty
       ? supabase.from('officiating_games').select('*').gte('game_date', today).order('game_date')
       : Promise.resolve({ data: [] as OfficiatingGame[], error: null });
 
@@ -147,7 +151,7 @@ export function TeamBoard({
         .sort((a, b) => weekdayIndex(a.weekday!) - weekdayIndex(b.weekday!) || a.start_time.localeCompare(b.start_time)),
       duty
     });
-  }, [showLocked]);
+  }, [showDuty]);
 
   useEffect(() => {
     load().catch(() => setError('Fehler beim Laden der Teaminformationen.'));
@@ -166,7 +170,7 @@ export function TeamBoard({
       </div>
 
       <section className="card overflow-hidden !p-0">
-        {showLocked && (
+        {showDuty && (
           <div className="flex flex-col gap-2.5 border-t-0 px-5 py-[18px]">
             <div className="flex items-center justify-between gap-2.5">
               <span className="to-label">KAMPFGERICHT</span>
@@ -207,7 +211,7 @@ export function TeamBoard({
         )}
 
         {showLocked && showAbsences && (
-          <div className="flex flex-col gap-2.5 border-t border-to-divider px-5 py-[18px]">
+          <div className={`flex flex-col gap-2.5 px-5 py-[18px] ${showDuty ? 'border-t border-to-divider' : ''}`}>
             <div className="flex items-center justify-between gap-2.5">
               <span className="to-label">ABWESEND</span>
               <LockPill />
@@ -256,34 +260,41 @@ export function TeamBoard({
           </div>
         )}
 
-        <div className={`flex flex-col gap-2.5 px-5 py-[18px] ${showLocked ? 'border-t border-to-divider' : ''}`}>
-          <span className="to-label">TRIKOTSÄTZE</span>
-          <div className="flex flex-col">
-            {trikotSets.map((set) => {
-              const holderName = set.current_holder_id ? players[set.current_holder_id]?.name : null;
-              const place = set.label.split(' · ')[1]?.toUpperCase() ?? set.label.toUpperCase();
-              return (
-                <div key={set.id} className="flex min-h-[42px] items-center gap-3">
-                  <span
-                    className={`h-[22px] w-[22px] shrink-0 rounded-[7px] border ${
-                      set.id === 'weiss' ? 'border-to-text bg-to-text' : 'border-to-lineMuted bg-to-bg'
-                    }`}
-                  />
-                  <span className="to-data w-[92px] shrink-0 text-[11px] tracking-[0.08em] text-to-text3">{place}</span>
-                  <span className={`min-w-0 flex-1 truncate text-right text-[15px] ${holderName ? 'text-to-text' : 'text-to-text3'}`}>
-                    {holderName ?? 'Nicht zugeordnet'}
-                  </span>
-                </div>
-              );
-            })}
+        {showKits && (
+          <div className={`flex flex-col gap-2.5 px-5 py-[18px] ${showDuty || (showLocked && showAbsences) ? 'border-t border-to-divider' : ''}`}>
+            <span className="to-label">TRIKOTSÄTZE</span>
+            <div className="flex flex-col">
+              {trikotSets.map((set) => {
+                const holderName = set.current_holder_id ? players[set.current_holder_id]?.name : null;
+                const place = set.label.split(' · ')[1]?.toUpperCase() ?? set.label.toUpperCase();
+                return (
+                  <div key={set.id} className="flex min-h-[42px] items-center gap-3">
+                    <span
+                      className={`h-[22px] w-[22px] shrink-0 rounded-[7px] border ${
+                        set.id === 'weiss' ? 'border-to-text bg-to-text' : 'border-to-lineMuted bg-to-bg'
+                      }`}
+                    />
+                    <span className="to-data w-[92px] shrink-0 text-[11px] tracking-[0.08em] text-to-text3">{place}</span>
+                    <span className={`min-w-0 flex-1 truncate text-right text-[15px] ${holderName ? 'text-to-text' : 'text-to-text3'}`}>
+                      {holderName ?? 'Nicht zugeordnet'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <Link to="/trikots" className="flex min-h-9 items-center gap-2 text-[13px] text-to-text3">
+              <span className="flex-1">Trikots verwalten</span>
+              <ChevronRightIcon />
+            </Link>
           </div>
-          <Link to="/trikots" className="flex min-h-9 items-center gap-2 text-[13px] text-to-text3">
-            <span className="flex-1">Trikots verwalten</span>
-            <ChevronRightIcon />
-          </Link>
-        </div>
+        )}
 
-        <div id="trainingszeiten" className="flex scroll-mt-20 flex-col gap-2.5 border-t border-to-divider px-5 py-[18px]">
+        <div
+          id="trainingszeiten"
+          className={`flex scroll-mt-20 flex-col gap-2.5 px-5 py-[18px] ${
+            showDuty || (showLocked && showAbsences) || showKits ? 'border-t border-to-divider' : ''
+          }`}
+        >
           <span className="to-label">TRAININGSZEITEN</span>
           {!state && !error && <span className="text-sm text-to-text3">Lädt…</span>}
           {state && state.trainings.length === 0 && <span className="text-sm text-to-text3">Noch keine Zeiten hinterlegt.</span>}

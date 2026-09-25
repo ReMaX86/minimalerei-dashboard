@@ -98,10 +98,13 @@ export function BottomNav() {
   const { flags } = useFeatureFlags();
 
   let items = role === 'viewer' ? VIEWER_ITEMS : ITEMS;
+  if (!flags.kits) items = items.filter((i) => i.key !== 'kits');
+  if (!flags.officiating) items = items.filter((i) => i.key !== 'duty');
   if (flags.player_profiles) {
     // Team direkt hinter Spiele einreihen, nicht ans Ende anhängen — Spiele
     // steht in ITEMS wie in VIEWER_ITEMS an Index 1.
-    items = [...items.slice(0, 2), { key: 'team', to: '/team', label: 'Team', end: false, Icon: TeamIcon }, ...items.slice(2)];
+    const gamesIdx = items.findIndex((i) => i.key === 'games');
+    items = [...items.slice(0, gamesIdx + 1), { key: 'team', to: '/team', label: 'Team', end: false, Icon: TeamIcon }, ...items.slice(gamesIdx + 1)];
   }
   if (isAdmin) {
     items = [...items, { key: 'admin', to: '/admin', label: 'Admin', end: false, Icon: AdminIcon }];

@@ -42,7 +42,10 @@ export interface TrikotReminderInput {
  * Was gehört in die "Für dich zu erledigen"-Karte auf der Spieler-
  * Startseite? Jede der vier Quellen ist optional (null = Funktion nicht
  * relevant/aktiv für diesen Spieler) und wird unabhängig geprüft; die
- * Fristen kommen aus den trainer-konfigurierbaren `reminder_settings`.
+ * Fristen kommen aus den trainer-konfigurierbaren `reminder_settings`. Ob
+ * Erinnerungen grundsätzlich aktiv sind, entscheidet seit Element 23 der
+ * feature_flags-Eintrag "reminders" — das prüft der Aufrufer (Dashboard.tsx)
+ * schon vor dem Aufruf hier.
  */
 export function computeReminders(
   today: Date,
@@ -52,7 +55,6 @@ export function computeReminders(
   officiating: OfficiatingReminderInput | null,
   trikot: TrikotReminderInput | null = null
 ): ReminderItem[] {
-  if (!settings.enabled) return [];
   const items: ReminderItem[] = [];
 
   if (

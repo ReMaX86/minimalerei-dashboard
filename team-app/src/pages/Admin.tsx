@@ -13,21 +13,36 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 const CORE_TABS = [
   { id: 'players', label: 'Spieler' },
   { id: 'games', label: 'Spiele' },
-  { id: 'officiating', label: 'Kampfgericht' },
   { id: 'trainings', label: 'Training' },
-  { id: 'trikots', label: 'Trikots' },
   { id: 'viewers', label: 'Betrachter' }
 ] as const;
 
-const FEATURE_TABS = [{ id: 'announcements', label: 'Meldungen' }] as const;
+// "officiating"/"trikots" waren bis Element 23 feste Reiter (CORE_TABS) —
+// jetzt genau wie "announcements" hinter einem feature_flags-Eintrag
+// (Kampfgericht/Trikots in FeatureFlagsAdmin abschaltbar, siehe
+// Migration 0072), deshalb hier zu FEATURE_TABS verschoben.
+const FEATURE_TABS = [
+  { id: 'officiating', label: 'Kampfgericht' },
+  { id: 'trikots', label: 'Trikots' },
+  { id: 'announcements', label: 'Meldungen' }
+] as const;
 
 type TabId = (typeof CORE_TABS)[number]['id'] | (typeof FEATURE_TABS)[number]['id'] | 'features';
+
+// "trikots" hat historisch eine andere Tab-Id als sein feature_flags-Key
+// ("kits", siehe Migration 0072) — daher diese kleine Zuordnung statt
+// direkt flags[t.id].
+const FEATURE_TAB_FLAG: Record<(typeof FEATURE_TABS)[number]['id'], keyof ReturnType<typeof useFeatureFlags>['flags']> = {
+  officiating: 'officiating',
+  trikots: 'kits',
+  announcements: 'announcements'
+};
 
 export function Admin() {
   const { flags } = useFeatureFlags();
   const tabs = [
     ...CORE_TABS,
-    ...FEATURE_TABS.filter((t) => flags[t.id]),
+    ...FEATURE_TABS.filter((t) => flags[FEATURE_TAB_FLAG[t.id]]),
     { id: 'features', label: 'Funktionen' }
   ] as const;
   const [tab, setTab] = useState<TabId>('players');

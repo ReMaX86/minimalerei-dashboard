@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Admin · Funktionen</title>
+<!--
+  REFERENZ-UMSETZUNG Element 23 · Adminreiter „Funktionen"
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=list         Reiter, Standard (drei Gruppen)
+    ?state=confirm      Blatt „Funktion ausschalten?"
+    ?state=switched     danach: Zeile ist aus, Daten bleiben
+    ?state=setup        Liga-Tabelle nicht eingerichtet, Schalter gesperrt
+    ?state=push         Detailseite Push-Benachrichtigungen
+    ?state=reminders    Detailseite Erinnerungen
+    ?state=addreminder  Blatt „Wann erinnern?"
+    ?state=liga         Detailseite Liga-Tabelle
+  Die Seite ist echt klickbar: schalten, bestätigen, Detailseiten öffnen,
+  Erinnerungen hinzufügen und entfernen.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.10);
+  --to-danger-frame:#5A2027;
+  --to-vacation:#E9B949; --to-vacation-soft:rgba(233,185,73,.12); --to-vacation-frame:rgba(233,185,73,.32);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer}
+input{font-family:inherit;color:var(--to-text)}
+.wrap{width:390px;margin:0 auto;padding:22px 0 28px;display:flex;flex-direction:column;gap:14px}
+.pad{padding-left:20px;padding-right:20px}
+.view{display:flex;flex-direction:column;gap:14px}
+
+.tabswrap{position:relative}
+.tabs{display:flex;gap:6px;padding:2px 20px 8px;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;white-space:nowrap;display:inline-flex;align-items:center;height:34px;padding:0 14px;
+  border-radius:999px;background:var(--to-surface);border:1px solid var(--to-border);
+  color:var(--to-text-2);font-size:13px;font-weight:500}
+.tab[aria-current="page"]{background:var(--to-accent);border-color:var(--to-accent);
+  color:var(--to-on-accent);font-weight:600}
+.tabsfade{position:absolute;right:0;top:0;bottom:8px;width:44px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(10,12,15,0),var(--to-bg) 72%)}
+
+.lede{font-size:12px;color:var(--to-text-3);line-height:1.55}
+.sechead{display:flex;align-items:center;gap:12px;padding-top:2px}
+.sechead__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4)}
+.sechead__rule{flex:1 1 auto;height:1px;background:var(--to-hairline)}
+
+.panel{margin:0 20px;border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.frow{display:flex;align-items:center;gap:12px;min-height:62px;padding:11px 16px;
+  border-top:1px solid var(--to-surface-2)}
+.frow:first-child{border-top:0}
+.frow__open{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:10px;border:0;
+  background:transparent;padding:0;text-align:left}
+.frow__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.frow__name{font-size:14px;font-weight:500}
+.frow--off .frow__name{color:var(--to-text-3)}
+.frow__sub{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--to-text-4)}
+.frow__sub--volt{color:var(--to-accent)}
+.frow__sub--warn{color:var(--to-vacation)}
+.chev{flex:none}
+.sw{border:0;background:transparent;padding:0;flex:none;display:flex;align-items:center}
+.track{width:44px;height:26px;flex:none;border-radius:999px;background:var(--to-surface-2);
+  border:1px solid var(--to-line);display:flex;align-items:center;justify-content:flex-start;padding:0 3px}
+.knob{width:18px;height:18px;border-radius:50%;background:var(--to-text-4)}
+.sw[aria-pressed="true"] .track{background:var(--to-accent);border-color:var(--to-accent);justify-content:flex-end}
+.sw[aria-pressed="true"] .knob{background:var(--to-on-accent)}
+.sw[aria-disabled="true"]{opacity:.45;cursor:default}
+.lock{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--to-text-4);flex:none}
+
+/* Detailseiten */
+.dhead{display:flex;align-items:center;gap:12px}
+.iconbtn{width:34px;height:34px;flex:none;border-radius:12px;background:var(--to-surface);
+  border:1px solid var(--to-border);display:grid;place-items:center}
+.dhead__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+.dhead__name{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:22px;letter-spacing:-.035em;line-height:1}
+.dhead__meta{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.card{margin:0 20px;border-radius:20px;background:var(--to-surface);border:1px solid var(--to-border);
+  padding:15px 16px;display:flex;flex-direction:column;gap:12px}
+.card__title{font-size:15px;font-weight:600}
+.card__hint{font-size:11px;color:var(--to-text-4);line-height:1.5}
+
+.stats{display:flex;gap:10px}
+.stat{flex:1 1 0;padding:12px 14px;border-radius:16px;background:var(--to-surface-3);
+  border:1px solid var(--to-hairline);display:flex;flex-direction:column;gap:3px}
+.stat--on{background:rgba(200,255,46,.07);border-color:var(--to-accent-frame)}
+.stat__val{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:24px;line-height:1;
+  color:var(--to-text-3)}
+.stat--on .stat__val{color:var(--to-accent)}
+.stat__label{font-family:'Geist Mono',monospace;font-size:8px;letter-spacing:.1em;color:var(--to-text-4)}
+.plist{display:flex;flex-direction:column;gap:9px}
+.prow{display:flex;align-items:center;gap:10px}
+.av{width:26px;height:26px;flex:none;border-radius:50%;background:var(--to-surface-2);display:grid;
+  place-items:center;font-family:'Geist Mono',monospace;font-size:9px;color:var(--to-text-3)}
+.av--on{background:rgba(200,255,46,.14);color:var(--to-accent)}
+.prow__name{flex:1 1 auto;min-width:0;font-size:13px;color:var(--to-text-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow__note{font-family:'Geist Mono',monospace;font-size:9px;color:var(--to-text-4);flex:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;
+  font-family:inherit;font-weight:600}
+.btn--wide{height:40px;border-radius:999px;border-color:var(--to-line);background:transparent;
+  color:var(--to-text-2);font-size:13px;width:100%}
+.btn--primary{height:46px;border-radius:999px;background:var(--to-accent);color:var(--to-on-accent);
+  font-size:15px;width:100%}
+.btn--ghost{height:46px;border-radius:999px;background:transparent;border-color:var(--to-line);
+  color:var(--to-text-2);font-size:15px;width:100%}
+.btn--save{height:44px;padding:0 16px;border-radius:14px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:14px;flex:none}
+
+/* Erinnerungen */
+.area{display:flex;flex-direction:column;gap:9px;padding:13px 14px;border-radius:16px;
+  background:var(--to-surface-3);border:1px solid var(--to-hairline)}
+.area__top{display:flex;align-items:center;gap:10px}
+.area__name{flex:1 1 auto;font-size:13px;font-weight:600;color:var(--to-text-2)}
+.area__count{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--to-text-4)}
+.area__count--on{color:var(--to-accent)}
+.area__hint{font-size:11px;color:var(--to-text-4);line-height:1.45}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:999px;
+  background:rgba(200,255,46,.10);border:1px solid var(--to-accent-frame);color:var(--to-accent);
+  font-size:12px;font-weight:600}
+.chip--add{background:transparent;border:1px dashed var(--to-line);color:var(--to-text-2)}
+.chip--full{background:transparent;border:1px solid var(--to-hairline);color:var(--to-text-4);
+  font-weight:400;cursor:default}
+
+/* Liga */
+.field{flex:1 1 auto;min-width:0;height:44px;padding:0 14px;border-radius:14px;background:#0F1216;
+  border:1px solid var(--to-line);font-family:'Geist Mono',monospace;font-size:14px;letter-spacing:.06em;
+  outline:none}
+.field:focus{border-color:var(--to-accent-frame)}
+.status{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:16px;
+  background:rgba(200,255,46,.06);border:1px solid var(--to-accent-frame)}
+.status--warn{background:var(--to-vacation-soft);border-color:var(--to-vacation-frame)}
+.status__text{flex:1 1 auto;font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;
+  color:var(--to-text-2)}
+.status__act{border:0;background:transparent;font-size:12px;font-weight:600;color:var(--to-accent);flex:none}
+.warnbox{margin:0 20px;border-radius:18px;background:var(--to-vacation-soft);
+  border:1px solid var(--to-vacation-frame);padding:13px 15px;display:flex;flex-direction:column;gap:6px}
+.warnbox__label{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-vacation)}
+.warnbox__text{font-size:12px;color:var(--to-text-2);line-height:1.5}
+
+/* Blatt */
+.scrim{position:fixed;inset:0;background:rgba(5,6,8,.74);display:flex;flex-direction:column;
+  justify-content:flex-end;z-index:20}
+.sheet{width:390px;margin:0 auto;background:var(--to-surface);border-top:1px solid var(--to-border);
+  border-radius:26px 26px 0 0;padding:12px 20px 22px;display:flex;flex-direction:column;gap:14px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sheet__note{font-size:12px;color:var(--to-text-4);line-height:1.5}
+.sheet__keep{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:16px;
+  background:var(--to-surface-3);border:1px solid var(--to-hairline);font-size:12px;
+  color:var(--to-text-2);line-height:1.45}
+.sheet__actions{display:flex;flex-direction:column;gap:8px}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{height:40px;padding:0 14px;border-radius:999px;background:var(--to-surface-3);
+  border:1px solid var(--to-line);color:var(--to-text-2);font-size:13px;font-weight:600}
+.opt[aria-disabled="true"]{opacity:.4;cursor:default}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ==================== LISTE ==================== -->
+  <div class="view" id="vList">
+    <div class="tabswrap">
+      <div class="tabs" id="tabs"></div>
+      <span class="tabsfade"></span>
+    </div>
+
+    <span class="lede pad">Was dein Team nicht braucht, schaltest du hier aus – die Funktion verschwindet
+      überall in der App. Vorhandene Daten bleiben erhalten und sind beim Einschalten wieder da.</span>
+
+    <div class="warnbox" id="setupBox" hidden>
+      <span class="warnbox__label">BRAUCHT EINRICHTUNG · 1</span>
+      <span class="warnbox__text">Die Liga-Tabelle holt ihre Daten täglich vom DBB. Solange der Abgleich
+        nicht läuft, lässt sie sich nicht einschalten.</span>
+    </div>
+
+    <div id="groups"></div>
+  </div>
+
+  <!-- ==================== PUSH ==================== -->
+  <div class="view" id="vPush" hidden>
+    <div class="dhead pad">
+      <button class="iconbtn" type="button" data-back="1" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__name">Push</span>
+        <span class="dhead__meta">14 VON 16 HABEN ES AKTIVIERT</span>
+      </span>
+    </div>
+
+    <span class="lede pad">Spieler aktivieren Push selbst auf ihrem Gerät. Hier siehst du nur, bei wem es
+      ankommt – ändern kannst du es nicht für sie.</span>
+
+    <div class="card">
+      <div class="stats">
+        <span class="stat stat--on">
+          <span class="stat__val">14</span>
+          <span class="stat__label">HABEN PUSH AN</span>
+        </span>
+        <span class="stat">
+          <span class="stat__val">2</span>
+          <span class="stat__label">NOCH NICHT</span>
+        </span>
+      </div>
+      <span class="card__hint">Ohne Push sieht der Spieler alles trotzdem – nur eben erst, wenn er die App
+        öffnet.</span>
+    </div>
+
+    <div class="card">
+      <span class="card__title">Ohne Push</span>
+      <div class="plist" id="noPush"></div>
+    </div>
+
+    <div class="card">
+      <span class="card__title">Mit Push</span>
+      <div class="plist" id="yesPush"></div>
+    </div>
+  </div>
+
+  <!-- ==================== ERINNERUNGEN ==================== -->
+  <div class="view" id="vRem" hidden>
+    <div class="dhead pad">
+      <button class="iconbtn" type="button" data-back="1" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__name">Erinnerungen</span>
+        <span class="dhead__meta" id="remMeta">5 ERINNERUNGEN AKTIV</span>
+      </span>
+    </div>
+
+    <span class="lede pad">Pro Bereich bis zu drei Push-Erinnerungen. Du entscheidest, wie viele und wann –
+      keine ist auch eine Antwort.</span>
+
+    <div class="card" id="remCard"></div>
+  </div>
+
+  <!-- ==================== LIGA-TABELLE ==================== -->
+  <div class="view" id="vLiga" hidden>
+    <div class="dhead pad">
+      <button class="iconbtn" type="button" data-back="1" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__name">Liga-Tabelle</span>
+        <span class="dhead__meta" id="ligaMeta">SYNC LÄUFT</span>
+      </span>
+    </div>
+
+    <div class="card">
+      <span class="card__title">Liga-ID</span>
+      <div style="display:flex;gap:10px">
+        <input class="field" id="ligaId" value="54636" inputmode="numeric" aria-label="Liga-ID">
+        <button class="btn btn--save" type="button">Speichern</button>
+      </div>
+      <span class="card__hint">Steht in der URL der DBB-Tabellenseite: …&amp;liga_id=<strong>12345</strong></span>
+    </div>
+
+    <div class="card">
+      <span class="card__title">Abgleich</span>
+      <div class="status" id="ligaStatus">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#C8FF2E" style="stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path id="ligaIcon" d="M5 13l4 4L19 7"></path></svg>
+        <span class="status__text" id="ligaText">SYNC LÄUFT · ZULETZT 23.09. 21:52</span>
+        <button class="status__act" type="button">Jetzt holen</button>
+      </div>
+      <span class="card__hint" id="ligaHint">Die Tabelle wird einmal täglich geholt und unter „Spiele"
+        angezeigt.</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var TABS = ['Spieler','Spiele','Kampfgericht','Training','Trikots','Betrachter','Meldungen','Funktionen'];
+
+  var GROUPS = ['Spielbetrieb','Team','Kommunikation'];
+
+  var F = [
+    {id:'games',    g:0, name:'Spiele & Kader',          sub:'GRUNDFUNKTION · IMMER AN', on:true, core:true},
+    {id:'training', g:0, name:'Training',                sub:'GRUNDFUNKTION · IMMER AN', on:true, core:true},
+    {id:'duty',     g:0, name:'Kampfgericht',            sub:'EINSTELLUNGEN IM REITER KAMPFGERICHT', on:true,
+     keep:'Die Einteilungen dieser Saison und die Einsatz-Zähler'},
+    {id:'score',    g:0, name:'Punkte & Ergebnisse',     sub:'LIVE-TRACKING UND BOX-SCORE', on:true,
+     keep:'Alle getrackten Spiele mit Box-Score'},
+    {id:'league',   g:0, name:'Liga-Tabelle',            on:true, detail:'liga', setup:true},
+    {id:'profiles', g:1, name:'Spielerprofile',          sub:'FOTO, POSITION, GRÖSSE, STÄRKEN', on:true,
+     keep:'Fotos, Positionen und Stärken'},
+    {id:'stats',    g:1, name:'Teamstatistik',           on:true, needs:'score', needsLabel:'BRAUCHT PUNKTE & ERGEBNISSE'},
+    {id:'kit',      g:1, name:'Trikots',                 sub:'ROTATION UND WASCHZÄHLER', on:true,
+     keep:'Waschzähler und die Reihenfolge'},
+    {id:'away',     g:1, name:'Urlaub & Abwesenheit',    sub:'SPIELER TRAGEN SELBST EIN', on:true,
+     keep:'Eingetragene Abwesenheiten'},
+    {id:'ride',     g:1, name:'Mitfahrgelegenheit',      sub:'FAHRGEMEINSCHAFTEN ZU AUSWÄRTSSPIELEN', on:false},
+    {id:'news',     g:2, name:'Meldungen',               sub:'3 LAUFEN GERADE', on:true,
+     keep:'Laufende und beendete Meldungen'},
+    {id:'push',     g:2, name:'Push-Benachrichtigungen', on:true, detail:'push'},
+    {id:'rem',      g:2, name:'Erinnerungen',            on:true, detail:'rem', needs:'push', needsLabel:'BRAUCHT PUSH'}
+  ];
+
+  var AREAS = [
+    {id:'training', name:'Training', hint:'Spieler ohne Zu- oder Absage werden erinnert.',
+     picks:[{v:72,l:'3 Tage vorher'},{v:24,l:'1 Tag vorher'},{v:12,l:'12 Std vorher'},
+            {v:2,l:'2 Std vorher'},{v:1,l:'1 Std vorher'},{v:0.5,l:'30 Min vorher'}],
+     set:[24,2]},
+    {id:'duty', name:'Kampfgericht', hint:'Keine Zu-/Absage – reine Gedächtnisstütze für Eingeteilte.',
+     picks:[{v:120,l:'5 Tage vorher'},{v:72,l:'3 Tage vorher'},{v:24,l:'1 Tag vorher'},
+            {v:2,l:'2 Std vorher'},{v:1,l:'1 Std vorher'}],
+     set:[120,24]},
+    {id:'squad', name:'Kader-Zusage', hint:'Nur Spieler im Kader, die noch nicht geantwortet haben.',
+     picks:[{v:120,l:'5 Tage vorher'},{v:72,l:'3 Tage vorher'},{v:24,l:'1 Tag vorher'},{v:2,l:'2 Std vorher'}],
+     set:[72]}
+  ];
+
+  var PUSH_ON = ['Azjargal Atarjargal','Benaja Feuersänger','Daniel Tekeste','Eldar Zherokov',
+    'Fin Petereit','Joscha Bohris','Luca Bürkle','Marc Rewald','Paul Hauptmann','Peter Grimm',
+    'Peter Woznicki','Ryan Bernard','Tobias Engler','Gürkan Ertas'];
+  var PUSH_OFF = ['Jannis Meier','Tim Sasse'];
+
+  var ui = { view:'list', ligaReady:true };
+
+  function el(id){ return document.getElementById(id); }
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function feat(id){ return F.filter(function(f){ return f.id === id; })[0]; }
+  function ini(n){ return n.split(' ').map(function(p){ return p.charAt(0); }).join('').slice(0,2).toUpperCase(); }
+  function remCount(){ return AREAS.reduce(function(n,a){ return n + a.set.length; }, 0); }
+  function labelFor(area, v){
+    var p = area.picks.filter(function(x){ return x.v === v; })[0];
+    return p ? p.l : v + ' Std vorher';
+  }
+
+  /* ---------- Zeilen ---------- */
+  function subFor(f){
+    if (f.id === 'league') {
+      if (!ui.ligaReady) return { text:'NICHT EINGERICHTET · SYNC FEHLT', tone:'warn' };
+      return f.on ? { text:'SYNC LÄUFT · ZULETZT 23.09. 21:52', tone:'volt' } : null;
+    }
+    if (f.id === 'push') return f.on ? { text:'14 VON 16 SPIELERN AKTIV', tone:'volt' } : null;
+    if (f.id === 'rem') {
+      if (!feat('push').on) return { text:'BRAUCHT PUSH · ZURZEIT OHNE WIRKUNG', tone:'warn' };
+      return f.on ? { text:remCount() + ' ERINNERUNGEN AKTIV', tone:'volt' } : null;
+    }
+    if (f.id === 'stats') {
+      if (!feat('score').on) return { text:'BRAUCHT PUNKTE & ERGEBNISSE', tone:'warn' };
+      return f.on ? { text:'BESTENLISTE AUS DEN GETRACKTEN SPIELEN', tone:'' } : null;
+    }
+    return f.on && f.sub ? { text:f.sub, tone:'' } : null;
+  }
+
+  function blocked(f){
+    if (f.id === 'league' && !ui.ligaReady) return true;
+    if (f.needs && !feat(f.needs).on) return true;
+    return false;
+  }
+
+  function renderList(){
+    el('tabs').innerHTML = TABS.map(function(t){
+      return '<button class="tab" type="button"'+(t === 'Funktionen' ? ' aria-current="page"' : '')+'>'+t+'</button>';
+    }).join('');
+
+    el('setupBox').hidden = ui.ligaReady;
+
+    el('groups').innerHTML = GROUPS.map(function(gname, gi){
+      var rows = F.filter(function(f){ return f.g === gi; }).map(function(f){
+        var isOn = f.on && !blocked(f);
+        var s = subFor(f);
+        if (!s) s = { text: f.keep ? 'AUS · DATEN BLEIBEN GESPEICHERT' : 'AUS', tone:'' };
+        var sub = '<span class="frow__sub'+(s.tone ? ' frow__sub--'+s.tone : '')+'">'+s.text+'</span>';
+        var chev = f.detail && isOn
+          ? '<svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>'
+          : '';
+        var main = '<span class="frow__main"><span class="frow__name">'+esc(f.name)+'</span>'+sub+'</span>';
+        var left = (f.detail && isOn)
+          ? '<button class="frow__open" type="button" data-open="'+f.detail+'">'+main+chev+'</button>'
+          : main;
+        var lockedTxt = f.core ? '<span class="lock">FEST</span>' : '';
+        var swDis = (f.core || blocked(f)) ? ' aria-disabled="true"' : '';
+        var sw = '<button class="sw" type="button" data-sw="'+f.id+'" aria-pressed="'+(isOn ? 'true' : 'false')+'"'+
+          swDis+' aria-label="'+esc(f.name)+' ein- oder ausschalten">'+
+          '<span class="track"><span class="knob"></span></span></button>';
+        return '<div class="frow'+(isOn ? '' : ' frow--off')+'">'+left+lockedTxt+sw+'</div>';
+      }).join('');
+      return '<div class="view" style="gap:14px;margin-bottom:14px">'+
+        '<div class="sechead pad"><span class="sechead__label">'+gname.toUpperCase()+'</span>'+
+        '<span class="sechead__rule"></span></div>'+
+        '<section class="panel">'+rows+'</section></div>';
+    }).join('');
+  }
+
+  /* ---------- Detailseiten ---------- */
+  function renderPush(){
+    el('noPush').innerHTML = PUSH_OFF.map(function(n){
+      return '<span class="prow"><span class="av">'+ini(n)+'</span>'+
+        '<span class="prow__name">'+esc(n)+'</span>'+
+        '<span class="prow__note">NIE AKTIVIERT</span></span>';
+    }).join('');
+    el('yesPush').innerHTML = PUSH_ON.map(function(n){
+      return '<span class="prow"><span class="av av--on">'+ini(n)+'</span>'+
+        '<span class="prow__name">'+esc(n)+'</span>'+
+        '<span class="prow__note">SEIT 11.09.</span></span>';
+    }).join('');
+  }
+
+  function renderRem(){
+    el('remMeta').textContent = remCount() + ' ERINNERUNGEN AKTIV';
+    el('remCard').innerHTML = AREAS.map(function(a){
+      var chips = a.set.slice().sort(function(x,y){ return y - x; }).map(function(v){
+        return '<button class="chip" type="button" data-del="'+a.id+'|'+v+'">'+labelFor(a, v)+
+          '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#C8FF2E" style="stroke-width:2.6;stroke-linecap:round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>'+
+          '</button>';
+      }).join('');
+      var add = a.set.length < 3
+        ? '<button class="chip chip--add" type="button" data-add="'+a.id+'">'+
+          '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#A3ABB8" style="stroke-width:2.4;stroke-linecap:round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Erinnerung</button>'
+        : '<span class="chip chip--full">Mehr als drei gehen nicht</span>';
+      var none = a.set.length === 0 ? '<span class="area__hint" style="color:#5B626D">Keine Erinnerung – hier geht nichts raus.</span>' : '';
+      return '<div class="area">'+
+        '<div class="area__top"><span class="area__name">'+a.name+'</span>'+
+        '<span class="area__count'+(a.set.length ? ' area__count--on' : '')+'">'+a.set.length+' VON 3</span></div>'+
+        '<span class="area__hint">'+a.hint+'</span>'+
+        '<div class="chips">'+chips+add+'</div>'+none+
+      '</div>';
+    }).join('');
+  }
+
+  function renderLiga(){
+    el('ligaMeta').textContent = ui.ligaReady ? 'SYNC LÄUFT' : 'NICHT EINGERICHTET';
+    el('ligaStatus').className = 'status' + (ui.ligaReady ? '' : ' status--warn');
+    el('ligaText').textContent = ui.ligaReady
+      ? 'SYNC LÄUFT · ZULETZT 23.09. 21:52'
+      : 'NOCH KEIN ABGLEICH GELAUFEN';
+  }
+
+  /* ---------- Blätter ---------- */
+  function openSheet(html){
+    el('sheet').innerHTML = '<span class="sheet__grip"></span>' + html;
+    el('scrim').hidden = false;
+  }
+  function closeSheet(){ el('scrim').hidden = true; }
+
+  function sheetOff(f){
+    openSheet(
+      '<span class="sheet__title">'+esc(f.name)+' ausschalten?</span>'+
+      '<span class="sheet__note">Die Funktion verschwindet überall: aus der Menüleiste, von der Startseite '+
+      'und aus dem Adminbereich. Nur hier kannst du sie wieder einschalten.</span>'+
+      (f.keep ? '<span class="sheet__keep">'+
+        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#C8FF2E" style="stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;flex:none;margin-top:1px" aria-hidden="true"><path d="M5 13l4 4L19 7"></path></svg>'+
+        esc(f.keep)+' bleiben gespeichert und sind beim Einschalten wieder da.</span>' : '')+
+      '<div class="sheet__actions">'+
+        '<button class="btn btn--primary" type="button" data-confirm="'+f.id+'">Ausschalten</button>'+
+        '<button class="btn btn--ghost" type="button" data-sheet="close">Abbrechen</button>'+
+      '</div>'
+    );
+  }
+
+  function sheetAdd(areaId){
+    var a = AREAS.filter(function(x){ return x.id === areaId; })[0];
+    var opts = a.picks.map(function(p){
+      var used = a.set.indexOf(p.v) >= 0;
+      return '<button class="opt" type="button" data-pick="'+a.id+'|'+p.v+'"'+
+        (used ? ' aria-disabled="true"' : '')+'>'+p.l+'</button>';
+    }).join('');
+    openSheet(
+      '<span class="sheet__title">Wann erinnern?</span>'+
+      '<span class="sheet__note">'+a.name+' · noch '+(3 - a.set.length)+' von 3 möglich. '+
+      'Die Push geht zu diesem Zeitpunkt an alle, die noch nicht geantwortet haben.</span>'+
+      '<div class="opts">'+opts+'</div>'+
+      '<div class="sheet__actions">'+
+        '<button class="btn btn--ghost" type="button" data-sheet="close">Abbrechen</button>'+
+      '</div>'
+    );
+  }
+
+  /* ---------- Ereignisse ---------- */
+  function show(view){
+    ui.view = view;
+    el('vList').hidden = view !== 'list';
+    el('vPush').hidden = view !== 'push';
+    el('vRem').hidden  = view !== 'rem';
+    el('vLiga').hidden = view !== 'liga';
+    window.scrollTo(0, 0);
+  }
+
+  document.addEventListener('click', function(e){
+    var back = e.target.closest('button[data-back]');
+    if (back) { show('list'); renderList(); return; }
+
+    var open = e.target.closest('button[data-open]');
+    if (open) {
+      var v = open.dataset.open;
+      if (v === 'push') renderPush();
+      if (v === 'rem') renderRem();
+      if (v === 'liga') renderLiga();
+      show(v);
+      return;
+    }
+
+    var sw = e.target.closest('button[data-sw]');
+    if (sw) {
+      if (sw.getAttribute('aria-disabled') === 'true') return;
+      var f = feat(sw.dataset.sw);
+      if (f.on) { sheetOff(f); }
+      else { f.on = true; renderList(); }
+      return;
+    }
+
+    var del = e.target.closest('button[data-del]');
+    if (del) {
+      var partsD = del.dataset.del.split('|');
+      var ad = AREAS.filter(function(x){ return x.id === partsD[0]; })[0];
+      ad.set = ad.set.filter(function(v){ return String(v) !== partsD[1]; });
+      renderRem();
+      return;
+    }
+
+    var add = e.target.closest('button[data-add]');
+    if (add) { sheetAdd(add.dataset.add); return; }
+
+    var pick = e.target.closest('button[data-pick]');
+    if (pick) {
+      if (pick.getAttribute('aria-disabled') === 'true') return;
+      var partsP = pick.dataset.pick.split('|');
+      var ap = AREAS.filter(function(x){ return x.id === partsP[0]; })[0];
+      if (ap.set.length < 3) ap.set.push(parseFloat(partsP[1]));
+      closeSheet(); renderRem();
+      return;
+    }
+
+    var conf = e.target.closest('button[data-confirm]');
+    if (conf) { feat(conf.dataset.confirm).on = false; closeSheet(); renderList(); return; }
+
+    if (e.target.closest('button[data-sheet="close"]') || e.target === el('scrim')) closeSheet();
+  });
+
+  /* ---------- Zustände ---------- */
+  function applyState(state){
+    if (state === 'switched') feat('kit').on = false;
+    if (state === 'setup') { ui.ligaReady = false; feat('league').on = false; }
+
+    renderList();
+
+    if (state === 'push') { renderPush(); show('push'); return; }
+    if (state === 'reminders') { renderRem(); show('rem'); return; }
+    if (state === 'liga') { renderLiga(); show('liga'); return; }
+    if (state === 'addreminder') { renderRem(); show('rem'); sheetAdd('training'); return; }
+
+    show('list');
+    if (state === 'confirm') sheetOff(feat('kit'));
+  }
+
+  applyState(new URLSearchParams(location.search).get('state') || 'list');
+})();
+</script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorNote } from '../components/ErrorNote';
 import { useTipoffLoader } from '../hooks/useTipoffLoader';
@@ -39,6 +40,7 @@ const GRID_POSITION: Record<PlayerPosition, string> = {
 
 export function PlayerProfiles() {
   const { role, player: me } = useAuth();
+  const { flags } = useFeatureFlags();
   const [players, setPlayers] = useState<Player[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Player | null>(null);
@@ -139,7 +141,7 @@ export function PlayerProfiles() {
         </div>
       )}
 
-      <BestenlisteBoard />
+      {flags.team_stats && flags.stats && <BestenlisteBoard />}
 
       {readAnnouncements && readAnnouncements.length > 0 && (
         <>

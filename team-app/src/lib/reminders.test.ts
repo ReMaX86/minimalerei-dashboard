@@ -5,29 +5,13 @@ import type { ReminderSettings } from '../types/database';
 const TODAY = new Date('2026-09-10');
 
 const SETTINGS: ReminderSettings = {
-  enabled: true,
   squad_reminder_days_before: 3,
   training_reminder_days_before: 1,
   officiating_season_min: 2,
-  officiating_signup_deadline: null,
-  training_push_offset_1_min: 1440,
-  training_push_offset_2_min: 60,
-  training_push_offset_3_min: 30,
-  officiating_push_offset_1_min: 7200,
-  officiating_push_offset_2_min: 1440,
-  officiating_push_offset_3_min: 120,
-  squad_push_offset_1_min: 7200,
-  squad_push_offset_2_min: 4320,
-  squad_push_offset_3_min: 1440
+  officiating_signup_deadline: null
 };
 
 describe('computeReminders', () => {
-  it('returns nothing when reminders are disabled, regardless of pending items', () => {
-    const squad = { published: true, inSquad: true, confirmation: 'pending' as const, gameDate: '2026-09-11', opponent: 'BC Test' };
-    const result = computeReminders(TODAY, { ...SETTINGS, enabled: false }, squad, null, null);
-    expect(result).toEqual([]);
-  });
-
   describe('squad', () => {
     const base = { published: true, inSquad: true, confirmation: 'pending' as const, gameDate: '2026-09-13', opponent: 'BC Test' };
 
