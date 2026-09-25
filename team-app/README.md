@@ -2669,6 +2669,33 @@ hier die getroffenen Entscheidungen samt Begründung:
   schreibt `squad_published: true`), eine zweite, sekundär gestylte Schaltfläche „Kader
   zurücknehmen (nicht veröffentlicht)" erscheint nur nach dem Veröffentlichen und schreibt
   explizit `false`.
+- **Update Element 24 (nur Querformat, `AENDERUNG-QUERFORMAT.md`): Kopf in einer Zeile,
+  Aktion/Mannschaft zu einem Panel verschmolzen, gleich hohe Spalten.** Betraf laut Vorgabe
+  ausschließlich Layout/Anordnung im Querformat, die Handy-Ansicht blieb unverändert. **Kopf:**
+  Punktestand/Viertel-Leiste/Teamfouls liegen jetzt nebeneinander statt gestapelt (~90px hoch
+  statt ~380px), „Viertel beenden" und „Spiel beenden" stehen als zwei Knöpfe rechts im Kopf —
+  „Spiel beenden" zieht damit aus der rechten Spalte hier hoch (`Header` bekam dafür zwei
+  komplett getrennte Render-Zweige statt nur unterschiedlicher Klassen). **Ein Panel statt
+  zwei:** das bisher separate, immer tippbare „MANNSCHAFT"-Panel entfällt; das linke Panel
+  zeigt jetzt entweder das Tastenfeld (eigenes CSS-Grid, 4 Spalten × `auto repeat(4,
+  minmax(56px,1fr)) auto` Zeilen, `ShotButton`/`PadButton` bekamen dafür `height="stretch"` +
+  eine optionale `style`-Prop für die Grid-Platzierung) oder die Spielerauswahl (`RosterGrid`
+  bekam eine `cols`-Prop, im Querformat `cols={3}` statt `cols={2}`) — nie beides gleichzeitig.
+  **Damit fällt zwangsläufig weg, im Querformat erst den Spieler und dann die Aktion zu
+  wählen** (die Vorlage verlangt das explizit: „überall dieselbe Reihenfolge") — der dafür
+  nötige Code (`handlePlayerTap`, das player-first-Antippen der Kacheln) wurde entfernt, da er
+  nach dem Zusammenlegen der Panels tot war. **Rückfrage aus der Vorlage noch offen:** falls
+  sich die alte Spieler-zuerst-Reihenfolge im Gebrauch schneller anfühlte, bitte melden — dann
+  bauen wir statt der Entweder-oder-Lösung eine Dauerauswahl. **Gleich hohe Spalten:** `WideBody`
+  layoutet jetzt mit `align-items: stretch` (vorher `items-start`), das `VERLAUF`-Panel wächst
+  mit der Restspalte (`HistoryPanel` bekam eine `grow`-Prop, Limit 4→9 Einträge), der Box-Score
+  behält seine natürliche Höhe. **Bewusste Abweichung von der mitgelieferten Vorlage:** deren
+  `tracking.html` zeigt im Box-Score wieder nur Spieler/Pkt/Reb/F — das ist der Stand vor der im
+  selben Zeitraum erledigten Box-Score-Rücknahme auf die ausführliche Tabelle (siehe Eintrag
+  oben) und wird hier bewusst NICHT zurückgesetzt, weil die Änderung laut PROMPT ausdrücklich
+  nur Layout/Anordnung betrifft, keine Logik oder Inhalte. Spielstand-Schriftgröße im Querformat
+  (44px) ebenfalls unverändert gelassen, obwohl die Vorlage dort 34px zeigt — das war eine
+  separate, explizite Nutzeranfrage kurz zuvor.
 
 ## Projektstruktur
 

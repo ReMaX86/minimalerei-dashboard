@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -177,20 +177,24 @@ function ShotButton({
   sub,
   make,
   height,
-  onClick
+  onClick,
+  style
 }: {
   label: string;
   sub: string;
   make: boolean;
-  height: number;
+  height: number | 'stretch';
   onClick: () => void;
+  style?: CSSProperties;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      style={{ height }}
+      style={height === 'stretch' ? style : { height, ...style }}
       className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-to-lg border font-semibold ${
+        height === 'stretch' ? 'h-full' : ''
+      } ${
         make
           ? 'border-to-borderMatchday bg-to-accentSoft text-to-accent'
           : 'border-to-dangerFrame bg-to-dangerSoft text-to-dangerText'
@@ -211,21 +215,25 @@ function PadButton({
   danger,
   volt,
   height,
-  onClick
+  onClick,
+  style
 }: {
   label: string;
   sub?: string;
   danger?: boolean;
   volt?: boolean;
-  height: number;
+  height: number | 'stretch';
   onClick: () => void;
+  style?: CSSProperties;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      style={{ height }}
+      style={height === 'stretch' ? style : { height, ...style }}
       className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-to-lg border text-[15px] font-semibold ${
+        height === 'stretch' ? 'h-full' : ''
+      } ${
         danger
           ? 'border-to-dangerFrame bg-to-dangerSoft text-to-dangerText'
           : volt
@@ -646,14 +654,6 @@ export function GameStatsTracker() {
     setPendingAction(statType);
   }
 
-  function handlePlayerTap(playerId: string) {
-    if (pendingAction) {
-      addStat('us', pendingAction, playerId);
-      return;
-    }
-    setPendingPlayer((prev) => (prev === playerId ? null : playerId));
-  }
-
   function cancelPicker() {
     setPendingAction(null);
     setPendingPlayer(null);
@@ -925,85 +925,120 @@ export function GameStatsTracker() {
   // "wide" statt einer reinen min-[900px]:-Media-Query, weil der Umschalter
   // (LayoutSwitcher) das Layout auch unabhängig von der Fensterbreite fest
   // auf "compact"/"wide" stellen kann (§1).
+  // "wide" statt einer reinen min-[900px]:-Media-Query, weil der Umschalter
+  // (LayoutSwitcher) das Layout auch unabhängig von der Fensterbreite fest
+  // auf "compact"/"wide" stellen kann (§1). Im Querformat (Element-24-
+  // Änderung §1) liegt der ganze Kopf jetzt in EINER Zeile statt gestapelt
+  // — Punktestand/Viertel-Leiste/Teamfouls werden dafür als eigene Blöcke
+  // zusammengesetzt statt in einer gemeinsamen Spalte.
   function Header({ withEndButton, wide: headerWide }: { withEndButton: boolean; wide: boolean }) {
-    return (
-      <div
-        className={`flex flex-col gap-2.5 rounded-to-xl border border-to-border bg-to-surface p-3.5 ${
-          headerWide ? 'flex-row items-center gap-4' : ''
-        }`}
-      >
-        <div className="flex flex-1 flex-col gap-2.5">
-          <div className="flex items-end justify-center gap-2.5">
-            <span className="flex flex-col items-end gap-0.5">
-              <span className="to-data text-[9px] tracking-[0.1em] text-to-accent">TBW</span>
-              <span className={`to-number leading-none text-to-text ${headerWide ? 'text-[44px]' : 'text-[64px]'}`}>{teamScore.us}</span>
-            </span>
-            <span className={`to-number text-to-textDisabled ${headerWide ? 'pb-1 text-xl' : 'pb-2 text-2xl'}`}>:</span>
-            <span className="flex flex-col gap-0.5">
-              <span className="to-data text-[9px] tracking-[0.1em] text-to-text3">{game?.opponent?.slice(0, 3).toUpperCase() ?? 'GEG'}</span>
-              <span className={`to-number leading-none text-to-text2 ${headerWide ? 'text-[44px]' : 'text-[64px]'}`}>{teamScore.opponent}</span>
-            </span>
-          </div>
-          {/* Nur noch Anzeige, nicht mehr antippbar — Viertel wechseln geht
-              ausschließlich über den "Viertel beenden"-Knopf/das Blatt unten,
-              damit es nur einen einzigen Weg dafür gibt (auf Nutzerwunsch:
-              zwei verschiedene Bestätigungsdialoge für dieselbe Aktion waren
-              verwirrend). */}
-          <div className="flex gap-1.5">
-            {[1, 2, 3, 4].map((q) => {
-              const qs = quarterScores.find((x) => x.quarter === q);
-              const done = q < quarter;
-              const live = q === quarter;
-              return (
-                <span
-                  key={q}
-                  className={`flex flex-1 flex-col items-center gap-0.5 rounded-to-md border py-2 ${
-                    live
-                      ? 'flex-[1.4] border-to-accent bg-to-accent'
-                      : done
-                        ? 'border-to-border bg-to-surface2'
-                        : 'border-to-divider bg-transparent'
-                  }`}
-                >
-                  <span className={`to-data text-[11px] font-bold ${live ? 'text-to-onAccent' : done ? 'text-to-text2' : 'text-to-textDisabled'}`}>
-                    Q{q}
-                  </span>
-                  <span className={`to-data text-[8px] ${live ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>
-                    {live ? 'LÄUFT' : qs ? `${qs.us}:${qs.opponent}` : '–'}
-                  </span>
-                </span>
-              );
-            })}
+    const score = (
+      <div className="flex items-end justify-center gap-2.5">
+        <span className="flex flex-col items-end gap-0.5">
+          <span className="to-data text-[9px] tracking-[0.1em] text-to-accent">TBW</span>
+          <span className={`to-number leading-none text-to-text ${headerWide ? 'text-[44px]' : 'text-[64px]'}`}>{teamScore.us}</span>
+        </span>
+        <span className={`to-number text-to-textDisabled ${headerWide ? 'pb-1 text-xl' : 'pb-2 text-2xl'}`}>:</span>
+        <span className="flex flex-col gap-0.5">
+          <span className="to-data text-[9px] tracking-[0.1em] text-to-text3">{game?.opponent?.slice(0, 3).toUpperCase() ?? 'GEG'}</span>
+          <span className={`to-number leading-none text-to-text2 ${headerWide ? 'text-[44px]' : 'text-[64px]'}`}>{teamScore.opponent}</span>
+        </span>
+      </div>
+    );
+
+    // Nur noch Anzeige, nicht mehr antippbar — Viertel wechseln geht
+    // ausschließlich über den "Viertel beenden"-Knopf/das Blatt unten,
+    // damit es nur einen einzigen Weg dafür gibt (auf Nutzerwunsch: zwei
+    // verschiedene Bestätigungsdialoge für dieselbe Aktion waren
+    // verwirrend).
+    const quarters = (
+      <div className="flex gap-1.5">
+        {[1, 2, 3, 4].map((q) => {
+          const qs = quarterScores.find((x) => x.quarter === q);
+          const done = q < quarter;
+          const live = q === quarter;
+          return (
             <span
-              className={`flex flex-col items-center gap-0.5 rounded-to-md border px-3 py-2 ${
-                quarter > 4 ? 'border-to-accent bg-to-accent' : 'border-to-divider bg-transparent'
+              key={q}
+              className={`flex flex-1 flex-col items-center gap-0.5 rounded-to-md border ${headerWide ? 'py-1.5' : 'py-2'} ${
+                live
+                  ? 'flex-[1.4] border-to-accent bg-to-accent'
+                  : done
+                    ? 'border-to-border bg-to-surface2'
+                    : 'border-to-divider bg-transparent'
               }`}
             >
-              <span className={`to-data text-[11px] font-bold ${quarter > 4 ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>
-                {quarter > 4 ? quarterLabel(quarter) : 'OT'}
+              <span className={`to-data text-[11px] font-bold ${live ? 'text-to-onAccent' : done ? 'text-to-text2' : 'text-to-textDisabled'}`}>
+                Q{q}
               </span>
-              <span className={`to-data text-[8px] ${quarter > 4 ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>{quarter > 4 ? 'LÄUFT' : '–'}</span>
+              <span className={`to-data text-[8px] ${live ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>
+                {live ? 'LÄUFT' : qs ? `${qs.us}:${qs.opponent}` : '–'}
+              </span>
             </span>
+          );
+        })}
+        <span
+          className={`flex flex-col items-center gap-0.5 rounded-to-md border px-3 ${headerWide ? 'py-1.5' : 'py-2'} ${
+            quarter > 4 ? 'border-to-accent bg-to-accent' : 'border-to-divider bg-transparent'
+          }`}
+        >
+          <span className={`to-data text-[11px] font-bold ${quarter > 4 ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>
+            {quarter > 4 ? quarterLabel(quarter) : 'OT'}
+          </span>
+          <span className={`to-data text-[8px] ${quarter > 4 ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>{quarter > 4 ? 'LÄUFT' : '–'}</span>
+        </span>
+      </div>
+    );
+
+    const fouls = (
+      <div className={headerWide ? 'flex shrink-0 flex-col items-start gap-1.5' : 'flex items-center gap-2.5'}>
+        <span className="to-data text-[9px] tracking-[0.12em] text-to-text3">TEAMFOULS Q{quarter}</span>
+        <span className="flex gap-1">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <span key={i} className={`h-2 w-2 rounded-full ${i < teamFouls ? 'bg-to-vacation' : 'bg-to-border'}`} />
+          ))}
+        </span>
+        <span className={`to-data text-[9px] text-to-vacation ${headerWide ? '' : 'ml-auto'}`}>
+          {teamFouls >= 5 ? 'IM BONUS' : `${5 - teamFouls} BIS BONUS`}
+        </span>
+      </div>
+    );
+
+    if (headerWide) {
+      return (
+        <div className="flex items-center gap-[22px] rounded-to-xl border border-to-border bg-to-surface px-4 py-2.5">
+          <div className="flex flex-1 items-center gap-[22px]">
+            {score}
+            <div className="max-w-[430px] flex-1">{quarters}</div>
+            {fouls}
           </div>
-          <div className="flex items-center gap-2.5">
-            <span className="to-data text-[9px] tracking-[0.12em] text-to-text3">TEAMFOULS Q{quarter}</span>
-            <span className="flex gap-1">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <span key={i} className={`h-2 w-2 rounded-full ${i < teamFouls ? 'bg-to-vacation' : 'bg-to-border'}`} />
-              ))}
-            </span>
-            <span className="to-data ml-auto text-[9px] text-to-vacation">{teamFouls >= 5 ? 'IM BONUS' : `${5 - teamFouls} BIS BONUS`}</span>
-          </div>
+          {withEndButton && (
+            <div className="flex shrink-0 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setSheet('quarter')}
+                className="h-11 shrink-0 rounded-to-pill border border-to-line px-[18px] text-sm font-semibold text-to-text2"
+              >
+                Viertel beenden
+              </button>
+              <button
+                type="button"
+                onClick={() => setSheet('finish')}
+                className="h-11 shrink-0 rounded-to-pill border border-to-dangerFrame bg-to-dangerSoft px-[18px] text-sm font-semibold text-to-dangerText"
+              >
+                Spiel beenden
+              </button>
+            </div>
+          )}
         </div>
-        {withEndButton && headerWide && (
-          <button
-            type="button"
-            onClick={() => setSheet('quarter')}
-            className="h-11 shrink-0 rounded-to-pill border border-to-line px-5 text-sm font-semibold text-to-text2"
-          >
-            Viertel beenden
-          </button>
-        )}
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-2.5 rounded-to-xl border border-to-border bg-to-surface p-3.5">
+        {score}
+        {quarters}
+        {fouls}
       </div>
     );
   }
@@ -1038,6 +1073,78 @@ export function GameStatsTracker() {
           <PadButton label="Wechseln" volt height={actionHeight} onClick={startSubstitution} />
         </div>
         <div className="flex items-center gap-2.5 rounded-to-lg border border-to-dangerFrame bg-to-dangerSoft px-3.5" style={{ height: actionHeight }}>
+          <span className="to-data flex-1 text-[9px] tracking-[0.1em] text-to-dangerText">GEGNER TRIFFT</span>
+          {OPPONENT_BUTTONS.map((o) => (
+            <button
+              key={o.statType}
+              type="button"
+              disabled={busy}
+              onClick={() => addStat('opponent', o.statType, null)}
+              className="h-[42px] w-[58px] rounded-to-md border border-to-dangerFrame bg-to-dangerSoft text-[16px] font-bold text-to-dangerText"
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ============ Tastenfeld Querformat (Element 24-Änderung §1/§2) ============
+  // Vier Spalten in zwei Blöcken gedacht: links die Würfe (Treffer/Fehlwurf
+  // je Zeile nebeneinander), rechts alles andere — ein eigenes Grid statt
+  // Keypad()s gestapelter Zeilen, weil die Anordnung nicht mehr linear ist.
+  const OTHER_ACTION_ROWS: { key: StatType; label: string; sub?: string }[][] = [
+    [
+      { key: 'rebound_def', label: 'Reb DEF', sub: 'DEFENSIV' },
+      { key: 'rebound_off', label: 'Reb OFF', sub: 'OFFENSIV' }
+    ],
+    [
+      { key: 'assist', label: 'Assist' },
+      { key: 'steal', label: 'Steal' }
+    ],
+    [
+      { key: 'block', label: 'Block' },
+      { key: 'turnover', label: 'Turnover' }
+    ]
+  ];
+
+  function WideKeypad() {
+    return (
+      <div className="grid grid-cols-4 grid-rows-[auto_repeat(4,minmax(56px,1fr))_auto] gap-2.5">
+        <span className="to-data col-span-4 pl-0.5 text-[9px] tracking-[0.1em] text-to-text3" style={{ gridRow: 1 }}>
+          TB WÜLFRATH · WAS IST PASSIERT?
+        </span>
+        {SHOT_BUTTONS.map(({ made, miss, label, sub }, i) => (
+          <Fragment key={made}>
+            <ShotButton label={label} sub={sub} make height="stretch" onClick={() => handleAction(made)} style={{ gridRow: i + 2, gridColumn: 1 }} />
+            <ShotButton label={label} sub="DANEBEN" make={false} height="stretch" onClick={() => handleAction(miss)} style={{ gridRow: i + 2, gridColumn: 2 }} />
+          </Fragment>
+        ))}
+        {OTHER_ACTION_ROWS.map((row, i) => (
+          <Fragment key={row[0].key}>
+            <PadButton
+              label={row[0].label}
+              sub={row[0].sub}
+              height="stretch"
+              onClick={() => handleAction(row[0].key)}
+              style={{ gridRow: i + 2, gridColumn: 3 }}
+            />
+            <PadButton
+              label={row[1].label}
+              sub={row[1].sub}
+              height="stretch"
+              onClick={() => handleAction(row[1].key)}
+              style={{ gridRow: i + 2, gridColumn: 4 }}
+            />
+          </Fragment>
+        ))}
+        <PadButton label="Foul" danger height="stretch" onClick={() => handleAction('foul')} style={{ gridRow: 5, gridColumn: '1 / 3' }} />
+        <PadButton label="Wechseln" volt height="stretch" onClick={startSubstitution} style={{ gridRow: 5, gridColumn: '3 / 5' }} />
+        <div
+          className="col-span-4 flex items-center gap-2.5 rounded-to-lg border border-to-dangerFrame bg-to-dangerSoft px-3.5"
+          style={{ gridRow: 6 }}
+        >
           <span className="to-data flex-1 text-[9px] tracking-[0.1em] text-to-dangerText">GEGNER TRIFFT</span>
           {OPPONENT_BUTTONS.map((o) => (
             <button
@@ -1097,7 +1204,8 @@ export function GameStatsTracker() {
     showCancel,
     onCancel,
     onPick,
-    selectedId
+    selectedId,
+    cols = 2
   }: {
     label: string;
     list: Player[];
@@ -1107,36 +1215,41 @@ export function GameStatsTracker() {
     onCancel: () => void;
     onPick: (id: string) => void;
     selectedId: string | null;
+    cols?: number;
   }) {
-    const rows: Player[][] = [];
-    for (let i = 0; i < list.length; i += 2) rows.push(list.slice(i, i + 2));
+    // Zellen (Spieler + optional "Abbrechen") auf volle Zeilen auffüllen,
+    // damit auch bei "cols=3" (Querformat) die letzte Reihe sauber
+    // aufgeht statt krumm zu werden.
+    const cells: (Player | 'cancel' | null)[] = [...list];
+    if (showCancel) cells.push('cancel');
+    while (cells.length % cols !== 0) cells.push(null);
+    const rows: (Player | 'cancel' | null)[][] = [];
+    for (let i = 0; i < cells.length; i += cols) rows.push(cells.slice(i, i + cols));
     return (
       <div className="flex flex-col gap-2.5 rounded-to-xl border border-to-borderMatchday bg-to-surface p-3.5">
         {label && <span className="to-data pl-1 text-[9px] tracking-[0.12em] text-to-accent">{label}</span>}
         {rows.map((row, i) => (
           <div key={i} className="flex gap-2.5">
-            {row.map((p) => (
-              <PlayerTile
-                key={p.id}
-                player={p}
-                number={numbers[p.id]}
-                fouls={countPlayerFouls(events, p.id)}
-                size={tileSize}
-                photoSize={photoSize}
-                selected={selectedId === p.id}
-                onClick={() => onPick(p.id)}
-              />
-            ))}
-            {row.length === 1 && showCancel && <CancelTile size={tileSize} onClick={onCancel} />}
-            {row.length === 1 && !showCancel && <span className="flex-1" />}
+            {row.map((cell, j) =>
+              cell === 'cancel' ? (
+                <CancelTile key="cancel" size={tileSize} onClick={onCancel} />
+              ) : cell === null ? (
+                <span key={j} className="flex-1" />
+              ) : (
+                <PlayerTile
+                  key={cell.id}
+                  player={cell}
+                  number={numbers[cell.id]}
+                  fouls={countPlayerFouls(events, cell.id)}
+                  size={tileSize}
+                  photoSize={photoSize}
+                  selected={selectedId === cell.id}
+                  onClick={() => onPick(cell.id)}
+                />
+              )
+            )}
           </div>
         ))}
-        {list.length % 2 === 0 && showCancel && (
-          <div className="flex gap-2.5">
-            <CancelTile size={tileSize} onClick={onCancel} />
-            <span className="flex-1" />
-          </div>
-        )}
       </div>
     );
   }
@@ -1156,27 +1269,32 @@ export function GameStatsTracker() {
   }
 
   // ============ Verlauf ============
-  function HistoryPanel({ limit }: { limit: number }) {
+  // `grow` (Querformat, §4): Panel füllt die verbleibende Höhe der rechten
+  // Spalte, statt wie am Handy nur so hoch wie nötig zu sein — der
+  // Box-Score darunter behält seine natürliche Höhe.
+  function HistoryPanel({ limit, grow }: { limit: number; grow?: boolean }) {
     const rows = logEntries.slice(0, limit);
     return (
-      <div className="overflow-hidden rounded-to-xl border border-to-border bg-to-surface">
+      <div className={`overflow-hidden rounded-to-xl border border-to-border bg-to-surface ${grow ? 'flex flex-1 flex-col' : ''}`}>
         <span className="to-data block px-3.5 pb-2 pt-2.5 text-[9px] tracking-[0.1em] text-to-text3">VERLAUF</span>
-        {rows.length === 0 ? (
-          <p className="border-t border-to-surface2 px-3.5 py-2.5 text-[13px] text-to-text2">Noch keine Aktionen.</p>
-        ) : (
-          rows.map((l) => (
-            <div key={l.id} className="flex items-center gap-2.5 border-t border-to-surface2 px-3.5 py-2.5">
-              <span className="to-data w-6 shrink-0 text-[9px] text-to-textDisabled">{l.quarter > 0 ? `Q${l.quarter}` : ''}</span>
-              <span className="to-data flex h-5 min-w-6 shrink-0 items-center justify-center rounded-to-sm bg-to-surface2 px-1.5 text-[10px] text-to-text3">
-                {l.num || '–'}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-[13px] text-to-text2">{l.text}</span>
-              <span className={`to-data shrink-0 text-[11px] font-bold ${l.pts ? (l.opp ? 'text-to-dangerText' : 'text-to-accent') : 'text-to-textDisabled'}`}>
-                {l.pts ? `+${l.pts}` : ''}
-              </span>
-            </div>
-          ))
-        )}
+        <div className={grow ? 'flex-1 overflow-y-auto' : ''}>
+          {rows.length === 0 ? (
+            <p className="border-t border-to-surface2 px-3.5 py-2.5 text-[13px] text-to-text2">Noch keine Aktionen.</p>
+          ) : (
+            rows.map((l) => (
+              <div key={l.id} className="flex items-center gap-2.5 border-t border-to-surface2 px-3.5 py-2.5">
+                <span className="to-data w-6 shrink-0 text-[9px] text-to-textDisabled">{l.quarter > 0 ? `Q${l.quarter}` : ''}</span>
+                <span className="to-data flex h-5 min-w-6 shrink-0 items-center justify-center rounded-to-sm bg-to-surface2 px-1.5 text-[10px] text-to-text3">
+                  {l.num || '–'}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[13px] text-to-text2">{l.text}</span>
+                <span className={`to-data shrink-0 text-[11px] font-bold ${l.pts ? (l.opp ? 'text-to-dangerText' : 'text-to-accent') : 'text-to-textDisabled'}`}>
+                  {l.pts ? `+${l.pts}` : ''}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     );
   }
@@ -1601,31 +1719,40 @@ export function GameStatsTracker() {
   }
 
   // ============ Querformat (ab 900px, drei Spalten) ============
+  // Querformat (Element-24-Änderung §2/§4): "Aktion" und "Mannschaft" sind
+  // jetzt EIN Panel mit zwei Zuständen (Tastenfeld/"Auf dem Feld" ODER
+  // Spielerauswahl), statt zwei parallelen Panels von denen eines immer
+  // funktionslos war. Damit entfällt zwangsläufig "erst Spieler, dann
+  // Aktion" im Querformat — überall gilt jetzt erst Aktion, dann Spieler,
+  // wie am Handy (§3). Rechts nur noch Verlauf + Box-Score, kein eigener
+  // "Spiel beenden"-Knopf mehr (der sitzt jetzt oben im Kopf, siehe Header).
   function WideBody() {
-    const benchRows: Player[][] = [];
-    for (let i = 0; i < benchPlayers.length; i += 3) benchRows.push(benchPlayers.slice(i, i + 3));
-    const midTitle = pendingAction
-      ? `WER WAR ES? · ${STAT_TYPE_LABELS[pendingAction].toUpperCase()}`
-      : subMode
-        ? subMode === 'out'
-          ? 'WER GEHT RAUS?'
-          : 'WER KOMMT REIN?'
-        : 'MANNSCHAFT · IMMER ANTIPPBAR';
-    const midList = subMode === 'in' ? benchPlayers : subMode === 'out' ? onCourtPlayers : pickablePlayers;
-    const showCancelInMid = !!pendingAction || !!pendingPlayer || !!subMode;
+    const picking = !!pendingAction || !!subMode;
+    const pickTitle = subMode
+      ? subMode === 'out'
+        ? 'WER GEHT RAUS?'
+        : 'WER KOMMT REIN?'
+      : pendingAction
+        ? `WER WAR ES? · ${STAT_TYPE_LABELS[pendingAction].toUpperCase()}`
+        : '';
+    const pickList = subMode === 'in' ? benchPlayers : subMode === 'out' ? onCourtPlayers : pickablePlayers;
 
     return (
-      <div className="flex items-start gap-3">
-        <div className="flex w-[330px] shrink-0 flex-col gap-2.5 rounded-to-xl border border-to-border bg-to-surface p-3.5 max-[1000px]:w-[288px]">
-          <Keypad shotHeight={52} actionHeight={44} />
-          <ConfirmBar />
-        </div>
-        <div className="min-w-0 flex-1 rounded-to-xl border border-to-borderMatchday bg-to-surface p-3.5">
-          <span className="to-data mb-2.5 block text-[9px] tracking-[0.12em] text-to-accent">{midTitle}</span>
+      <div className="flex gap-3">
+        <div
+          className={`flex min-w-0 flex-1 flex-col gap-2.5 rounded-to-xl border bg-to-surface p-3 ${
+            picking ? 'border-to-borderMatchday' : 'border-to-border'
+          }`}
+        >
           {trackablePlayers.length === 0 ? (
             <p className="text-sm text-to-text3">Kein Kader für dieses Spiel hinterlegt.</p>
           ) : useCourtSplit && onCourtIds.length < COURT_SIZE ? (
+            // Startaufstellung, außerhalb des Umfangs dieser Änderung —
+            // Logik/Größen unverändert gelassen.
             <div className="flex flex-col gap-2.5">
+              <span className="to-data pl-0.5 text-[9px] tracking-[0.1em] text-to-text3">
+                STARTAUFSTELLUNG ({onCourtIds.length}/{COURT_SIZE})
+              </span>
               {Array.from({ length: Math.ceil(trackablePlayers.length / 2) }).map((_, i) => (
                 <div key={i} className="flex gap-2.5">
                   {trackablePlayers.slice(i * 2, i * 2 + 2).map((p) => (
@@ -1643,60 +1770,42 @@ export function GameStatsTracker() {
                 </div>
               ))}
             </div>
+          ) : picking ? (
+            <RosterGrid
+              label={pickTitle}
+              list={pickList}
+              tileSize={124}
+              photoSize={48}
+              showCancel
+              onCancel={subMode ? cancelSubstitution : cancelPicker}
+              onPick={(id) => {
+                if (subMode === 'out') pickOutgoing(id);
+                else if (subMode === 'in') confirmSubstitution(id);
+                else if (pendingAction) addStat('us', pendingAction, id);
+              }}
+              selectedId={subMode ? null : pendingPlayer}
+              cols={3}
+            />
           ) : (
-            <div className="flex flex-col gap-2.5">
-              {(() => {
-                const rows: Player[][] = [];
-                for (let i = 0; i < midList.length; i += 2) rows.push(midList.slice(i, i + 2));
-                return rows.map((row, i) => (
-                  <div key={i} className="flex gap-2.5">
-                    {row.map((p) => (
-                      <PlayerTile
-                        key={p.id}
-                        player={p}
-                        number={numbers[p.id]}
-                        fouls={countPlayerFouls(events, p.id)}
-                        size={100}
-                        photoSize={48}
-                        selected={subMode ? false : pendingPlayer === p.id}
-                        onClick={() => (subMode === 'out' ? pickOutgoing(p.id) : subMode === 'in' ? confirmSubstitution(p.id) : handlePlayerTap(p.id))}
-                      />
-                    ))}
-                    {row.length === 1 && showCancelInMid && (
-                      <CancelTile size={100} onClick={subMode ? cancelSubstitution : cancelPicker} />
-                    )}
-                    {row.length === 1 && !showCancelInMid && <span className="flex-1" />}
-                  </div>
-                ));
-              })()}
-              {!subMode && (
-                <>
-                  <span className="to-data pt-1.5 text-[9px] tracking-[0.1em] text-to-text3">BANK</span>
-                  {benchRows.map((row, i) => (
-                    <div key={i} className="flex gap-1.5">
-                      {row.map((p) => (
-                        <span key={p.id} className="flex flex-1 items-center gap-1.5 rounded-to-md border border-to-border bg-to-surface2 px-2 py-1.5">
-                          <span className="to-number text-sm text-to-text">{numbers[p.id] ?? '–'}</span>
-                          <span className="truncate text-xs text-to-text2">{shortPlayerName(p.name)}</span>
-                        </span>
-                      ))}
-                    </div>
+            <>
+              <WideKeypad />
+              <div className="flex flex-col gap-2">
+                <span className="to-data pl-0.5 text-[9px] tracking-[0.1em] text-to-text3">AUF DEM FELD</span>
+                <div className="flex gap-1.5">
+                  {onCourtPlayers.map((p) => (
+                    <CourtChip key={p.id} player={p} number={numbers[p.id]} fouls={countPlayerFouls(events, p.id)} />
                   ))}
-                </>
-              )}
-            </div>
+                </div>
+              </div>
+            </>
           )}
+          <div className="mt-auto">
+            <ConfirmBar />
+          </div>
         </div>
-        <div className="flex w-[262px] shrink-0 flex-col gap-3 max-[1000px]:w-[236px]">
-          <HistoryPanel limit={4} />
+        <div className="flex w-[300px] shrink-0 flex-col gap-3 max-[1000px]:w-[236px]">
+          <HistoryPanel limit={9} grow />
           <SimpleBoxScore onlyCourt />
-          <button
-            type="button"
-            onClick={() => setSheet('finish')}
-            className="h-[44px] rounded-to-pill border border-to-dangerFrame bg-to-dangerSoft text-sm font-semibold text-to-dangerText"
-          >
-            Spiel beenden
-          </button>
         </div>
       </div>
     );

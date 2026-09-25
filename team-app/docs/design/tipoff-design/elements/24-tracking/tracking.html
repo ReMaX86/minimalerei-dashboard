@@ -213,15 +213,56 @@ button{font-family:inherit;color:inherit;cursor:pointer;border:0;background:tran
 body.wide .wrap{width:100%;max-width:1180px;padding:16px 20px;gap:12px}
 body.wide .deskonly{display:flex}
 body.wide .mobonly{display:none !important}
-body.wide .cols{display:flex;gap:12px;align-items:flex-start}
-body.wide .col-l{width:330px;flex:none;border-radius:20px;background:var(--to-surface);
-  border:1px solid var(--to-border);padding:12px;display:flex;flex-direction:column;gap:9px}
-body.wide .col-m{flex:1 1 auto;min-width:0;border-radius:20px;background:var(--to-surface);
-  border:1px solid var(--to-accent-frame);padding:12px;display:flex;flex-direction:column;gap:10px}
-body.wide .col-r{width:262px;flex:none;display:flex;flex-direction:column;gap:12px}
-body.wide .head{flex-direction:row;align-items:center;gap:16px;padding:11px 14px}
-body.wide .head__block{display:flex;flex-direction:column;gap:11px;flex:1 1 auto}
-body.wide .ptile{height:100px}
+body.wide .cols{display:flex;gap:12px;align-items:stretch;min-height:560px}
+body.wide .col-main{flex:1 1 auto;min-width:0;border-radius:20px;background:var(--to-surface);
+  border:1px solid var(--to-border);padding:12px;display:flex;flex-direction:column;gap:10px}
+body.wide .col-main--pick{border-color:var(--to-accent-frame)}
+body.wide .col-main .pick{background:transparent;border:0;padding:0;gap:9px}
+/* Tastenfeld: links die Würfe untereinander, rechts der Rest */
+body.wide .col-main .pad{flex:1 1 auto;display:grid;grid-template-columns:repeat(4,1fr);
+  grid-template-rows:auto repeat(4,minmax(56px,1fr)) auto;gap:9px}
+body.wide .col-main .pad > .lbl{grid-column:1/-1;grid-row:1}
+body.wide .col-main .pad .prow{display:contents}
+body.wide .col-main .pad .opp{grid-column:1/-1;grid-row:6}
+body.wide .col-main .btn{height:auto}
+
+/* 2er / 3er / FW untereinander, jeweils Treffer links, Fehlwurf rechts */
+body.wide .col-main .pad .prow:nth-of-type(1) > *:nth-child(1){grid-row:2;grid-column:1}
+body.wide .col-main .pad .prow:nth-of-type(1) > *:nth-child(2){grid-row:2;grid-column:2}
+body.wide .col-main .pad .prow:nth-of-type(2) > *:nth-child(1){grid-row:3;grid-column:1}
+body.wide .col-main .pad .prow:nth-of-type(2) > *:nth-child(2){grid-row:3;grid-column:2}
+body.wide .col-main .pad .prow:nth-of-type(3) > *:nth-child(1){grid-row:4;grid-column:1}
+body.wide .col-main .pad .prow:nth-of-type(3) > *:nth-child(2){grid-row:4;grid-column:2}
+/* rechte Hälfte: Rebounds, Assist/Steal, Block/Turnover */
+body.wide .col-main .pad .prow:nth-of-type(4) > *:nth-child(1){grid-row:2;grid-column:3}
+body.wide .col-main .pad .prow:nth-of-type(4) > *:nth-child(2){grid-row:2;grid-column:4}
+body.wide .col-main .pad .prow:nth-of-type(5) > *:nth-child(1){grid-row:3;grid-column:3}
+body.wide .col-main .pad .prow:nth-of-type(5) > *:nth-child(2){grid-row:3;grid-column:4}
+body.wide .col-main .pad .prow:nth-of-type(6) > *:nth-child(1){grid-row:4;grid-column:3}
+body.wide .col-main .pad .prow:nth-of-type(6) > *:nth-child(2){grid-row:4;grid-column:4}
+/* Foul und Wechseln über je zwei Spalten */
+body.wide .col-main .pad .prow:nth-of-type(7) > *:nth-child(1){grid-row:5;grid-column:1/3}
+body.wide .col-main .pad .prow:nth-of-type(7) > *:nth-child(2){grid-row:5;grid-column:3/5}
+
+body.wide .col-main .court{background:transparent;border:0;padding:0}
+body.wide .col-main .pick{flex:0 0 auto;display:flex;flex-direction:column;gap:9px;
+  background:transparent;border:0;padding:0}
+body.wide .col-main .pick .prow{flex:0 0 auto}
+body.wide .col-main .ptile{height:124px}
+body.wide .col-main .confirm{margin-top:auto}
+body.wide .col-r .panel:first-of-type{flex:1 1 auto;overflow:hidden}
+body.wide .col-r{width:300px;flex:none;display:flex;flex-direction:column;gap:12px}
+
+/* Kopfzeile: alles in einer Reihe */
+body.wide .head{flex-direction:row;align-items:center;gap:22px;padding:10px 16px}
+body.wide .head__block{display:flex;flex-direction:row;align-items:center;gap:22px;flex:1 1 auto}
+body.wide .head__block .score{flex:none}
+body.wide .head__block .qrow{flex:1 1 auto;max-width:430px}
+body.wide .head__block .foulrow{flex:none;flex-direction:column;align-items:flex-start;gap:5px}
+body.wide .foulrow .bonus{margin-left:0}
+body.wide .head__acts{display:flex;gap:9px;flex:none}
+body.wide .head__acts .big{width:auto;padding:0 18px;height:44px;font-size:14px}
+body.wide .ptile{height:112px;min-height:96px}
 body.wide .photo{width:48px;height:48px}
 body.wide .btn{height:44px}
 body.wide .btn--shot{height:52px}
@@ -347,8 +388,10 @@ body.wide .big{height:44px}
           '<span class="dots">'+dots+'</span>'+
           '<span class="bonus">'+(5 - S.teamFouls)+' BIS BONUS</span></div>'+
       '</div>'+
-      '<button class="big big--q deskonly" type="button" data-sheet="quarter" '+
-        'style="width:160px;flex:none">Viertel beenden</button>'+
+      '<div class="head__acts deskonly">'+
+        '<button class="big big--q" type="button" data-sheet="quarter">Viertel beenden</button>'+
+        '<button class="big big--end" type="button" data-sheet="finish">Spiel beenden</button>'+
+      '</div>'+
     '</div>';
   }
 
@@ -420,18 +463,25 @@ body.wide .big{height:44px}
       '<span class="ptile__f'+foulClass(p)+'">'+foulText(p)+'</span></span></button>';
   }
 
-  function rosterHtml(title, list, withCancel){
-    var rows = '', i;
-    for (i = 0; i < list.length; i += 2) {
-      rows += '<div class="prow">' + tileHtml(list[i], S.pendingPlayer === list[i].id);
-      if (list[i+1]) rows += tileHtml(list[i+1], S.pendingPlayer === list[i+1].id);
-      else if (withCancel) rows += '<button class="ptile ptile--cancel" type="button" data-cancel="1">'+
-        '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" '+
-        'style="stroke-width:2.4;stroke-linecap:round"><path d="M6 6l12 12M18 6L6 18"></path></svg>Abbrechen</button>';
-      else rows += '<span class="ptile" style="visibility:hidden"></span>';
+  function cancelTile(){
+    return '<button class="ptile ptile--cancel" type="button" data-cancel="1">'+
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" '+
+      'style="stroke-width:2.4;stroke-linecap:round"><path d="M6 6l12 12M18 6L6 18"></path></svg>Abbrechen</button>';
+  }
+
+  function rosterHtml(title, list, withCancel, cols){
+    var per = cols || 2;
+    var cells = list.map(function(p){ return tileHtml(p, S.pendingPlayer === p.id); });
+    if (withCancel) cells.push(cancelTile());
+    var rows = '', i, j;
+    for (i = 0; i < cells.length; i += per) {
+      rows += '<div class="prow">';
+      for (j = 0; j < per; j++) {
+        rows += cells[i+j] || '<span class="ptile" style="visibility:hidden"></span>';
+      }
       rows += '</div>';
     }
-    return '<div class="pick"><span class="pick__lbl">'+title+'</span>'+rows+'</div>';
+    return '<div class="pick">'+(title ? '<span class="pick__lbl">'+title+'</span>' : '')+rows+'</div>';
   }
 
   function courtHtml(){
@@ -509,28 +559,26 @@ body.wide .big{height:44px}
   }
 
   function renderWide(){
-    var title = S.pendingAction
-      ? 'WER WAR ES? · ' + ACTIONS[S.pendingAction].text.toUpperCase()
-      : (S.view === 'sub' ? (S.subMode === 'out' ? 'WER GEHT RAUS?' : 'WER KOMMT REIN?')
-                          : 'MANNSCHAFT · IMMER ANTIPPBAR');
-    var list = (S.view === 'sub' && S.subMode === 'in') ? bench() : court();
-    var benchChips = bench().map(function(p){
-      return '<span class="chip" style="flex:1 1 0"><span class="chip__num">'+p.num+'</span>'+
-        '<span class="chip__name">'+esc(p.name)+'</span></span>';
-    });
-    var benchRows = '';
-    for (var i = 0; i < benchChips.length; i += 3) {
-      benchRows += '<div class="court__row">'+benchChips.slice(i, i+3).join('')+'</div>';
+    var picking = !!S.pendingAction || S.view === 'sub';
+    var title, list, main;
+
+    if (picking) {
+      if (S.view === 'sub') {
+        title = S.subMode === 'out' ? 'WER GEHT RAUS?' : 'WER KOMMT REIN?';
+        list = S.subMode === 'in' ? bench() : court();
+      } else {
+        title = 'WER WAR ES? · ' + ACTIONS[S.pendingAction].text.toUpperCase();
+        list = court();
+      }
+      main = '<span class="pick__lbl">'+title+'</span>' + rosterHtml('', list, true, 3);
+    } else {
+      main = padHtml() + courtHtml();
     }
+
     el('wrap').innerHTML = layoutBarHtml() + headHtml() +
       '<div class="cols">'+
-        '<div class="col-l">'+padHtml()+confirmHtml()+'</div>'+
-        '<div class="col-m"><span class="pick__lbl">'+title+'</span>'+
-          rosterHtml('', list, !!(S.pendingAction || S.pendingPlayer || S.view === 'sub')).replace('<div class="pick"><span class="pick__lbl"></span>', '<div style="display:flex;flex-direction:column;gap:9px">')+
-          '<span class="lbl" style="padding-top:6px">BANK</span>'+benchRows+
-        '</div>'+
-        '<div class="col-r">'+logHtml(4)+boxHtml(true)+
-          '<button class="big big--end" type="button" data-sheet="finish">Spiel beenden</button></div>'+
+        '<div class="col-main'+(picking ? ' col-main--pick' : '')+'">'+main+confirmHtml()+'</div>'+
+        '<div class="col-r">'+logHtml(9)+boxHtml(true)+'</div>'+
       '</div>';
   }
 
