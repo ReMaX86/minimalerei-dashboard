@@ -10,22 +10,20 @@ import { TrainingCard } from '../components/TrainingCard';
 import { AbsenceCard } from '../components/AbsenceCard';
 import { TeamBoard } from '../components/TeamBoard';
 import { PushNotificationCard } from '../components/PushNotificationCard';
-import { IconChevronRight, IconClipboard } from '../components/NavIcons';
+import { IconChevronRight } from '../components/NavIcons';
 import { StartHeader } from '../components/StartHeader';
 import { NextGameCard } from '../components/NextGameCard';
 import { LastResultCard } from '../components/LastResultCard';
 import { OfficiatingDutyCard } from '../components/OfficiatingDutyCard';
 import { usePushStatus } from '../hooks/usePushStatus';
-import { fmtDate, fmtTime, hasKickedOff } from '../lib/format';
+import { hasKickedOff } from '../lib/format';
 import { nextTrainingOccurrences } from '../lib/trainingSchedule';
 import { computeReminders, type ReminderItem } from '../lib/reminders';
 import { pendingWasherFor } from '../lib/trikots';
 import { computeBoxScore } from '../lib/gameStats';
 import { ANNOUNCEMENT_KIND_LABELS, isAnnouncementOpen, sortAnnouncements } from '../lib/announcements';
 import {
-  OFFICIATING_TASK_LABELS,
   STAT_POINT_VALUES,
-  officiatingGameLabel,
   type Announcement,
   type AnnouncementKind,
   type AnnouncementReadRow,
@@ -48,11 +46,6 @@ import {
   type TrikotWashLogRow
 } from '../types/database';
 
-// Spielberichtsbogen-Grenze — dieselbe Zahl wie MAX_SQUAD_SIZE in
-// Spiele.tsx; wird bei der Kader/Trainer-Modus-Umstellung (nächster
-// Schritt) in eine gemeinsame Stelle gezogen statt an zwei Stellen gepflegt.
-const MAX_SQUAD_SIZE = 12;
-
 // Lokales Datum, NICHT new Date().toISOString().slice(0,10) (das ist UTC —
 // würde in den ersten ein bis zwei Stunden nach Mitternacht fälschlich noch
 // den Vortag liefern, z. B. den heutigen Spieltag verfehlen).
@@ -72,7 +65,6 @@ interface DashboardData {
   // (inkl. der eigenen) — für den Block "MIT DIR AM TISCH" auf der Karte
   // "Dein Kampfgericht-Einsatz" (siehe elements/05-kampfgericht/PROMPT.md).
   playerNextTaskTeammates: OfficiatingTask[];
-  trainerNextOfficiatingGame: (OfficiatingGame & { tasks: OfficiatingTask[] }) | null;
   trikotSets: TrikotSet[];
   trikotWashLog: TrikotWashLogRow[];
   players: Record<string, Player>;
@@ -149,11 +141,6 @@ export function Dashboard() {
   const [trainingVersion, setTrainingVersion] = useState(0);
   const [squadResponseVersion, setSquadResponseVersion] = useState(0);
   const [resultVersion, setResultVersion] = useState(0);
-  // Trainers/admin-players get the full Kampfgericht overview so they can
-  // plan; a read-only Betrachter (e.g. Abteilungsleiter) gets to see the
-  // same overview, just with no way to assign/edit anything. Captains/
-  // Co-Captains get it too so they can remind teammates who's up next.
-  const showOfficiatingOverview = (isAdmin || role === 'viewer' || !!player?.is_captain || !!player?.is_co_captain) && flags.officiating;
   // Trainer/Captains (ohne Betrachter) — Sichtbarkeits-Gate für die
   // Kampfgericht- und Abwesend-Abschnitte im Team-Board unten (siehe
   // docs/design/tipoff-design/elements/07-teaminfos/PROMPT.md "Sichtbarkeit").
@@ -194,7 +181,6 @@ export function Dashboard() {
 
       let playerNextTask: DashboardData['playerNextTask'] = null;
       let playerNextTaskTeammates: DashboardData['playerNextTaskTeammates'] = [];
-      let trainerNextOfficiatingGame: DashboardData['trainerNextOfficiatingGame'] = null;
       let playerInSquad: DashboardData['playerInSquad'] = null;
       let myConfirmation: DashboardData['myConfirmation'] = null;
       let carpoolOffers: CarpoolOffer[] = [];
@@ -580,23 +566,6 @@ export function Dashboard() {
         }
       }
 
-      if (showOfficiatingOverview) {
-        const { data: nextOg } = await supabase
-          .from('officiating_games')
-          .select('*')
-          .gte('game_date', today)
-          .order('game_date')
-          .limit(1)
-          .maybeSingle();
-        if (nextOg) {
-          const { data: tasks } = await supabase
-            .from('officiating_tasks')
-            .select('*')
-            .eq('officiating_game_id', nextOg.id);
-          trainerNextOfficiatingGame = { ...(nextOg as OfficiatingGame), tasks: (tasks as OfficiatingTask[]) ?? [] };
-        }
-      }
-
       if (cancelled) return;
 
       if (gameRes.error || trikotRes.error || trikotWashRes.error) {
@@ -612,7 +581,6 @@ export function Dashboard() {
         myDeclineNote,
         playerNextTask,
         playerNextTaskTeammates,
-        trainerNextOfficiatingGame,
         trikotSets: (trikotRes.data as TrikotSet[]) ?? [],
         trikotWashLog,
         players: playersById,
@@ -804,102 +772,10 @@ export function Dashboard() {
     <div className="space-y-4">
       <StartHeader nextGameDate={data.nextGame?.game_date ?? null} pushStatus={pushStatus} onPushChange={refreshPushStatus} />
 
-      {/* Nächstes Spiel — Vorlage: docs/design/tipoff-design/elements/
-          02-naechstes-spiel/ (pixelgenau, siehe PROMPT.md dort). */}
-      {data.nextGame ? (
-        <NextGameCard
-          game={data.nextGame}
-          // Dashboard rendert nur für diese drei Rollen (siehe App.tsx) —
-          // 'loading'/'guest' sind an dieser Stelle bereits ausgeschlossen.
-          role={role as 'trainer' | 'player' | 'viewer'}
-          playerInSquad={data.playerInSquad}
-          myConfirmation={data.myConfirmation}
-          myDeclineReason={data.myDeclineReason}
-          myDeclineNote={data.myDeclineNote}
-          squadCount={data.squadCount}
-          showTracking={flags.stats && !data.nextGame.stats_finalized_at}
-          activeStatsHolder={data.activeStatsHolder}
-          liveScore={data.liveScore}
-          liveQuarter={data.liveQuarter}
-          refreshingLive={refreshingLive}
-          onRefreshLive={refreshLiveScore}
-          onResponded={() => setSquadResponseVersion((v) => v + 1)}
-        />
-      ) : (
-        <section className="card">
-          <p className="text-sm text-to-text2">Kein Spiel geplant.</p>
-        </section>
-      )}
-
-      {/* Mitfahrgelegenheit — kein Bestandteil der neuen Kartenvorlage
-          (Auswärtsspiel-Feature, siehe §7), bleibt deshalb als eigener,
-          unveränderter Block direkt darunter erhalten. */}
-      {flags.carpool && data.nextGame && !data.nextGame.is_home && data.carpoolOffers.length > 0 && (
-        <section className="card">
-          <div className="flex items-center justify-between">
-            <p className="to-label">Mitfahrgelegenheit</p>
-            <Link to="/spiele" className="text-xs font-semibold text-to-accent">
-              Verwalten →
-            </Link>
-          </div>
-          {data.carpoolOffers.map((o) => {
-            const free = o.seats - data.carpoolClaims.filter((c) => c.offer_id === o.id).length;
-            return (
-              <p key={o.id} className="mt-0.5 text-sm text-to-text2">
-                <span className="font-semibold text-to-text">{data.players[o.driver_player_id]?.name ?? '?'}</span>{' '}
-                · {free > 0 ? `${free} von ${o.seats} Plätzen frei` : 'voll'}
-              </p>
-            );
-          })}
-        </section>
-      )}
-
-      {/* Letztes Ergebnis — Vorlage: docs/design/tipoff-design/elements/
-          03-letztes-ergebnis/ (pixelgenau, siehe PROMPT.md dort). */}
-      {flags.stats && data.lastResult && (
-        <LastResultCard
-          game={data.lastResult}
-          role={role as 'trainer' | 'player' | 'viewer'}
-          inSquad={data.lastResultInSquad}
-          wasTracked={data.lastResultTracked}
-          myBoxScore={data.lastResultMyBoxScore}
-          recentResults={data.recentResults}
-          onScoreReported={() => setResultVersion((v) => v + 1)}
-        />
-      )}
-
-      {/* Kader-Stand — DESIGN.md: statt einer Trikotnummer, die es in dieser
-          App gar nicht gibt — siehe DESIGN.md §7. Stand bis hierhin neben der
-          Kampfgericht-Kachel in einem 2-spaltigen Raster; die neue, größere
-          Kampfgericht-Karte (elements/05-kampfgericht/) passt nicht mehr in
-          eine halbe Spalte, deshalb jetzt beides untereinander. */}
-      {data.squadCount !== null && (
-        <div className="card flex flex-col gap-3.5 !p-4">
-          <div className="flex items-center justify-between">
-            <span className="to-label">Kader</span>
-            <span className="h-2 w-2 rounded-full bg-to-accent" />
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-lg font-semibold text-to-text">{data.squadCount} nominiert</span>
-            <span className="text-[13px] text-to-text2">von {MAX_SQUAD_SIZE} Plätzen</span>
-          </div>
-        </div>
-      )}
-
-      {/* Kampfgericht — Karte "Dein Kampfgericht-Einsatz", siehe
-          docs/design/tipoff-design/elements/05-kampfgericht/PROMPT.md. */}
-      {role === 'player' && flags.officiating && (
-        <OfficiatingDutyCard task={data.playerNextTask} teammates={data.playerNextTaskTeammates} players={data.players} />
-      )}
-
-      {/* Abwesenheit — direkt unter dem Kampfgericht-Element, siehe
-          docs/design/tipoff-design/elements/06-abwesenheit/PROMPT.md. */}
-      {flags.absences && role === 'player' && <AbsenceCard onChange={() => setAbsenceVersion((v) => v + 1)} />}
-
-      {flags.push_notifications && (pushStatus === 'unsubscribed' || pushStatus === 'denied') && (
-        <PushNotificationCard status={pushStatus} onChange={refreshPushStatus} />
-      )}
-
+      {/* Meldungen/Erinnerungen — auf Nutzerwunsch ganz nach oben, direkt
+          unter den Kopf: das sind die Dinge, die von der Spielerin/dem
+          Spieler noch eine Aktion brauchen, alles andere darunter ist nur
+          zum Nachschauen. */}
       {forDichCount > 0 && (
         <section className={`overflow-hidden rounded-to-xl border bg-to-surface ${openAnnouncements.length > 0 ? 'border-to-borderMatchday' : 'border-to-border'}`}>
           <div className={`flex min-h-10 items-center gap-2.5 px-4 ${openAnnouncements.length > 0 ? 'bg-to-accent' : ''}`}>
@@ -977,49 +853,85 @@ export function Dashboard() {
         </section>
       )}
 
-      {/* Kampfgericht — DESIGN.md Dashboard.dc.html: eine Karte mit den
-          Aufgaben des nächsten Kampfgericht-Termins (auch für andere Teams
-          im Verein, siehe §7) plus dem eigenen nächsten Einsatz darunter. */}
-      {showOfficiatingOverview && (
-        <section className="card flex flex-col gap-1 !p-5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <IconClipboard className="h-[22px] w-[22px] text-to-text" />
-              <h2 className="text-lg font-semibold text-to-text">Kampfgericht</h2>
-            </div>
-            {data.trainerNextOfficiatingGame && (
-              <span className="pill pill-open">
-                {data.trainerNextOfficiatingGame.tasks.filter((t) => !t.assigned_player_id).length} offen
-              </span>
-            )}
-          </div>
-          {data.trainerNextOfficiatingGame ? (
-            <>
-              <p className="mb-1 text-[13px] text-to-text3">
-                {fmtDate(data.trainerNextOfficiatingGame.game_date)}
-                {data.trainerNextOfficiatingGame.game_time
-                  ? ` · ${fmtTime(data.trainerNextOfficiatingGame.game_time)} Uhr`
-                  : ''}{' '}
-                · {officiatingGameLabel(data.trainerNextOfficiatingGame)}
-              </p>
-              <div className="divide-y divide-to-divider">
-                {data.trainerNextOfficiatingGame.tasks.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between gap-3 py-3">
-                    <span className="text-sm font-medium text-to-text">{OFFICIATING_TASK_LABELS[t.task_type]}</span>
-                    <span className={t.assigned_player_id ? 'pill pill-ok' : 'pill pill-open'}>
-                      {t.assigned_player_id ? data.players[t.assigned_player_id]?.name ?? '?' : 'offen'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="mt-1 text-sm text-to-text2">Kein Kampfgericht-Termin geplant.</p>
-          )}
+      {/* Nächstes Spiel — Vorlage: docs/design/tipoff-design/elements/
+          02-naechstes-spiel/ (pixelgenau, siehe PROMPT.md dort). */}
+      {data.nextGame ? (
+        <NextGameCard
+          game={data.nextGame}
+          // Dashboard rendert nur für diese drei Rollen (siehe App.tsx) —
+          // 'loading'/'guest' sind an dieser Stelle bereits ausgeschlossen.
+          role={role as 'trainer' | 'player' | 'viewer'}
+          playerInSquad={data.playerInSquad}
+          myConfirmation={data.myConfirmation}
+          myDeclineReason={data.myDeclineReason}
+          myDeclineNote={data.myDeclineNote}
+          squadCount={data.squadCount}
+          showTracking={flags.stats && !data.nextGame.stats_finalized_at}
+          activeStatsHolder={data.activeStatsHolder}
+          liveScore={data.liveScore}
+          liveQuarter={data.liveQuarter}
+          refreshingLive={refreshingLive}
+          onRefreshLive={refreshLiveScore}
+          onResponded={() => setSquadResponseVersion((v) => v + 1)}
+        />
+      ) : (
+        <section className="card">
+          <p className="text-sm text-to-text2">Kein Spiel geplant.</p>
         </section>
       )}
 
+      {/* Mitfahrgelegenheit — kein Bestandteil der neuen Kartenvorlage
+          (Auswärtsspiel-Feature, siehe §7), bleibt deshalb als eigener,
+          unveränderter Block direkt darunter erhalten. */}
+      {flags.carpool && data.nextGame && !data.nextGame.is_home && data.carpoolOffers.length > 0 && (
+        <section className="card">
+          <div className="flex items-center justify-between">
+            <p className="to-label">Mitfahrgelegenheit</p>
+            <Link to="/spiele" className="text-xs font-semibold text-to-accent">
+              Verwalten →
+            </Link>
+          </div>
+          {data.carpoolOffers.map((o) => {
+            const free = o.seats - data.carpoolClaims.filter((c) => c.offer_id === o.id).length;
+            return (
+              <p key={o.id} className="mt-0.5 text-sm text-to-text2">
+                <span className="font-semibold text-to-text">{data.players[o.driver_player_id]?.name ?? '?'}</span>{' '}
+                · {free > 0 ? `${free} von ${o.seats} Plätzen frei` : 'voll'}
+              </p>
+            );
+          })}
+        </section>
+      )}
+
+      {/* Letztes Ergebnis — Vorlage: docs/design/tipoff-design/elements/
+          03-letztes-ergebnis/ (pixelgenau, siehe PROMPT.md dort). */}
+      {flags.stats && data.lastResult && (
+        <LastResultCard
+          game={data.lastResult}
+          role={role as 'trainer' | 'player' | 'viewer'}
+          inSquad={data.lastResultInSquad}
+          wasTracked={data.lastResultTracked}
+          myBoxScore={data.lastResultMyBoxScore}
+          recentResults={data.recentResults}
+          onScoreReported={() => setResultVersion((v) => v + 1)}
+        />
+      )}
+
       <TrainingCard refreshKey={absenceVersion} onChange={() => setTrainingVersion((v) => v + 1)} />
+
+      {/* Kampfgericht — Karte "Dein Kampfgericht-Einsatz", siehe
+          docs/design/tipoff-design/elements/05-kampfgericht/PROMPT.md. */}
+      {role === 'player' && flags.officiating && (
+        <OfficiatingDutyCard task={data.playerNextTask} teammates={data.playerNextTaskTeammates} players={data.players} />
+      )}
+
+      {/* Abwesenheit — direkt unter dem Kampfgericht-Element, siehe
+          docs/design/tipoff-design/elements/06-abwesenheit/PROMPT.md. */}
+      {flags.absences && role === 'player' && <AbsenceCard onChange={() => setAbsenceVersion((v) => v + 1)} />}
+
+      {flags.push_notifications && (pushStatus === 'unsubscribed' || pushStatus === 'denied') && (
+        <PushNotificationCard status={pushStatus} onChange={refreshPushStatus} />
+      )}
 
       <TeamBoard
         showLocked={showTeamLocked}

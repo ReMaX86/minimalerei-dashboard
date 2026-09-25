@@ -164,7 +164,7 @@ export function TeamBoard({
   return (
     <div className="flex flex-col gap-3.5">
       <div className="flex items-center gap-3 pt-1.5">
-        <span className="to-display-sm text-to-text">Team</span>
+        <span className="to-display-sm text-to-text">Team Infos</span>
         <span className="h-px flex-1 bg-to-divider" />
         <span className="to-data text-[10px] tracking-[0.12em] text-to-textDisabled">TB WÜLFRATH HERREN</span>
       </div>
