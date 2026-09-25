@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Admin · Training</title>
+<!--
+  REFERENZ-UMSETZUNG des Admin-Reiters „Training".
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=list       Standard: nächste 6 Termine, Wochenplan, Ferienregeln
+    ?state=cancel     Blatt „Training absagen?" mit Grund
+    ?state=cancelled  direkt nach dem Absagen
+    ?state=newtime    neue wöchentliche Trainingszeit
+    ?state=edittime   wöchentliche Trainingszeit bearbeiten
+    ?state=rule       neue Ferienzeit / Sonderregel
+    ?state=special    Ferienzeit mit Sonderzeiten + Sondertermin-Formular
+    ?state=empty      noch keine Ferienzeiten eingetragen
+  Die Seite ist echt klickbar: absagen, zurücknehmen, Modus wechseln, Formulare öffnen.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.10);
+  --to-danger-frame:#5A2027;
+  --to-vacation:#E9B949; --to-vacation-soft:rgba(233,185,73,.12); --to-vacation-frame:rgba(233,185,73,.32);
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;color:var(--to-text)}
+.wrap{width:390px;margin:0 auto;padding:22px 0 28px;display:flex;flex-direction:column;gap:14px}
+.pad{padding-left:20px;padding-right:20px}
+
+.tabswrap{position:relative}
+.tabs{display:flex;gap:6px;padding:2px 20px 8px;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;white-space:nowrap;display:inline-flex;align-items:center;height:34px;padding:0 14px;
+  border-radius:999px;background:var(--to-surface);border:1px solid var(--to-border);
+  color:var(--to-text-2);font-size:13px;font-weight:500}
+.tab[aria-current="page"]{background:var(--to-accent);border-color:var(--to-accent);
+  color:var(--to-on-accent);font-weight:600}
+.tabsfade{position:absolute;right:0;top:0;bottom:8px;width:44px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(10,12,15,0),var(--to-bg) 72%)}
+
+.sec{display:flex;align-items:center;gap:12px;padding-top:4px}
+.sec__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1;flex:1 1 auto}
+.sec__count{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;
+  font-family:inherit;font-weight:600}
+.btn--new{height:32px;padding:0 13px;border-radius:999px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:13px;flex:none}
+
+/* Termine */
+.panel{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.drow{display:flex;align-items:center;gap:12px;min-height:70px;padding:11px 16px;
+  border-top:1px solid var(--to-surface-2)}
+.drow:first-child{border-top:0}
+.drow--off{background:rgba(255,90,103,.04)}
+.date{width:40px;flex:none;display:flex;flex-direction:column;align-items:center;gap:1px}
+.date__dow{font-family:'Geist Mono',monospace;font-size:9px;color:var(--to-text-3)}
+.date__day{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:19px;line-height:1.05}
+.drow--off .date__day{color:var(--to-text-3)}
+.drow--special .date__day{color:var(--to-vacation)}
+.date__mon{font-family:'Geist Mono',monospace;font-size:8px;color:var(--to-text-4)}
+.drow__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+.drow__time{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.drow--off .drow__time{color:var(--to-text-3);text-decoration:line-through}
+.drow__sub{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drow--off .drow__sub{color:var(--to-danger-text)}
+.drow--special .drow__sub{color:var(--to-vacation)}
+.btn--row{height:30px;padding:0 12px;border-radius:999px;background:transparent;
+  border-color:var(--to-danger-frame);color:var(--to-danger-text);font-size:12px;flex:none}
+.btn--undo{border-color:var(--to-line);color:var(--to-text-2)}
+
+/* Wochenleiste */
+.week{display:flex;gap:6px}
+.wd{flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 0;
+  border-radius:14px;background:var(--to-surface);border:1px solid var(--to-border)}
+.wd--on{background:rgba(200,255,46,.10);border-color:var(--to-accent-frame)}
+.wd__abbr{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.06em;color:var(--to-text-4)}
+.wd--on .wd__abbr{color:var(--to-accent)}
+.wd__dot{width:5px;height:5px;border-radius:50%;background:var(--to-border)}
+.wd--on .wd__dot{background:var(--to-accent)}
+
+.wrow{display:flex;align-items:center;gap:12px;min-height:62px;padding:10px 16px;width:100%;
+  border:0;border-top:1px solid var(--to-surface-2);background:transparent;text-align:left}
+.wrow:first-child{border-top:0}
+.badge{width:34px;height:34px;flex:none;border-radius:12px;background:var(--to-surface-2);
+  display:grid;place-items:center;font-family:'Geist Mono',monospace;font-size:10px;font-weight:600;
+  color:var(--to-text-2)}
+.wrow__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.wrow__day{font-size:14px;font-weight:600}
+.wrow__info{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-3)}
+.chev{flex:none}
+
+/* Regeln */
+.rule{border-radius:20px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.rule--off{border-color:var(--to-danger-frame)}
+.rule--special{border-color:var(--to-vacation-frame)}
+.rule__head{display:flex;align-items:center;gap:12px;min-height:66px;padding:11px 16px;width:100%;
+  border:0;background:transparent;text-align:left}
+.rule__icon{width:34px;height:34px;flex:none;border-radius:12px;background:var(--to-surface-2);
+  display:grid;place-items:center}
+.rule--off .rule__icon{background:var(--to-danger-soft)}
+.rule--special .rule__icon{background:var(--to-vacation-soft)}
+.rule__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.rule__range{font-size:14px;font-weight:600}
+.rule__mode{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rule--off .rule__mode{color:var(--to-danger-text)}
+.rule--special .rule__mode{color:var(--to-vacation)}
+.rule__extra{display:flex;flex-direction:column;border-top:1px solid var(--to-surface-2);
+  background:var(--to-surface-3)}
+.xrow{display:flex;align-items:center;gap:10px;min-height:42px;padding:0 16px}
+.xdot{width:5px;height:5px;border-radius:50%;background:var(--to-vacation);flex:none}
+.xrow span:nth-child(2){flex:1 1 auto;font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-2)}
+.addlink{display:flex;align-items:center;min-height:44px;padding:0 16px;border:0;background:transparent;
+  border-top:1px solid var(--to-surface-2);color:var(--to-accent);font-size:13px;font-weight:600;
+  width:100%;text-align:left}
+.empty{border-radius:20px;background:var(--to-surface);border:1px dashed var(--to-line);
+  padding:22px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.empty__title{font-size:14px;font-weight:600}
+.empty__sub{font-size:12px;color:var(--to-text-4);line-height:1.5}
+
+/* Formulare */
+.dhead{display:flex;align-items:center;gap:12px}
+.iconbtn{width:34px;height:34px;flex:none;border-radius:12px;background:var(--to-surface);
+  border:1px solid var(--to-border);display:grid;place-items:center}
+.dhead__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+.dhead__name{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1.1}
+.dhead__meta{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.f{display:flex;flex-direction:column;gap:6px}
+.f__label{font-size:12px;color:var(--to-text-3)}
+.field{height:48px;padding:0 14px;border-radius:14px;background:var(--to-surface);
+  border:1px solid var(--to-line);font-size:15px;width:100%;outline:none}
+.field::placeholder{color:var(--to-text-4)}
+.field:focus{border-color:var(--to-accent-frame)}
+select.field{appearance:none;background-image:
+  linear-gradient(45deg,transparent 50%,#7C8594 50%),linear-gradient(135deg,#7C8594 50%,transparent 50%);
+  background-position:calc(100% - 20px) 21px,calc(100% - 14px) 21px;
+  background-size:6px 6px,6px 6px;background-repeat:no-repeat}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grouplabel{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-text-4)}
+.seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:var(--to-surface-3);
+  border:1px solid var(--to-hairline)}
+.seg button{flex:1 1 0;min-width:0;height:38px;border:0;border-radius:10px;background:transparent;
+  color:var(--to-text-2);font-size:13px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--to-accent);color:var(--to-on-accent);font-weight:600}
+.seg--off button[aria-pressed="true"]{background:var(--to-danger);color:#120507}
+.seg--special button[aria-pressed="true"]{background:var(--to-vacation);color:#1A1405}
+.hint{font-size:11px;color:var(--to-text-4);line-height:1.5}
+.savebar{display:flex;gap:8px;padding-top:4px}
+.btn--primary{flex:1 1 auto;height:48px;border-radius:999px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:15px}
+.btn--cancel{flex:0 0 auto;height:48px;padding:0 20px;border-radius:999px;background:transparent;
+  border-color:var(--to-line);color:var(--to-text-2);font-size:15px}
+.btn--danger-ghost{height:48px;border-radius:999px;background:transparent;
+  border-color:var(--to-danger-frame);color:var(--to-danger-text);font-size:15px;width:100%}
+.subcard{border-radius:16px;background:var(--to-surface-3);border:1px solid var(--to-hairline);
+  padding:14px;display:flex;flex-direction:column;gap:10px}
+.subcard__title{font-size:13px;font-weight:600}
+
+/* Blatt */
+.scrim{position:fixed;inset:0;background:rgba(5,6,8,.74);display:flex;flex-direction:column;
+  justify-content:flex-end;z-index:20}
+.sheet{width:390px;margin:0 auto;background:var(--to-surface);border-top:1px solid var(--to-danger-frame);
+  border-radius:26px 26px 0 0;padding:12px 20px 22px;display:flex;flex-direction:column;gap:13px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1;color:var(--to-danger-text)}
+.sheet__sub{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:999px;
+  background:transparent;border:1px solid var(--to-line);color:var(--to-text-2);font-size:13px}
+.chip[aria-pressed="true"]{background:var(--to-danger-soft);border-color:var(--to-danger-frame);
+  color:var(--to-danger-text);font-weight:600}
+.btn--confirm{height:48px;border-radius:999px;background:var(--to-danger);color:#120507;
+  font-size:15px;width:100%}
+.btn--text{height:24px;border:0;background:transparent;color:var(--to-text-3);font-size:13px;
+  font-weight:400;width:100%}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ============ HAUPTANSICHT ============ -->
+  <div id="vList" style="display:flex;flex-direction:column;gap:14px">
+
+    <div class="tabswrap">
+      <div class="tabs" id="tabs"></div>
+      <span class="tabsfade"></span>
+    </div>
+
+    <div class="sec pad">
+      <span class="sec__title">Nächste Trainings</span>
+      <span class="sec__count">6 TERMINE</span>
+    </div>
+
+    <section class="panel" id="dateList" style="margin:0 20px"></section>
+
+    <div class="sec pad">
+      <span class="sec__title">Wöchentliche Zeiten</span>
+      <button class="btn btn--new" type="button" id="newTime">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" style="stroke-width:2.6;stroke-linecap:round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Neu
+      </button>
+    </div>
+
+    <div class="week pad" id="weekStrip"></div>
+
+    <section class="panel" id="weeklyList" style="margin:0 20px"></section>
+
+    <div class="sec pad">
+      <span class="sec__title">Ferien &amp; Sonderregeln</span>
+      <button class="btn btn--new" type="button" id="newRule">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" style="stroke-width:2.6;stroke-linecap:round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Neu
+      </button>
+    </div>
+
+    <div class="pad" id="ruleList" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+
+  <!-- ============ TRAININGSZEIT ============ -->
+  <div id="vTime" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="tBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__name" id="tTitle">Neue Trainingszeit</span>
+        <span class="dhead__meta" id="tSub">JEDE WOCHE ZUR GLEICHEN ZEIT</span>
+      </span>
+    </div>
+
+    <span class="f"><span class="f__label">Wochentag</span>
+      <select class="field" id="tDay">
+        <option>Montag</option><option>Dienstag</option><option>Mittwoch</option><option>Donnerstag</option>
+        <option>Freitag</option><option>Samstag</option><option>Sonntag</option>
+      </select>
+    </span>
+    <div class="two">
+      <span class="f"><span class="f__label">Beginn</span><input class="field" id="tFrom" placeholder="20:00"></span>
+      <span class="f"><span class="f__label">Ende</span><input class="field" id="tTo" placeholder="21:30"></span>
+    </div>
+    <span class="f"><span class="f__label">Halle / Adresse</span><input class="field" id="tPlace" placeholder="Goethestraße"></span>
+    <span class="hint">Aus dieser Zeit erzeugt die App die anstehenden Termine – die nächsten sechs
+      stehen oben in der Liste.</span>
+
+    <div class="savebar">
+      <button class="btn btn--primary" type="button" id="tSave">Speichern</button>
+      <button class="btn btn--cancel" type="button" id="tCancel">Abbrechen</button>
+    </div>
+    <button class="btn btn--danger-ghost" type="button" id="tDelete" hidden>Trainingszeit löschen</button>
+  </div>
+
+  <!-- ============ FERIENZEIT ============ -->
+  <div id="vRule" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="rBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__name" id="rTitle">Neue Ferienzeit</span>
+        <span class="dhead__meta" id="rSub">GILT FÜR ALLE TRAININGSTAGE IM ZEITRAUM</span>
+      </span>
+    </div>
+
+    <div class="two">
+      <span class="f"><span class="f__label">Von</span><input class="field" id="rFrom" placeholder="tt.mm."></span>
+      <span class="f"><span class="f__label">Bis</span><input class="field" id="rTo" placeholder="tt.mm."></span>
+    </div>
+    <span class="f"><span class="f__label">Notiz</span><input class="field" id="rNote" placeholder="z. B. Herbstferien"></span>
+
+    <div class="f">
+      <span class="grouplabel">WAS PASSIERT IN DIESEM ZEITRAUM?</span>
+      <div class="seg" id="rSeg">
+        <button type="button" data-mode="regular">Regulär</button>
+        <button type="button" data-mode="off">Fällt aus</button>
+        <button type="button" data-mode="special">Sonderzeiten</button>
+      </div>
+      <span class="hint" id="rHint">Reguläres Training findet wie gewohnt statt – der Eintrag ist nur eine Notiz.</span>
+    </div>
+
+    <div id="rSpecial" hidden style="display:flex;flex-direction:column;gap:10px">
+      <span class="grouplabel">SONDERTERMINE</span>
+      <section class="panel" id="specialList"></section>
+      <div class="subcard" id="specialForm">
+        <span class="subcard__title">Sondertermin hinzufügen</span>
+        <span class="f"><span class="f__label">Datum</span><input class="field" placeholder="tt.mm.jjjj"></span>
+        <div class="two">
+          <span class="f"><span class="f__label">Beginn</span><input class="field" placeholder="18:00"></span>
+          <span class="f"><span class="f__label">Ende</span><input class="field" placeholder="19:30"></span>
+        </div>
+        <span class="f"><span class="f__label">Halle / Adresse</span><input class="field" placeholder="Goethestraße"></span>
+        <div class="savebar">
+          <button class="btn btn--primary" type="button">Hinzufügen</button>
+          <button class="btn btn--cancel" type="button" id="specialDone">Fertig</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="savebar">
+      <button class="btn btn--primary" type="button" id="rSave">Speichern</button>
+      <button class="btn btn--cancel" type="button" id="rCancel">Abbrechen</button>
+    </div>
+    <button class="btn btn--danger-ghost" type="button" id="rDelete" hidden>Ferienzeit löschen</button>
+  </div>
+
+</div>
+
+<!-- ============ BLATT: ABSAGEN ============ -->
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet">
+    <span class="sheet__grip"></span>
+    <span class="sheet__title">Training absagen?</span>
+    <span class="sheet__sub" id="cSub">MO 28.09. · 20:00–21:30 · GOETHESTRASSE</span>
+    <span class="f">
+      <span class="f__label">Grund (wird allen angezeigt)</span>
+      <input class="field" id="cReason" placeholder="z. B. Halle belegt">
+    </span>
+    <div class="chips" id="cChips"></div>
+    <span class="hint">Die Zu- und Absagen der Spieler bleiben gespeichert, falls du die Absage
+      zurücknimmst.</span>
+    <button class="btn btn--confirm" type="button" id="cConfirm">Absagen und Team informieren</button>
+    <button class="btn--text" type="button" id="cCancel">Abbrechen</button>
+  </div>
+</div>
+
+<script>
+var STATE = new URLSearchParams(location.search).get('state') || 'list';
+
+var TABS = ['Spieler','Spiele','Kampfgericht','Training','Trikots','Betrachter','Meldungen','Funktionen'];
+var WEEKDAYS = ['MO','DI','MI','DO','FR','SA','SO'];
+var REASONS = ['Spiel','Halle belegt','Feiertag','Trainer fehlt'];
+
+var WEEKLY = [
+  { abbr:'MO', day:'Montag',  info:'20:00–21:30 · GOETHESTRASSE' },
+  { abbr:'FR', day:'Freitag', info:'20:30–22:00 · GOETHESTRASSE' }
+];
+
+/* kind: ok | off | special */
+var DATES = [
+  { dow:'FR', day:'25', mon:'09.', time:'20:30–22:00', place:'GOETHESTRASSE', kind:'ok' },
+  { dow:'MO', day:'28', mon:'09.', time:'20:00–21:30', place:'GOETHESTRASSE', kind:'ok' },
+  { dow:'FR', day:'02', mon:'10.', time:'20:30–22:00', place:'GOETHESTRASSE', kind:'ok' },
+  { dow:'DI', day:'07', mon:'10.', time:'18:00–19:30', place:'SONDERZEIT · HERBSTFERIEN', kind:'special' },
+  { dow:'DI', day:'14', mon:'10.', time:'18:00–19:30', place:'SONDERZEIT · HERBSTFERIEN', kind:'special' },
+  { dow:'DI', day:'21', mon:'10.', time:'18:00–19:30', place:'SONDERZEIT · HERBSTFERIEN', kind:'special' }
+];
+
+var RULES = [
+  { range:'06.10. – 24.10.', note:'Herbstferien', mode:'special',
+    extra:['DI 07.10. · 18:00–19:30 · GOETHESTRASSE','DI 14.10. · 18:00–19:30 · GOETHESTRASSE','DI 21.10. · 18:00–19:30 · GOETHESTRASSE'] },
+  { range:'21.12. – 04.01.', note:'Weihnachtsferien', mode:'off' },
+  { range:'09.02. – 13.02.', note:'Karneval', mode:'regular' }
+];
+
+var view = 'list', sheetFor = null, reason = '', ruleMode = 'regular', showSpecialForm = false;
+var editTime = false, editRule = false, noRules = false;
+
+if (STATE === 'cancel')    { sheetFor = 1; }
+if (STATE === 'cancelled') { DATES[1].kind = 'off'; DATES[1].reason = 'HALLE BELEGT'; }
+if (STATE === 'newtime')   { view = 'time'; }
+if (STATE === 'edittime')  { view = 'time'; editTime = true; }
+if (STATE === 'rule')      { view = 'rule'; }
+if (STATE === 'special')   { view = 'rule'; editRule = true; ruleMode = 'special'; showSpecialForm = true; }
+if (STATE === 'empty')     { noRules = true; }
+
+function el(tag, cls, text){
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+var CHEV = '<svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>';
+var CAL = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" style="stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M3.5 5h17v15a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V5zM3.5 10h17M8 3v3M16 3v3"></path></svg>';
+var CLOCK = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" style="stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M12 7v5l3 2"></path><circle cx="12" cy="12" r="9"></circle></svg>';
+
+function renderTabs(){
+  var host = document.getElementById('tabs');
+  host.innerHTML = '';
+  TABS.forEach(function(t, i){
+    var b = el('button','tab', t);
+    b.type = 'button';
+    if (i === 3) b.setAttribute('aria-current','page');
+    host.appendChild(b);
+  });
+}
+
+function renderDates(){
+  var host = document.getElementById('dateList');
+  host.innerHTML = '';
+  DATES.forEach(function(d, i){
+    var row = el('div','drow' + (d.kind === 'off' ? ' drow--off' : (d.kind === 'special' ? ' drow--special' : '')));
+    var dt = el('span','date');
+    dt.appendChild(el('span','date__dow', d.dow));
+    dt.appendChild(el('span','date__day', d.day));
+    dt.appendChild(el('span','date__mon', d.mon));
+    row.appendChild(dt);
+    var m = el('span','drow__main');
+    m.appendChild(el('span','drow__time', d.time));
+    m.appendChild(el('span','drow__sub', d.kind === 'off' ? ('FÄLLT AUS · ' + (d.reason || 'OHNE GRUND')) : d.place));
+    row.appendChild(m);
+    var b = el('button','btn btn--row' + (d.kind === 'off' ? ' btn--undo' : ''),
+      d.kind === 'off' ? 'Zurücknehmen' : 'Absagen');
+    b.type = 'button';
+    b.onclick = function(){
+      if (d.kind === 'off'){ d.kind = d.wasSpecial ? 'special' : 'ok'; delete d.reason; render(); }
+      else { sheetFor = i; reason = ''; render(); }
+    };
+    row.appendChild(b);
+    host.appendChild(row);
+  });
+}
+
+function renderWeek(){
+  var strip = document.getElementById('weekStrip');
+  strip.innerHTML = '';
+  var active = WEEKLY.map(function(w){ return w.abbr; });
+  WEEKDAYS.forEach(function(d){
+    var on = active.indexOf(d) !== -1;
+    var n = el('span','wd' + (on ? ' wd--on' : ''));
+    n.appendChild(el('span','wd__abbr', d));
+    n.appendChild(el('span','wd__dot'));
+    strip.appendChild(n);
+  });
+
+  var host = document.getElementById('weeklyList');
+  host.innerHTML = '';
+  WEEKLY.forEach(function(w){
+    var b = el('button','wrow');
+    b.type = 'button';
+    b.appendChild(el('span','badge', w.abbr));
+    var m = el('span','wrow__main');
+    m.appendChild(el('span','wrow__day', w.day));
+    m.appendChild(el('span','wrow__info', w.info));
+    b.appendChild(m);
+    b.insertAdjacentHTML('beforeend', CHEV);
+    b.onclick = function(){ view = 'time'; editTime = true; render(); };
+    host.appendChild(b);
+  });
+}
+
+function renderRules(){
+  var host = document.getElementById('ruleList');
+  host.innerHTML = '';
+  if (noRules){
+    var e = el('div','empty');
+    e.appendChild(el('span','empty__title','Keine Ferienzeiten eingetragen'));
+    e.appendChild(el('span','empty__sub','Trag Ferien oder Feiertage ein – die App passt die anstehenden Termine dann automatisch an.'));
+    host.appendChild(e);
+    return;
+  }
+  RULES.forEach(function(r){
+    var card = el('section','rule' + (r.mode === 'off' ? ' rule--off' : (r.mode === 'special' ? ' rule--special' : '')));
+    var head = el('button','rule__head');
+    head.type = 'button';
+    var ic = el('span','rule__icon');
+    ic.style.color = r.mode === 'off' ? 'var(--to-danger-text)' : (r.mode === 'special' ? 'var(--to-vacation)' : 'var(--to-text-2)');
+    ic.insertAdjacentHTML('beforeend', r.mode === 'special' ? CLOCK : CAL);
+    head.appendChild(ic);
+    var m = el('span','rule__main');
+    m.appendChild(el('span','rule__range', r.range));
+    m.appendChild(el('span','rule__mode',
+      (r.mode === 'off' ? 'FÄLLT AUS' : (r.mode === 'special' ? 'SONDERZEITEN' : 'REGULÄR')) +
+      ' · ' + r.note.toUpperCase()));
+    head.appendChild(m);
+    head.insertAdjacentHTML('beforeend', CHEV);
+    head.onclick = function(){ view = 'rule'; editRule = true; ruleMode = r.mode; showSpecialForm = false; render(); };
+    card.appendChild(head);
+
+    if (r.mode === 'special' && r.extra){
+      var x = el('div','rule__extra');
+      r.extra.forEach(function(t){
+        var row = el('div','xrow');
+        row.appendChild(el('span','xdot'));
+        row.appendChild(el('span', null, t));
+        x.appendChild(row);
+      });
+      card.appendChild(x);
+    }
+    host.appendChild(card);
+  });
+}
+
+function renderTime(){
+  document.getElementById('tTitle').textContent = editTime ? 'Trainingszeit ändern' : 'Neue Trainingszeit';
+  document.getElementById('tSub').textContent = editTime ? 'MONTAG · 20:00–21:30' : 'JEDE WOCHE ZUR GLEICHEN ZEIT';
+  document.getElementById('tDelete').hidden = !editTime;
+  if (editTime){
+    document.getElementById('tFrom').value = '20:00';
+    document.getElementById('tTo').value = '21:30';
+    document.getElementById('tPlace').value = 'Goethestraße';
+  }
+}
+
+function renderRule(){
+  document.getElementById('rTitle').textContent = editRule ? 'Ferienzeit ändern' : 'Neue Ferienzeit';
+  document.getElementById('rSub').textContent = editRule ? 'HERBSTFERIEN · 06.10.–24.10.' : 'GILT FÜR ALLE TRAININGSTAGE IM ZEITRAUM';
+  document.getElementById('rDelete').hidden = !editRule;
+  if (editRule){
+    document.getElementById('rFrom').value = '06.10.';
+    document.getElementById('rTo').value = '24.10.';
+    document.getElementById('rNote').value = 'Herbstferien';
+  }
+  var seg = document.getElementById('rSeg');
+  seg.className = 'seg' + (ruleMode === 'off' ? ' seg--off' : (ruleMode === 'special' ? ' seg--special' : ''));
+  Array.prototype.forEach.call(seg.querySelectorAll('button'), function(b){
+    b.setAttribute('aria-pressed', b.getAttribute('data-mode') === ruleMode ? 'true' : 'false');
+  });
+  document.getElementById('rHint').textContent =
+    ruleMode === 'off' ? 'Alle Trainings in diesem Zeitraum fallen aus. Das Team sieht die Notiz als Grund.'
+    : ruleMode === 'special' ? 'Die regulären Termine entfallen; stattdessen gelten die Sondertermine unten.'
+    : 'Reguläres Training findet wie gewohnt statt – der Eintrag ist nur eine Notiz.';
+
+  document.getElementById('rSpecial').hidden = (ruleMode !== 'special');
+  document.getElementById('rSpecial').style.display = (ruleMode === 'special') ? 'flex' : 'none';
+  document.getElementById('specialForm').hidden = !showSpecialForm;
+
+  var host = document.getElementById('specialList');
+  host.innerHTML = '';
+  var items = (editRule && RULES[0].extra) ? RULES[0].extra : [];
+  if (!items.length){
+    var e = el('div','xrow');
+    e.style.minHeight = '48px';
+    e.appendChild(el('span', null, 'Noch keine Sondertermine eingetragen.'));
+    e.firstChild.style.color = 'var(--to-text-4)';
+    host.appendChild(e);
+  } else {
+    items.forEach(function(t){
+      var row = el('div','xrow');
+      row.style.minHeight = '48px';
+      row.appendChild(el('span','xdot'));
+      row.appendChild(el('span', null, t));
+      row.insertAdjacentHTML('beforeend','<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#7C8594" style="stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M8 7l1 13h6l1-13"></path></svg>');
+      host.appendChild(row);
+    });
+  }
+  if (!showSpecialForm){
+    var add = el('button','addlink','+ Sondertermin hinzufügen');
+    add.type = 'button';
+    add.onclick = function(){ showSpecialForm = true; render(); };
+    host.appendChild(add);
+  }
+}
+
+function renderSheet(){
+  var s = document.getElementById('scrim');
+  s.hidden = (sheetFor === null);
+  if (sheetFor === null) return;
+  var d = DATES[sheetFor];
+  document.getElementById('cSub').textContent =
+    (d.dow + ' ' + d.day + '.' + d.mon + ' · ' + d.time + ' · ' + d.place).toUpperCase();
+  var host = document.getElementById('cChips');
+  host.innerHTML = '';
+  REASONS.forEach(function(r){
+    var b = el('button','chip', r);
+    b.type = 'button';
+    b.setAttribute('aria-pressed', reason === r ? 'true' : 'false');
+    b.onclick = function(){
+      reason = (reason === r ? '' : r);
+      document.getElementById('cReason').value = reason;
+      render();
+    };
+    host.appendChild(b);
+  });
+}
+
+function render(){
+  [['vList','list'],['vTime','time'],['vRule','rule']].forEach(function(p){
+    var n = document.getElementById(p[0]);
+    var on = (view === p[1]);
+    n.hidden = !on;
+    n.style.display = on ? 'flex' : 'none';
+  });
+  if (view === 'list'){ renderDates(); renderWeek(); renderRules(); }
+  if (view === 'time') renderTime();
+  if (view === 'rule') renderRule();
+  renderSheet();
+}
+
+document.getElementById('newTime').onclick = function(){ view = 'time'; editTime = false; render(); };
+document.getElementById('newRule').onclick = function(){ view = 'rule'; editRule = false; ruleMode = 'regular'; showSpecialForm = false; render(); };
+['tBack','tCancel','tSave'].forEach(function(id){
+  document.getElementById(id).onclick = function(){ view = 'list'; render(); };
+});
+['rBack','rCancel','rSave'].forEach(function(id){
+  document.getElementById(id).onclick = function(){ view = 'list'; render(); };
+});
+document.getElementById('specialDone').onclick = function(){ showSpecialForm = false; render(); };
+Array.prototype.forEach.call(document.querySelectorAll('#rSeg button'), function(b){
+  b.onclick = function(){ ruleMode = b.getAttribute('data-mode'); render(); };
+});
+document.getElementById('cCancel').onclick = function(){ sheetFor = null; render(); };
+document.getElementById('cConfirm').onclick = function(){
+  var d = DATES[sheetFor];
+  d.wasSpecial = (d.kind === 'special');
+  d.kind = 'off';
+  d.reason = (document.getElementById('cReason').value || reason || 'ohne Grund').toUpperCase();
+  sheetFor = null;
+  render();
+};
+document.getElementById('scrim').onclick = function(e){ if (e.target === this){ sheetFor = null; render(); } };
+
+renderTabs();
+render();
+</script>
+</body>
+</html>
