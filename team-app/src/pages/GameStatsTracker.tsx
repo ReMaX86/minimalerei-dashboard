@@ -636,20 +636,6 @@ export function GameStatsTracker() {
     }
   }
 
-  // Zurückspringen über die Viertel-Leiste (§8) — wie bisher mit
-  // Rückfrage, jetzt aber serverseitig persistiert statt nur lokal.
-  async function jumpToQuarter(q: number) {
-    if (!gameId || q === quarter) return;
-    const ok = window.confirm(`Ist ${quarterLabel(quarter)} wirklich beendet und möchtest du zu ${quarterLabel(q)} wechseln?`);
-    if (!ok) return;
-    const { error: quarterError } = await supabase.rpc('set_game_quarter', { p_game_id: gameId, p_quarter: q });
-    if (quarterError) {
-      setError('Viertel konnte nicht gewechselt werden.');
-      return;
-    }
-    setGame((g) => (g ? { ...g, current_quarter: q } : g));
-  }
-
   async function reopen() {
     if (!gameId || busy) return;
     setBusy(true);
@@ -816,16 +802,19 @@ export function GameStatsTracker() {
               <span className="to-number text-[40px] leading-none text-to-text2 min-[900px]:text-[30px]">{teamScore.opponent}</span>
             </span>
           </div>
+          {/* Nur noch Anzeige, nicht mehr antippbar — Viertel wechseln geht
+              ausschließlich über den "Viertel beenden"-Knopf/das Blatt unten,
+              damit es nur einen einzigen Weg dafür gibt (auf Nutzerwunsch:
+              zwei verschiedene Bestätigungsdialoge für dieselbe Aktion waren
+              verwirrend). */}
           <div className="flex gap-1.5">
             {[1, 2, 3, 4].map((q) => {
               const qs = quarterScores.find((x) => x.quarter === q);
               const done = q < quarter;
               const live = q === quarter;
               return (
-                <button
+                <span
                   key={q}
-                  type="button"
-                  onClick={() => jumpToQuarter(q)}
                   className={`flex flex-1 flex-col items-center gap-0.5 rounded-to-md border py-2 ${
                     live
                       ? 'flex-[1.4] border-to-accent bg-to-accent'
@@ -840,12 +829,10 @@ export function GameStatsTracker() {
                   <span className={`to-data text-[8px] ${live ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>
                     {live ? 'LÄUFT' : qs ? `${qs.us}:${qs.opponent}` : '–'}
                   </span>
-                </button>
+                </span>
               );
             })}
-            <button
-              type="button"
-              onClick={() => jumpToQuarter(quarter > 4 ? quarter + 1 : 5)}
+            <span
               className={`flex flex-col items-center gap-0.5 rounded-to-md border px-3 py-2 ${
                 quarter > 4 ? 'border-to-accent bg-to-accent' : 'border-to-divider bg-transparent'
               }`}
@@ -854,7 +841,7 @@ export function GameStatsTracker() {
                 {quarter > 4 ? quarterLabel(quarter) : 'OT'}
               </span>
               <span className={`to-data text-[8px] ${quarter > 4 ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>{quarter > 4 ? 'LÄUFT' : '–'}</span>
-            </button>
+            </span>
           </div>
           <div className="flex items-center gap-2.5">
             <span className="to-data text-[9px] tracking-[0.12em] text-to-text3">TEAMFOULS Q{quarter}</span>
