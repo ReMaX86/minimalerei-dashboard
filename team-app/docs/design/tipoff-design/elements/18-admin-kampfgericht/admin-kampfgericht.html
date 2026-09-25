@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TipOff · Admin · Kampfgericht</title>
+<!--
+  REFERENZ-UMSETZUNG des Admin-Reiters „Kampfgericht".
+  Werte entsprechen tokens.css – in der App die Token-Variablen verwenden, nicht diese Datei einbinden.
+
+  Zustände über die URL:
+    ?state=list      nach der Meldefrist, offene Positionen zum Zuteilen (Standard)
+    ?state=before    vor der Meldefrist – Spieler tragen sich noch selbst ein
+    ?state=done      alles zugeteilt
+    ?state=assign    Blatt „Wer übernimmt?", sortiert nach wenigsten Einsätzen
+    ?state=past      vergangene Termine aufgeklappt
+    ?state=detail    Detailseite eines Termins
+    ?state=settings  Einstellungen (Meldefrist, Jahrgänge/Teams)
+    ?state=edit      Termin bearbeiten
+    ?state=new       Neuen Termin anlegen
+  Die Seite ist echt klickbar: zuteilen, aufklappen, Termin öffnen, Einstellungen öffnen.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+:root{
+  --to-bg:#0A0C0F; --to-surface:#12151A; --to-surface-2:#1A1E25; --to-surface-3:#14181E;
+  --to-border:#232830; --to-line:#2A303A; --to-hairline:#1F242C;
+  --to-text:#F2F4F7; --to-text-2:#A3ABB8; --to-text-3:#7C8594; --to-text-4:#5B626D;
+  --to-accent:#C8FF2E; --to-on-accent:#0A0C0F; --to-accent-soft:rgba(200,255,46,.12);
+  --to-accent-frame:#3A4A12;
+  --to-danger:#FF5A67; --to-danger-text:#FF7A85; --to-danger-soft:rgba(255,90,103,.10);
+  --to-danger-frame:#5A2027;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--to-bg);color:var(--to-text);
+  font-family:'Geist',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer}
+input,select{font-family:inherit;color:var(--to-text)}
+.wrap{width:390px;margin:0 auto;padding:22px 0 28px;display:flex;flex-direction:column;gap:14px}
+.pad{padding-left:20px;padding-right:20px}
+
+/* Reiterleiste */
+.tabswrap{position:relative}
+.tabs{display:flex;gap:6px;padding:2px 20px 8px;overflow-x:auto;flex-wrap:nowrap;
+  scroll-snap-type:x proximity;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;scroll-snap-align:start;white-space:nowrap;display:inline-flex;align-items:center;
+  height:34px;padding:0 14px;border-radius:999px;background:var(--to-surface);
+  border:1px solid var(--to-border);color:var(--to-text-2);font-size:13px;font-weight:500}
+.tab[aria-current="page"]{background:var(--to-accent);border-color:var(--to-accent);
+  color:var(--to-on-accent);font-weight:600}
+.tabsfade{position:absolute;right:0;top:0;bottom:8px;width:44px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(10,12,15,0),var(--to-bg) 72%)}
+
+/* Meldungsblock */
+.banner{border-radius:20px;padding:15px 16px;display:flex;flex-direction:column;gap:9px}
+.banner--warn{background:var(--to-danger-soft);border:1px solid var(--to-danger-frame)}
+.banner--info{background:var(--to-surface);border:1px solid var(--to-border)}
+.banner--ok{background:rgba(200,255,46,.06);border:1px solid var(--to-accent-frame);
+  flex-direction:row;align-items:center;gap:12px}
+.banner__top{display:flex;align-items:center;gap:10px}
+.banner__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;flex:1 1 auto}
+.banner--warn .banner__label{color:var(--to-danger-text)}
+.banner--info .banner__label{color:var(--to-text-3)}
+.banner__num{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:22px;line-height:1}
+.banner--warn .banner__num{color:var(--to-danger-text)}
+.banner--info .banner__num{color:var(--to-text-2)}
+.banner__text{font-size:13px;color:var(--to-text-2);line-height:1.5}
+.banner__okmain{flex:1 1 auto;display:flex;flex-direction:column;gap:3px}
+.banner__oktitle{font-size:14px;font-weight:600;color:var(--to-accent)}
+.banner__oksub{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-3)}
+
+/* Panels und Zeilen */
+.panel{border-radius:22px;background:var(--to-surface);border:1px solid var(--to-border);
+  overflow:hidden;display:flex;flex-direction:column}
+.panel--past{border-color:var(--to-hairline)}
+.orow{display:flex;align-items:center;gap:12px;min-height:64px;padding:10px 16px;
+  border-top:1px solid var(--to-surface-2)}
+.orow:first-child{border-top:0}
+.date{width:40px;flex:none;display:flex;flex-direction:column;align-items:center;gap:1px}
+.date__dow{font-family:'Geist Mono',monospace;font-size:9px;color:var(--to-text-3)}
+.date__day{font-family:'Archivo',sans-serif;font-stretch:62%;font-weight:800;font-size:19px;line-height:1.05}
+.date__mon{font-family:'Geist Mono',monospace;font-size:8px;color:var(--to-text-4)}
+.orow__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+.orow__role{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.orow__where{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;
+  font-family:inherit;font-weight:600}
+.btn--assign{height:34px;padding:0 14px;border-radius:999px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:13px;flex:none}
+.btn--new{height:34px;padding:0 14px;border-radius:999px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:13px;flex:none}
+
+.settingsrow{display:flex;align-items:center;gap:12px;min-height:58px;padding:10px 16px;width:100%;
+  border-radius:18px;background:var(--to-surface);border:1px solid var(--to-border);text-align:left}
+.settingsrow__main{flex:1 1 auto;display:flex;flex-direction:column;gap:3px}
+.settingsrow__label{font-size:14px;font-weight:500}
+.settingsrow__sub{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-3)}
+
+.sec{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;padding:4px 0 0;text-align:left}
+.sec__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sec__rule{flex:1 1 auto;height:1px;background:var(--to-hairline)}
+.sec__count{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-4)}
+
+.trow{display:flex;align-items:center;gap:12px;min-height:72px;padding:12px 16px;width:100%;
+  border:0;border-top:1px solid var(--to-surface-2);background:transparent;text-align:left}
+.trow:first-child{border-top:0}
+.trow--next{background:rgba(200,255,46,.04)}
+.trow--next .date__day{color:var(--to-accent)}
+.trow__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+.trow__team{font-size:14px;font-weight:600;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow__info{font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;
+  font-family:'Geist Mono',monospace;font-size:9px;font-weight:600;flex:none}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill--ok{background:var(--to-accent-soft);color:var(--to-accent)}
+.pill--open{background:rgba(255,90,103,.14);color:var(--to-danger-text)}
+.pill--past{background:var(--to-surface-2);color:var(--to-text-3)}
+.pill--past::before{display:none}
+.chev{flex:none}
+.trow--past{min-height:62px}
+.trow--past .trow__team{color:var(--to-text-2)}
+
+/* Detailseite */
+.dhead{display:flex;align-items:flex-start;gap:12px}
+.iconbtn{width:34px;height:34px;flex:none;border-radius:12px;background:var(--to-surface);
+  border:1px solid var(--to-border);display:grid;place-items:center}
+.dhead__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px}
+.dhead__name{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1.1}
+.dhead__meta{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.grouplabel{font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--to-text-4)}
+.roles{display:flex;flex-direction:column;border-radius:16px;background:var(--to-surface);
+  border:1px solid var(--to-hairline);overflow:hidden}
+.rrow{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 14px;
+  border-top:1px solid var(--to-surface-2)}
+.rrow:first-child{border-top:0}
+.rrow__label{flex:1 1 auto;font-size:14px}
+.rrow__label--muted{color:var(--to-text-4)}
+.rrow__label--soft{color:var(--to-text-2)}
+.chip{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-radius:999px;
+  border:1px solid transparent;background:transparent;font-size:13px;flex:none}
+.chip--filled{background:var(--to-surface-2);border-color:var(--to-surface-2);color:var(--to-text);font-weight:500}
+.chip--open{border-color:var(--to-danger-frame);color:var(--to-danger-text);font-weight:600}
+.chip--other{color:var(--to-text-4);font-weight:500;cursor:default}
+.chip svg{width:12px;height:12px;opacity:.55}
+.chip--other svg{display:none}
+.hint{font-size:11px;color:var(--to-text-4);line-height:1.5}
+.actions{display:flex;flex-direction:column;border-radius:16px;background:var(--to-surface);
+  border:1px solid var(--to-hairline);overflow:hidden}
+.act{display:flex;align-items:center;gap:12px;min-height:54px;padding:8px 14px;width:100%;
+  border:0;border-top:1px solid var(--to-surface-2);background:transparent;text-align:left}
+.act:first-child{border-top:0}
+.act__main{flex:1 1 auto;display:flex;flex-direction:column;gap:2px}
+.act__label{font-size:14px;font-weight:500}
+.act__sub{font-size:11px;color:var(--to-text-4)}
+.act__label--danger{color:var(--to-danger-text)}
+
+/* Einstellungen */
+.card{border-radius:20px;background:var(--to-surface);border:1px solid var(--to-border);
+  display:flex;flex-direction:column}
+.card__pad{padding:16px;display:flex;flex-direction:column;gap:11px}
+.card__label{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--to-text-3)}
+.card__text{font-size:12px;color:var(--to-text-3);line-height:1.55}
+.inputrow{display:flex;gap:8px}
+.field{flex:1 1 auto;min-width:0;height:46px;padding:0 14px;border-radius:14px;background:#0F1216;
+  border:1px solid var(--to-line);font-size:15px;outline:none}
+.field::placeholder{color:var(--to-text-4)}
+.field:focus{border-color:var(--to-accent-frame)}
+.btn--save{height:46px;padding:0 18px;border-radius:14px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:14px;flex:none}
+.btn--ghost{height:46px;padding:0 16px;border-radius:14px;background:transparent;
+  border-color:var(--to-line);color:var(--to-text-2);font-size:13px;flex:none}
+.btn--small{height:26px;padding:0 11px;border-radius:999px;background:transparent;
+  border-color:var(--to-line);color:var(--to-text-2);font-size:12px;flex:none}
+.teamrow{display:flex;align-items:center;gap:12px;min-height:46px;padding:0 16px;
+  border-top:1px solid var(--to-surface-2)}
+.teamrow__name{flex:1 1 auto;font-size:14px}
+.teamrow__count{font-family:'Geist Mono',monospace;font-size:9px;color:var(--to-text-4)}
+.iconghost{width:30px;height:30px;flex:none;border:0;background:transparent;display:grid;place-items:center}
+
+/* Formular */
+.f{display:flex;flex-direction:column;gap:6px}
+.f__label{font-size:12px;color:var(--to-text-3)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fieldblock{height:48px;padding:0 14px;border-radius:14px;background:var(--to-surface);
+  border:1px solid var(--to-line);font-size:15px;width:100%;outline:none}
+select.fieldblock{appearance:none;background-image:
+  linear-gradient(45deg,transparent 50%,#7C8594 50%),linear-gradient(135deg,#7C8594 50%,transparent 50%);
+  background-position:calc(100% - 20px) 21px,calc(100% - 14px) 21px;
+  background-size:6px 6px,6px 6px;background-repeat:no-repeat}
+.checks{display:flex;flex-direction:column;border-radius:16px;background:var(--to-surface);
+  border:1px solid var(--to-hairline);overflow:hidden}
+.check{display:flex;align-items:center;gap:12px;min-height:52px;padding:8px 14px;width:100%;
+  border:0;border-top:1px solid var(--to-surface-2);background:transparent;text-align:left}
+.check:first-child{border-top:0}
+.check__box{width:22px;height:22px;flex:none;border-radius:7px;border:1.5px solid var(--to-line);
+  display:grid;place-items:center}
+.check[aria-pressed="true"] .check__box{background:var(--to-accent);border-color:var(--to-accent)}
+.check__box svg{opacity:0}
+.check[aria-pressed="true"] .check__box svg{opacity:1}
+.check__label{flex:1 1 auto;font-size:14px}
+.savebar{display:flex;gap:8px;padding-top:4px}
+.btn--primary{flex:1 1 auto;height:48px;border-radius:999px;background:var(--to-accent);
+  color:var(--to-on-accent);font-size:15px}
+.btn--cancel{flex:0 0 auto;height:48px;padding:0 20px;border-radius:999px;background:transparent;
+  border-color:var(--to-line);color:var(--to-text-2);font-size:15px}
+
+/* Blatt */
+.scrim{position:fixed;inset:0;background:rgba(5,6,8,.74);display:flex;flex-direction:column;
+  justify-content:flex-end;z-index:20}
+.sheet{width:390px;margin:0 auto;background:var(--to-surface);border-top:1px solid var(--to-border);
+  border-radius:26px 26px 0 0;padding:12px 20px 22px;display:flex;flex-direction:column;gap:13px}
+.sheet__grip{width:38px;height:4px;border-radius:2px;background:var(--to-line);align-self:center}
+.sheet__title{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:800;font-style:italic;
+  font-size:20px;letter-spacing:-.035em;line-height:1}
+.sheet__sub{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--to-text-3)}
+.picker{display:flex;flex-direction:column;border-radius:18px;background:#0F1216;
+  border:1px solid var(--to-hairline);overflow:hidden;max-height:302px;overflow-y:auto}
+.prow{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 14px;width:100%;
+  border:0;border-top:1px solid var(--to-surface-2);background:transparent;text-align:left}
+.prow:first-child{border-top:0}
+.prow--me{background:rgba(200,255,46,.05)}
+.av{width:30px;height:30px;flex:none;border-radius:50%;background:var(--to-surface-2);
+  display:grid;place-items:center;font-family:'Geist Mono',monospace;font-size:10px;color:var(--to-text-3)}
+.prow--me .av{background:var(--to-accent-soft);border:1px solid var(--to-accent-frame);color:var(--to-accent)}
+.prow__name{flex:1 1 auto;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow--me .prow__name{color:var(--to-accent);font-weight:600}
+.count{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;
+  background:var(--to-surface-2);color:var(--to-text-2);
+  font-family:'Geist Mono',monospace;font-size:10px;font-weight:600;flex:none}
+.count--zero{background:var(--to-accent-soft);color:var(--to-accent)}
+.btn--wide{height:44px;border-radius:999px;background:transparent;border-color:var(--to-line);
+  color:var(--to-text-2);font-size:14px;width:100%}
+.btn--text{height:24px;border:0;background:transparent;color:var(--to-text-3);font-size:13px;font-weight:400;width:100%}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ============ HAUPTANSICHT ============ -->
+  <div id="vMain" style="display:flex;flex-direction:column;gap:14px">
+
+    <div class="tabswrap">
+      <div class="tabs" id="tabs"></div>
+      <span class="tabsfade"></span>
+    </div>
+
+    <div class="pad" id="bannerHost"></div>
+
+    <section class="panel" id="openList" style="margin:0 20px" hidden></section>
+
+    <div class="pad">
+      <button class="settingsrow" type="button" id="toSettings">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#7C8594" style="stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none" aria-hidden="true"><path d="M11 4.5h2M12 4.5v3"></path><circle cx="12" cy="14" r="7.5"></circle><path d="M12 14v-3.5"></path></svg>
+        <span class="settingsrow__main">
+          <span class="settingsrow__label">Einstellungen</span>
+          <span class="settingsrow__sub" id="settingsSub">MELDEFRIST 10.10. · 7 TEAMS</span>
+        </span>
+        <svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </button>
+    </div>
+
+    <div class="sec pad">
+      <span class="sec__title">Termine</span>
+      <span class="sec__rule"></span>
+      <button class="btn btn--new" type="button">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" style="stroke-width:2.6;stroke-linecap:round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Neu
+      </button>
+    </div>
+
+    <section class="panel" id="dateList" style="margin:0 20px"></section>
+
+    <button class="sec pad" id="pastToggle" type="button" aria-expanded="false">
+      <span class="sec__title">Vergangene Termine</span>
+      <span class="sec__rule"></span>
+      <span class="sec__count" id="pastCount">2</span>
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#7C8594" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none" aria-hidden="true"><path id="pastChev" d="M6 9l6 6 6-6"></path></svg>
+    </button>
+
+    <section class="panel panel--past" id="pastList" style="margin:0 20px" hidden></section>
+  </div>
+
+  <!-- ============ DETAILSEITE ============ -->
+  <div id="vDetail" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="dBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__name" id="dName">TBW U18</span>
+        <span class="dhead__meta" id="dMeta">SO 27.09. · 17:00 · GEGEN METTMANN</span>
+      </span>
+      <span class="pill" id="dPill">1 OFFEN</span>
+    </div>
+
+    <span class="grouplabel">ZUTEILUNG</span>
+    <div class="roles" id="dRoles"></div>
+    <span class="hint" id="dHint">Nach der Meldefrist kannst nur noch du oder die Kapitäne zuteilen.</span>
+
+    <div class="actions">
+      <button class="act" type="button" id="toEdit">
+        <span class="act__main">
+          <span class="act__label">Termin bearbeiten</span>
+          <span class="act__sub">Datum, Uhrzeit, Team, Gegner, Halle, Aufgaben</span>
+        </span>
+        <svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </button>
+      <button class="act" type="button">
+        <span class="act__main"><span class="act__label act__label--danger">Termin löschen</span></span>
+        <svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ EINSTELLUNGEN ============ -->
+  <div id="vSettings" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="sBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main"><span class="dhead__name">Einstellungen</span></span>
+    </div>
+
+    <div class="card">
+      <div class="card__pad">
+        <span class="card__label">MELDEFRIST</span>
+        <span class="card__text">Bis dahin tragen sich die Spieler selbst ein. Danach sind die Zuteilungen
+          fix – ändern kannst nur noch du oder die Kapitäne.</span>
+        <div class="inputrow">
+          <input class="field" id="deadline" value="10.10.2026" placeholder="tt.mm.jjjj">
+          <button class="btn btn--save" type="button">Speichern</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="hint" style="flex:1 1 auto">Leer lassen = keine Frist, Spieler können jederzeit ändern.</span>
+          <button class="btn btn--small" type="button">Frist löschen</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__pad" style="padding-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="card__label" style="flex:1 1 auto">JAHRGÄNGE / TEAMS</span>
+          <span class="card__label" id="teamCount">7</span>
+        </div>
+        <span class="card__text">Auswahlliste beim Anlegen eines Termins.</span>
+        <div class="inputrow">
+          <input class="field" placeholder="z. B. TBW U16" style="height:42px">
+          <button class="btn btn--ghost" type="button" style="height:42px">Hinzufügen</button>
+        </div>
+      </div>
+      <div id="teamList"></div>
+    </div>
+  </div>
+
+  <!-- ============ FORMULAR ============ -->
+  <div id="vEdit" class="pad" style="display:none;flex-direction:column;gap:14px" hidden>
+    <div class="dhead">
+      <button class="iconbtn" type="button" id="eBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#A3ABB8" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="dhead__main">
+        <span class="dhead__name" id="eTitle">Termin bearbeiten</span>
+        <span class="dhead__meta" id="eSub">TBW U18 · SO 27.09.</span>
+      </span>
+    </div>
+
+    <div class="two">
+      <span class="f"><span class="f__label">Datum</span><input class="fieldblock" id="eDate" value="27.09.2026"></span>
+      <span class="f"><span class="f__label">Uhrzeit</span><input class="fieldblock" id="eTime" value="17:00"></span>
+    </div>
+    <span class="f"><span class="f__label">Team</span>
+      <select class="fieldblock" id="eTeam">
+        <option>TBW U 18</option><option>TBW Herren 1</option><option>TBW U 12-1</option>
+        <option>TBW U 12-2</option><option>TBW U 14-1</option><option>TBW U 14-2</option><option>TBW U 16</option>
+      </select>
+    </span>
+    <span class="f"><span class="f__label">Gegner (optional)</span><input class="fieldblock" id="eOpp" value="Mettmann" placeholder="z. B. DJK Erkrath"></span>
+    <span class="f"><span class="f__label">Halle / Adresse</span><input class="fieldblock" id="ePlace" value="Flurstraße 10, 40822 Mettmann" placeholder="Halle / Adresse"></span>
+
+    <span class="grouplabel">WELCHE AUFGABEN MÜSSEN WIR STELLEN?</span>
+    <div class="checks" id="eChecks"></div>
+    <span class="hint">Nicht angehakt heißt: Diese Position stellt ein anderes Team – sie erscheint bei
+      uns als „anderes Team" und ist nicht zuteilbar.</span>
+
+    <div class="savebar">
+      <button class="btn btn--primary" type="button" id="eSave">Speichern</button>
+      <button class="btn btn--cancel" type="button" id="eCancel">Abbrechen</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============ BLATT: WER ÜBERNIMMT ============ -->
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet">
+    <span class="sheet__grip"></span>
+    <span class="sheet__title">Wer übernimmt?</span>
+    <span class="sheet__sub" id="sheetSub">ANSCHREIBEN · TBW U18 · SO 27.09.</span>
+    <span class="hint">Sortiert nach den wenigsten Einsätzen in dieser Saison.</span>
+    <div class="picker" id="picker"></div>
+    <button class="btn btn--wide" type="button" id="clearSlot">Offen lassen</button>
+    <button class="btn--text" type="button" id="closeSheet">Abbrechen</button>
+  </div>
+</div>
+
+<script>
+var STATE = new URLSearchParams(location.search).get('state') || 'list';
+
+var TABS = ['Spieler','Spiele','Kampfgericht','Training','Trikots','Betrachter','Meldungen','Funktionen'];
+var ROLES = ['24-Sek.-Uhr','Anschreiben','Zeit & Punkte'];
+
+/* '-' = anderes Team (Aufgabe beim Anlegen nicht angehakt), null = offen */
+var DATES = [
+  { dow:'SA', day:'19', mon:'09.', team:'TBW U12-1',    info:'14:00 · BARMEN',
+    roles:['-','Axel Flaujac','-'] },
+  { dow:'FR', day:'25', mon:'09.', team:'TBW Herren 1', info:'20:00 · GEGEN SOLINGEN 2',
+    roles:['-','Daniel Tekeste','-'], next:true },
+  { dow:'SO', day:'27', mon:'09.', team:'TBW U18',      info:'17:00 · GEGEN METTMANN',
+    roles:['-',null,'-'] },
+  { dow:'FR', day:'02', mon:'10.', team:'TBW U18',      info:'18:30 · GEGEN LANGENFELD',
+    roles:[null,'Peter Woznicki',null] }
+];
+
+var PAST = [
+  { dow:'SO', day:'14', mon:'09.', team:'TBW U16', info:'12:00 · GEGEN RATINGEN',
+    roles:['-','Sven Hasenpusch','Marc Rewald'] },
+  { dow:'FR', day:'05', mon:'09.', team:'TBW Herren 1', info:'20:00 · GEGEN BG MONHEIM',
+    roles:['Peter Woznicki','Gürkan Ertas','-'] }
+];
+
+/* nach Einsätzen sortiert – dieselbe Zahl wie im Kampfgericht-Reiter */
+var PLAYERS = [
+  ['Axel Flaujac', 0], ['Finn Weidemann', 0], ['Benaia Tesfamariam', 1], ['Daniel Tekeste', 1],
+  ['Gürkan Ertas', 1], ['Jens Mertens', 1], ['Marc Rewald', 2], ['Peter Woznicki', 3]
+];
+var ME = 'Marc Rewald';
+
+var TEAMS = [
+  ['TBW Herren 1','4 TERMINE'], ['TBW U 12-1','2 TERMINE'], ['TBW U 12-2','1 TERMIN'],
+  ['TBW U 14-1','3 TERMINE'], ['TBW U 14-2','2 TERMINE'], ['TBW U 16','3 TERMINE'], ['TBW U 18','5 TERMINE']
+];
+
+var view = 'main', pastOpen = false, detIdx = 2, sheet = null, isNew = false;
+var deadlinePassed = true, hasDeadline = true;
+var checks = [false, true, false];
+
+if (STATE === 'before')   { deadlinePassed = false; }
+if (STATE === 'done')     { DATES[2].roles[1] = 'Axel Flaujac'; DATES[3].roles[0] = 'Finn Weidemann'; DATES[3].roles[2] = 'Jens Mertens'; }
+if (STATE === 'past')     { pastOpen = true; }
+if (STATE === 'detail')   { view = 'detail'; }
+if (STATE === 'settings') { view = 'settings'; }
+if (STATE === 'edit')     { view = 'edit'; }
+if (STATE === 'new')      { view = 'edit'; isNew = true; }
+if (STATE === 'assign')   { sheet = { d:2, r:1 }; }
+
+function el(tag, cls, text){
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+var CHEV = '<svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5B626D" style="stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>';
+var CHEVDOWN = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" style="stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>';
+var TRASH = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#7C8594" style="stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M8 7l1 13h6l1-13"></path></svg>';
+var CHECKICON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#0A0C0F" style="stroke-width:3;stroke-linecap:round;stroke-linejoin:round" aria-hidden="true"><path d="M5 13l4 4L19 7"></path></svg>';
+
+function openCount(d){ return d.roles.filter(function(r){ return r === null; }).length; }
+function totalOpen(){ return DATES.reduce(function(s, d){ return s + openCount(d); }, 0); }
+function initials(n){ return n.split(' ').map(function(p){ return p.charAt(0); }).join('').slice(0,2).toUpperCase(); }
+
+function renderTabs(){
+  var host = document.getElementById('tabs');
+  host.innerHTML = '';
+  TABS.forEach(function(t, i){
+    var b = el('button','tab', t);
+    b.type = 'button';
+    if (i === 2) b.setAttribute('aria-current','page');
+    host.appendChild(b);
+  });
+}
+
+function renderBanner(){
+  var host = document.getElementById('bannerHost');
+  host.innerHTML = '';
+  var open = totalOpen();
+
+  if (!hasDeadline){
+    var n0 = el('div','banner banner--info');
+    var t0 = el('div','banner__top');
+    t0.appendChild(el('span','banner__label','KEINE MELDEFRIST GESETZT'));
+    t0.appendChild(el('span','banner__num', String(open)));
+    n0.appendChild(t0);
+    n0.appendChild(el('span','banner__text','Die Spieler können sich jederzeit selbst eintragen und wieder abwählen.'));
+    host.appendChild(n0);
+    return;
+  }
+  if (!deadlinePassed){
+    var n1 = el('div','banner banner--info');
+    var t1 = el('div','banner__top');
+    t1.appendChild(el('span','banner__label','MELDEFRIST LÄUFT BIS 10.10.'));
+    t1.appendChild(el('span','banner__num', String(open)));
+    n1.appendChild(t1);
+    n1.appendChild(el('span','banner__text',
+      open === 1 ? 'Eine Position ist noch offen. Bis zur Frist tragen sich die Spieler selbst ein.'
+                 : open + ' Positionen sind noch offen. Bis zur Frist tragen sich die Spieler selbst ein.'));
+    host.appendChild(n1);
+    return;
+  }
+  if (open === 0){
+    var n2 = el('div','banner banner--ok');
+    n2.insertAdjacentHTML('beforeend','<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#C8FF2E" style="stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;flex:none" aria-hidden="true"><path d="M5 13l4 4L19 7"></path></svg>');
+    var m = el('span','banner__okmain');
+    m.appendChild(el('span','banner__oktitle','Alles zugeteilt'));
+    m.appendChild(el('span','banner__oksub','MELDEFRIST ABGELAUFEN · 10.10.'));
+    n2.appendChild(m);
+    host.appendChild(n2);
+    return;
+  }
+  var n3 = el('div','banner banner--warn');
+  var t3 = el('div','banner__top');
+  t3.appendChild(el('span','banner__label','MELDEFRIST ABGELAUFEN · 10.10.'));
+  t3.appendChild(el('span','banner__num', String(open)));
+  n3.appendChild(t3);
+  n3.appendChild(el('span','banner__text',
+    'Die Spieler können sich nicht mehr selbst eintragen. ' +
+    (open === 1 ? 'Eine Position musst du noch zuteilen.' : open + ' Positionen musst du noch zuteilen.')));
+  host.appendChild(n3);
+}
+
+function renderOpen(){
+  var host = document.getElementById('openList');
+  host.innerHTML = '';
+  var any = false;
+  DATES.forEach(function(d, di){
+    d.roles.forEach(function(r, ri){
+      if (r !== null) return;
+      any = true;
+      var row = el('div','orow');
+      var dt = el('span','date');
+      dt.appendChild(el('span','date__dow', d.dow));
+      dt.appendChild(el('span','date__day', d.day));
+      row.appendChild(dt);
+      var m = el('span','orow__main');
+      m.appendChild(el('span','orow__role', ROLES[ri]));
+      m.appendChild(el('span','orow__where', d.team + ' · ' + d.info));
+      row.appendChild(m);
+      var b = el('button','btn btn--assign','Zuteilen');
+      b.type = 'button';
+      b.onclick = function(){ sheet = { d: di, r: ri }; render(); };
+      row.appendChild(b);
+      host.appendChild(row);
+    });
+  });
+  host.hidden = !(any && deadlinePassed && hasDeadline);
+}
+
+function dateRow(d, di, past){
+  var b = el('button','trow' + (d.next && !past ? ' trow--next' : '') + (past ? ' trow--past' : ''));
+  b.type = 'button';
+  var dt = el('span','date');
+  dt.appendChild(el('span','date__dow', d.dow));
+  dt.appendChild(el('span','date__day', d.day));
+  dt.appendChild(el('span','date__mon', d.mon));
+  b.appendChild(dt);
+  var m = el('span','trow__main');
+  m.appendChild(el('span','trow__team', d.team));
+  m.appendChild(el('span','trow__info', d.info));
+  b.appendChild(m);
+  var o = openCount(d);
+  if (past){
+    b.appendChild(el('span','pill pill--past','KOMPLETT'));
+  } else {
+    b.appendChild(el('span','pill ' + (o === 0 ? 'pill--ok' : 'pill--open'),
+      o === 0 ? 'KOMPLETT' : (o === 1 ? '1 OFFEN' : o + ' OFFEN')));
+  }
+  b.insertAdjacentHTML('beforeend', CHEV);
+  if (!past) b.onclick = function(){ detIdx = di; view = 'detail'; render(); };
+  return b;
+}
+
+function renderDates(){
+  var host = document.getElementById('dateList');
+  host.innerHTML = '';
+  DATES.forEach(function(d, i){ host.appendChild(dateRow(d, i)); });
+
+  var past = document.getElementById('pastList');
+  past.innerHTML = '';
+  past.hidden = !pastOpen;
+  document.getElementById('pastToggle').setAttribute('aria-expanded', pastOpen ? 'true' : 'false');
+  document.getElementById('pastChev').setAttribute('d', pastOpen ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6');
+  document.getElementById('pastCount').textContent = PAST.length;
+  PAST.forEach(function(d, i){ past.appendChild(dateRow(d, i, true)); });
+}
+
+function renderDetail(){
+  var d = DATES[detIdx];
+  document.getElementById('dName').textContent = d.team;
+  document.getElementById('dMeta').textContent = d.dow + ' ' + d.day + '.' + d.mon + ' · ' + d.info;
+  var o = openCount(d);
+  var pill = document.getElementById('dPill');
+  pill.className = 'pill ' + (o === 0 ? 'pill--ok' : 'pill--open');
+  pill.textContent = o === 0 ? 'KOMPLETT' : (o === 1 ? '1 OFFEN' : o + ' OFFEN');
+
+  var host = document.getElementById('dRoles');
+  host.innerHTML = '';
+  d.roles.forEach(function(r, ri){
+    var row = el('div','rrow');
+    var other = (r === '-');
+    row.appendChild(el('span','rrow__label' + (other ? ' rrow__label--muted' : (r === null ? '' : ' rrow__label--soft')), ROLES[ri]));
+    if (other){
+      row.appendChild(el('span','chip chip--other','anderes Team'));
+    } else {
+      var c = el('button','chip ' + (r === null ? 'chip--open' : 'chip--filled'), r === null ? 'offen' : r);
+      c.type = 'button';
+      c.insertAdjacentHTML('beforeend', CHEVDOWN);
+      c.onclick = function(){ sheet = { d: detIdx, r: ri }; render(); };
+      row.appendChild(c);
+    }
+    host.appendChild(row);
+  });
+  document.getElementById('dHint').textContent = deadlinePassed
+    ? 'Nach der Meldefrist kannst nur noch du oder die Kapitäne zuteilen. Die Spieler werden über die Änderung informiert.'
+    : 'Bis zur Meldefrist am 10.10. tragen sich die Spieler selbst ein – du kannst trotzdem jederzeit ändern.';
+}
+
+function renderSettings(){
+  var host = document.getElementById('teamList');
+  host.innerHTML = '';
+  TEAMS.forEach(function(t){
+    var row = el('div','teamrow');
+    row.appendChild(el('span','teamrow__name', t[0]));
+    row.appendChild(el('span','teamrow__count', t[1]));
+    var b = el('button','iconghost');
+    b.type = 'button';
+    b.setAttribute('aria-label','Löschen');
+    b.insertAdjacentHTML('beforeend', TRASH);
+    row.appendChild(b);
+    host.appendChild(row);
+  });
+  document.getElementById('teamCount').textContent = TEAMS.length;
+}
+
+function renderEdit(){
+  document.getElementById('eTitle').textContent = isNew ? 'Neuer Termin' : 'Termin bearbeiten';
+  document.getElementById('eSub').textContent = isNew ? 'NOCH NICHT GESPEICHERT' : 'TBW U18 · SO 27.09.';
+  if (isNew){
+    ['eDate','eTime','eOpp','ePlace'].forEach(function(id){ document.getElementById(id).value = ''; });
+    document.getElementById('eDate').placeholder = 'tt.mm.jjjj';
+    document.getElementById('eTime').placeholder = '17:00';
+  }
+  var host = document.getElementById('eChecks');
+  host.innerHTML = '';
+  ROLES.forEach(function(r, i){
+    var b = el('button','check');
+    b.type = 'button';
+    b.setAttribute('aria-pressed', checks[i] ? 'true' : 'false');
+    var box = el('span','check__box');
+    box.insertAdjacentHTML('beforeend', CHECKICON);
+    b.appendChild(box);
+    b.appendChild(el('span','check__label', r));
+    b.onclick = function(){ checks[i] = !checks[i]; render(); };
+    host.appendChild(b);
+  });
+}
+
+function renderSheet(){
+  document.getElementById('scrim').hidden = !sheet;
+  if (!sheet) return;
+  var d = DATES[sheet.d];
+  document.getElementById('sheetSub').textContent =
+    (ROLES[sheet.r] + ' · ' + d.team + ' · ' + d.dow + ' ' + d.day + '.' + d.mon).toUpperCase();
+  var host = document.getElementById('picker');
+  host.innerHTML = '';
+  PLAYERS.forEach(function(p){
+    var me = (p[0] === ME);
+    var b = el('button','prow' + (me ? ' prow--me' : ''));
+    b.type = 'button';
+    b.appendChild(el('span','av', initials(p[0])));
+    b.appendChild(el('span','prow__name', me ? 'Du (' + p[0] + ')' : p[0]));
+    b.appendChild(el('span','count' + (p[1] === 0 ? ' count--zero' : ''), p[1] + '×'));
+    b.onclick = function(){ DATES[sheet.d].roles[sheet.r] = me ? 'Du' : p[0]; sheet = null; render(); };
+    host.appendChild(b);
+  });
+}
+
+function render(){
+  [['vMain','main'],['vDetail','detail'],['vSettings','settings'],['vEdit','edit']].forEach(function(p){
+    var n = document.getElementById(p[0]);
+    var on = (view === p[1]);
+    n.hidden = !on;
+    n.style.display = on ? 'flex' : 'none';
+  });
+  if (view === 'main'){ renderBanner(); renderOpen(); renderDates(); }
+  if (view === 'detail') renderDetail();
+  if (view === 'settings') renderSettings();
+  if (view === 'edit') renderEdit();
+  renderSheet();
+  document.getElementById('settingsSub').textContent =
+    (hasDeadline ? 'MELDEFRIST 10.10. · ' : 'KEINE MELDEFRIST · ') + TEAMS.length + ' TEAMS';
+}
+
+document.getElementById('pastToggle').onclick = function(){ pastOpen = !pastOpen; render(); };
+document.getElementById('toSettings').onclick = function(){ view = 'settings'; render(); };
+document.getElementById('sBack').onclick = function(){ view = 'main'; render(); };
+document.getElementById('dBack').onclick = function(){ view = 'main'; render(); };
+document.getElementById('toEdit').onclick = function(){ view = 'edit'; isNew = false; render(); };
+document.getElementById('eBack').onclick = function(){ view = isNew ? 'main' : 'detail'; render(); };
+document.getElementById('eCancel').onclick = function(){ view = isNew ? 'main' : 'detail'; render(); };
+document.getElementById('eSave').onclick = function(){ view = isNew ? 'main' : 'detail'; render(); };
+document.getElementById('closeSheet').onclick = function(){ sheet = null; render(); };
+document.getElementById('clearSlot').onclick = function(){ DATES[sheet.d].roles[sheet.r] = null; sheet = null; render(); };
+document.getElementById('scrim').onclick = function(e){ if (e.target === this){ sheet = null; render(); } };
+
+renderTabs();
+render();
+</script>
+</body>
+</html>
