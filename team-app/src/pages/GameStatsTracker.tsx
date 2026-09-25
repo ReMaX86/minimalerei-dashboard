@@ -8,11 +8,16 @@ import { useScrollResetOnChange } from '../hooks/useScrollResetOnChange';
 import { useTipoffLoader } from '../hooks/useTipoffLoader';
 import {
   computeBoxScore,
+  computePlusMinus,
   computeQuarterScores,
   computeTeamScore,
+  computeTeamTotals,
   countPlayerFouls,
   countTeamFouls,
-  quarterLabel
+  fgPct,
+  fmtPlusMinus,
+  quarterLabel,
+  type PlayerBoxScore
 } from '../lib/gameStats';
 import { fmtDate, fmtTime, shortPlayerName } from '../lib/format';
 import {
@@ -804,6 +809,14 @@ export function GameStatsTracker() {
   }
 
   const boxScore = computeBoxScore(events);
+  const teamTotals = computeTeamTotals(boxScore);
+  // fallbackOnCourtIds greift nur, solange zu einem Event noch kein
+  // Log-Eintrag existiert — siehe computePlusMinus()-Kommentar in gameStats.ts.
+  const plusMinusByPlayer = computePlusMinus(
+    events,
+    lineupLog,
+    trackablePlayers.map((p) => p.id)
+  );
   const teamScore =
     lockState.kind === 'readonly' && events.length === 0 && game?.final_score_us !== null && game?.final_score_us !== undefined
       ? { us: game.final_score_us, opponent: game.final_score_opponent ?? 0 }
@@ -1169,36 +1182,146 @@ export function GameStatsTracker() {
   }
 
   // ============ Box-Score (Bugfix §9) ============
+  // Für Textkontexte, wo eine NumberTile zu groß wäre (Box-Score-Zeilen) —
+  // Nummer als Präfix vor dem Namen, wie vor Element 24.
+  function numPrefix(playerId: string): string {
+    return numbers[playerId] !== undefined ? `#${numbers[playerId]} ` : '';
+  }
+
+  // Ausführliche Box-Score-Tabelle (Trefferquoten, Nebenwerte, +/-) mit
+  // seitlichem Scrollen und fixierter Spielerspalte — auf Nutzerwunsch
+  // wieder auf den Stand vor Element 24 gebracht (§9 hatte nur die dortige
+  // Vorlage 1:1 übernommen, die diese Spalten bewusst nicht zeigte; das
+  // stellte sich im echten Gebrauch als Rückschritt heraus). onlyCourt
+  // filtert für die schmale Seitenleiste im Querformat auf die fünf
+  // aktuell auf dem Feld Stehenden, sonst zeigt es jeden mit Einsatz.
   function SimpleBoxScore({ onlyCourt }: { onlyCourt: boolean }) {
     const list = onlyCourt ? onCourtPlayers : trackablePlayers.filter((p) => onCourtIds.includes(p.id) || boxScore.some((b) => b.playerId === p.id));
     const rows = list.map((p) => ({
       player: p,
-      box: boxScore.find((b) => b.playerId === p.id) ?? { points: 0, rebounds: 0, fouls: 0 }
+      box:
+        boxScore.find((b) => b.playerId === p.id) ??
+        ({
+          playerId: p.id,
+          points: 0,
+          fg2m: 0,
+          fg2a: 0,
+          fg3m: 0,
+          fg3a: 0,
+          ftm: 0,
+          fta: 0,
+          rebounds: 0,
+          assists: 0,
+          steals: 0,
+          blocks: 0,
+          turnovers: 0,
+          fouls: 0
+        } as PlayerBoxScore)
     }));
-    const totalPts = rows.reduce((s, r) => s + r.box.points, 0);
-    const totalReb = rows.reduce((s, r) => s + r.box.rebounds, 0);
-    const totalF = rows.reduce((s, r) => s + r.box.fouls, 0);
     return (
-      <div className="overflow-hidden rounded-to-xl border border-to-border bg-to-surface">
-        <div className="flex items-center gap-2 bg-to-surface2 px-3.5 py-2.5">
-          <span className="to-data flex-1 text-[8px] tracking-[0.1em] text-to-textDisabled">SPIELER</span>
-          <span className="to-data w-7 text-right text-[8px] tracking-[0.1em] text-to-textDisabled">PKT</span>
-          <span className="to-data w-7 text-right text-[8px] tracking-[0.1em] text-to-textDisabled">REB</span>
-          <span className="to-data w-5 text-right text-[8px] tracking-[0.1em] text-to-textDisabled">F</span>
-        </div>
-        {rows.map(({ player: p, box }) => (
-          <div key={p.id} className="flex items-center gap-2 border-t border-to-surface2 px-3.5 py-2">
-            <span className="min-w-0 flex-1 truncate text-xs font-medium text-to-text">{p.name}</span>
-            <span className="w-7 text-right text-[11px] font-bold text-to-text">{box.points}</span>
-            <span className="w-7 text-right text-[11px] text-to-text2">{box.rebounds}</span>
-            <span className="w-5 text-right text-[11px] text-to-text2">{box.fouls}</span>
-          </div>
-        ))}
-        <div className="flex items-center gap-2 border-t border-to-surface2 bg-to-surface2 px-3.5 py-2">
-          <span className="flex-1 text-xs font-bold text-to-accent">Team</span>
-          <span className="w-7 text-right text-[11px] font-bold text-to-accent">{totalPts}</span>
-          <span className="w-7 text-right text-[11px] font-bold text-to-accent">{totalReb}</span>
-          <span className="w-5 text-right text-[11px] font-bold text-to-accent">{totalF}</span>
+      <div className="rounded-to-xl border border-to-border bg-to-surface p-3.5">
+        <span className="to-data mb-2 block text-[9px] tracking-[0.12em] text-to-textDisabled">BOX-SCORE</span>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[620px] border-collapse text-left text-xs">
+            <thead>
+              <tr className="text-to-text3">
+                <th className="sticky left-0 z-10 border-r border-to-divider bg-to-surface py-1 pr-2 font-semibold">Spieler</th>
+                <th className="px-1 py-1 text-right font-semibold">Pkt</th>
+                <th className="px-1 py-1 text-right font-semibold">2P</th>
+                <th className="px-1 py-1 text-right font-semibold">2P%</th>
+                <th className="px-1 py-1 text-right font-semibold">3P</th>
+                <th className="px-1 py-1 text-right font-semibold">3P%</th>
+                <th className="px-1 py-1 text-right font-semibold">FW</th>
+                <th className="px-1 py-1 text-right font-semibold">FW%</th>
+                <th className="px-1 py-1 text-right font-semibold">Reb</th>
+                <th className="px-1 py-1 text-right font-semibold">Ast</th>
+                <th className="px-1 py-1 text-right font-semibold">Stl</th>
+                <th className="px-1 py-1 text-right font-semibold">Blk</th>
+                <th className="px-1 py-1 text-right font-semibold">TO</th>
+                <th className="px-1 py-1 text-right font-semibold">PF</th>
+                <th className="pl-1 py-1 text-right font-semibold">+/-</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ player: p, box: b }) => (
+                <tr key={p.id} className="border-t border-to-divider">
+                  <td className="sticky left-0 z-10 border-r border-to-divider bg-to-surface py-1.5 pr-2 font-semibold text-to-text">
+                    <div className="flex items-center gap-2">
+                      <Photo player={p} size={20} />
+                      {numPrefix(p.id)}
+                      {shortPlayerName(p.name)}
+                    </div>
+                  </td>
+                  <td className="px-1 py-1.5 text-right font-bold text-to-text">{b.points}</td>
+                  <td className="px-1 py-1.5 text-right text-to-text2">
+                    {b.fg2m}/{b.fg2a}
+                  </td>
+                  <td className="px-1 py-1.5 text-right text-to-textDisabled">{fgPct(b.fg2m, b.fg2a)}</td>
+                  <td className="px-1 py-1.5 text-right text-to-text2">
+                    {b.fg3m}/{b.fg3a}
+                  </td>
+                  <td className="px-1 py-1.5 text-right text-to-textDisabled">{fgPct(b.fg3m, b.fg3a)}</td>
+                  <td className="px-1 py-1.5 text-right text-to-text2">
+                    {b.ftm}/{b.fta}
+                  </td>
+                  <td className="px-1 py-1.5 text-right text-to-textDisabled">{fgPct(b.ftm, b.fta)}</td>
+                  <td className="px-1 py-1.5 text-right text-to-text2">{b.rebounds}</td>
+                  <td className="px-1 py-1.5 text-right text-to-text2">{b.assists}</td>
+                  <td className="px-1 py-1.5 text-right text-to-text2">{b.steals}</td>
+                  <td className="px-1 py-1.5 text-right text-to-text2">{b.blocks}</td>
+                  <td className="px-1 py-1.5 text-right text-to-text2">{b.turnovers}</td>
+                  <td className="px-1 py-1.5 text-right text-to-text2">{b.fouls}</td>
+                  {(() => {
+                    const pm = plusMinusByPlayer[p.id] ?? 0;
+                    return (
+                      <td
+                        className={`py-1.5 pl-1 text-right font-semibold ${
+                          pm > 0 ? 'text-to-accent' : pm < 0 ? 'text-to-dangerText' : 'text-to-textDisabled'
+                        }`}
+                      >
+                        {fmtPlusMinus(pm)}
+                      </td>
+                    );
+                  })()}
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              {(() => {
+                // Team-+/- ist bewusst der tatsächliche Punktabstand
+                // (teamScore.us - teamScore.opponent), NICHT die Summe der
+                // einzelnen +/- oben — jeder Korb fließt dort in bis zu 5
+                // Spieler-Werte gleichzeitig ein, eine Summe würde also
+                // mehrfach zählen.
+                const teamNet = teamScore.us - teamScore.opponent;
+                return (
+                  <tr className="border-t-2 border-to-border bg-to-surface2 font-bold text-to-accent">
+                    <td className="sticky left-0 z-10 border-r border-to-divider bg-to-surface2 py-1.5 pr-2">Team</td>
+                    <td className="px-1 py-1.5 text-right">{teamTotals.points}</td>
+                    <td className="px-1 py-1.5 text-right font-normal text-to-text2">
+                      {teamTotals.fg2m}/{teamTotals.fg2a}
+                    </td>
+                    <td className="px-1 py-1.5 text-right font-normal text-to-textDisabled">{fgPct(teamTotals.fg2m, teamTotals.fg2a)}</td>
+                    <td className="px-1 py-1.5 text-right font-normal text-to-text2">
+                      {teamTotals.fg3m}/{teamTotals.fg3a}
+                    </td>
+                    <td className="px-1 py-1.5 text-right font-normal text-to-textDisabled">{fgPct(teamTotals.fg3m, teamTotals.fg3a)}</td>
+                    <td className="px-1 py-1.5 text-right font-normal text-to-text2">
+                      {teamTotals.ftm}/{teamTotals.fta}
+                    </td>
+                    <td className="px-1 py-1.5 text-right font-normal text-to-textDisabled">{fgPct(teamTotals.ftm, teamTotals.fta)}</td>
+                    <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.rebounds}</td>
+                    <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.assists}</td>
+                    <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.steals}</td>
+                    <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.blocks}</td>
+                    <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.turnovers}</td>
+                    <td className="px-1 py-1.5 text-right font-normal text-to-text2">{teamTotals.fouls}</td>
+                    <td className="py-1.5 pl-1 text-right">{fmtPlusMinus(teamNet)}</td>
+                  </tr>
+                );
+              })()}
+            </tfoot>
+          </table>
         </div>
       </div>
     );

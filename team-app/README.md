@@ -2641,6 +2641,16 @@ hier die getroffenen Entscheidungen samt Begründung:
   schmaler erzwungener Breite (Handy quer, `max-width:1000px`) schmaler (288px/236px statt
   330px/262px); `PlayerTile` bekam dafür `min-w-0`, damit die Spielerkacheln bei starker
   Verengung sauber schrumpfen statt in die Nachbarspalte zu laufen.
+  **Update (Box-Score wieder ausführlich):** die §9-Vorlage zeigte bewusst nur Spieler/Pkt/
+  Reb/F — im echten Gebrauch stellte sich das als Rückschritt gegenüber dem Stand vor Element
+  24 heraus (Trefferquoten, Nebenwerte, +/- fehlten). `SimpleBoxScore` zeigt jetzt wieder die
+  ausführliche Tabelle von vor dem Redesign (Pkt/2P/2P%/3P/3P%/FW/FW%/Reb/Ast/Stl/Blk/TO/PF/
+  +/-, `computeTeamTotals()`/`computePlusMinus()`/`fgPct()`/`fmtPlusMinus()` aus `gameStats.ts`
+  wieder verwendet statt entfernt) — mit fixierter Spielerspalte (`sticky left-0`) und
+  seitlichem Scrollen (`overflow-x-auto`, `min-w-[620px]`) in Tipoff-Tokens statt der alten
+  `tbw-*`-Farben, plus die hervorgehobene "Team"-Zeile (`bg-to-surface2`, `text-to-accent`,
+  dickerer oberer Rand). Läuft unverändert an allen drei Stellen (Kompakt-Vollbild, Seitenleiste
+  im Querformat, Nur-Ansicht bei abgeschlossenem Spiel).
 
 ## Projektstruktur
 
