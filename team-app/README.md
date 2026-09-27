@@ -2785,6 +2785,25 @@ hier die getroffenen Entscheidungen samt Begründung:
     Spieler-Trainer via Kaderblock) inkl. RPC-Aufrufen, Sheet-Inhalten und Statuswechseln. Keine
     neue Migration nötig — nutzt ausschließlich die bereits vorhandene, seit `0060` bestehende
     4-Parameter-`respond_to_squad()`-RPC (Grund/Notiz).
+- **Korrektur/Bugfix `0077` — "Doch dabei?"/"Doch wieder dabei?" funktionierten in echt nicht.**
+  Beim Vorbereiten des Produktions-Umzugs (Migrations-Audit) aufgefallen: Migration `0075` hat
+  beim Zurücknehmen von "Absage entfernt automatisch aus dem Kader" (s. o.) die WHERE-Klausel von
+  `respond_to_squad()` versehentlich mit zurückgesetzt — von `is_selected = true or confirmation
+  = 'declined'` (Migration `0060`) auf nur noch `is_selected = true`. Da eine Absage
+  `is_selected` selbst auf `false` setzt, konnte die Funktion eine bereits abgesagte Zeile
+  danach **nie wieder** finden: jeder "Doch dabei?"/"Doch wieder dabei?"-Versuch wäre mit
+  `not_in_squad` fehlgeschlagen. Der Playwright-Test im vorigen Punkt hat das nicht bemerkt, weil
+  er die REST-Schicht mockt (er bildet nach, was der Client sendet/erwartet, nicht die
+  tatsächliche SQL-Logik der RPC) — ein reiner Mock-Test kann einen Bug in der Datenbankfunktion
+  selbst grundsätzlich nicht auffangen. Per direktem SQL-Reproduktionstest auf Staging
+  nachgewiesen (Testzeile mit `is_selected=false, confirmation='declined'` angelegt: die alte
+  WHERE-Klausel fand 0 Treffer, die korrigierte 1) und mit Migration `0077` behoben — Klausel
+  wieder wie in `0060`, das `is_selected`-Verhalten bei Absage bleibt wie in `0075`/`0076`
+  unverändert. Nebenbefund: **dieselbe Einschränkung stand exakt so schon in der allerersten
+  Version der Funktion (Migration `0030`, die auf Produktion heute noch läuft)** — "Doch dabei?"
+  nach einer Absage war also nie ein Regressions-Bug dieses Redesigns, sondern ein
+  Alt-Verhalten seit Einführung des Features, das `0060` (nur auf Staging) erstmals behoben und
+  `0075` dann unbeabsichtigt wieder eingeführt hatte. Nur auf Staging angewendet.
 
 ## Projektstruktur
 
