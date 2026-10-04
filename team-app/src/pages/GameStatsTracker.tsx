@@ -1647,33 +1647,33 @@ export function GameStatsTracker() {
     if (subMode) {
       const list = subMode === 'out' ? onCourtPlayers : benchPlayers;
       return (
-        <RosterGrid
-          label={subMode === 'out' ? 'WER GEHT RAUS?' : 'WER KOMMT REIN?'}
-          list={list}
-          tileSize={wide ? 100 : 116}
-          photoSize={wide ? 48 : 56}
-          showCancel
-          onCancel={cancelSubstitution}
-          onPick={(id) => (subMode === 'out' ? pickOutgoing(id) : confirmSubstitution(id))}
-          selectedId={null}
-        />
+        RosterGrid({
+          label: subMode === 'out' ? 'WER GEHT RAUS?' : 'WER KOMMT REIN?',
+          list,
+          tileSize: wide ? 100 : 116,
+          photoSize: wide ? 48 : 56,
+          showCancel: true,
+          onCancel: cancelSubstitution,
+          onPick: (id) => (subMode === 'out' ? pickOutgoing(id) : confirmSubstitution(id)),
+          selectedId: null
+        })
       );
     }
 
     if (pendingAction && !wide) {
       return (
         <div className="flex flex-col gap-2">
-          <RosterGrid
-            label={`WER WAR ES? · ${STAT_TYPE_LABELS[pendingAction].toUpperCase()}`}
-            list={pickablePlayers}
-            tileSize={116}
-            photoSize={56}
-            showCancel
-            onCancel={cancelPicker}
-            onPick={(id) => addStat('us', pendingAction, id)}
-            selectedId={pendingPlayer}
-          />
-          <ConfirmBar />
+          {RosterGrid({
+            label: `WER WAR ES? · ${STAT_TYPE_LABELS[pendingAction].toUpperCase()}`,
+            list: pickablePlayers,
+            tileSize: 116,
+            photoSize: 56,
+            showCancel: true,
+            onCancel: cancelPicker,
+            onPick: (id) => addStat('us', pendingAction, id),
+            selectedId: pendingPlayer
+          })}
+          {ConfirmBar()}
           <p className="px-1 text-xs leading-relaxed text-to-textDisabled">
             Die Auswahl steht an der Stelle des Tastenfelds – kein Scrollen, kein Suchen. Nach dem Tipp ist das Tastenfeld sofort wieder da.
           </p>
@@ -1684,7 +1684,7 @@ export function GameStatsTracker() {
     if (showBox && !wide) {
       return (
         <div className="flex flex-col gap-3">
-          <SimpleBoxScore onlyCourt={false} />
+          {SimpleBoxScore({ onlyCourt: false })}
           <button type="button" onClick={() => setShowBox(false)} className="h-[52px] rounded-to-pill border border-to-line text-[15px] font-semibold text-to-text2">
             Zurück zum Tracking
           </button>
@@ -1694,10 +1694,10 @@ export function GameStatsTracker() {
 
     return (
       <div className="flex flex-col gap-2.5">
-        <Keypad shotHeight={62} actionHeight={58} />
-        <ConfirmBar />
-        <CourtRow />
-        <HistoryPanel limit={3} />
+        {Keypad({ shotHeight: 62, actionHeight: 58 })}
+        {ConfirmBar()}
+        {CourtRow()}
+        {HistoryPanel({ limit: 3 })}
         <button type="button" onClick={() => setShowBox(true)} className="h-[52px] rounded-to-pill border border-to-line text-[15px] font-semibold text-to-text2">
           Box-Score ansehen
         </button>
@@ -1771,24 +1771,24 @@ export function GameStatsTracker() {
               ))}
             </div>
           ) : picking ? (
-            <RosterGrid
-              label={pickTitle}
-              list={pickList}
-              tileSize={124}
-              photoSize={48}
-              showCancel
-              onCancel={subMode ? cancelSubstitution : cancelPicker}
-              onPick={(id) => {
+            RosterGrid({
+              label: pickTitle,
+              list: pickList,
+              tileSize: 124,
+              photoSize: 48,
+              showCancel: true,
+              onCancel: subMode ? cancelSubstitution : cancelPicker,
+              onPick: (id) => {
                 if (subMode === 'out') pickOutgoing(id);
                 else if (subMode === 'in') confirmSubstitution(id);
                 else if (pendingAction) addStat('us', pendingAction, id);
-              }}
-              selectedId={subMode ? null : pendingPlayer}
-              cols={3}
-            />
+              },
+              selectedId: subMode ? null : pendingPlayer,
+              cols: 3
+            })
           ) : (
             <>
-              <WideKeypad />
+              {WideKeypad()}
               <div className="flex flex-col gap-2">
                 <span className="to-data pl-0.5 text-[9px] tracking-[0.1em] text-to-text3">AUF DEM FELD</span>
                 <div className="flex gap-1.5">
@@ -1799,13 +1799,11 @@ export function GameStatsTracker() {
               </div>
             </>
           )}
-          <div className="mt-auto">
-            <ConfirmBar />
-          </div>
+          <div className="mt-auto">{ConfirmBar()}</div>
         </div>
         <div className="flex w-[300px] shrink-0 flex-col gap-3 max-[1000px]:w-[236px]">
-          <HistoryPanel limit={9} grow />
-          <SimpleBoxScore onlyCourt />
+          {HistoryPanel({ limit: 9, grow: true })}
+          {SimpleBoxScore({ onlyCourt: true })}
         </div>
       </div>
     );
@@ -1863,7 +1861,7 @@ export function GameStatsTracker() {
             ) : (
               <>
                 <p className="text-xs text-to-text3">Nur noch zur Ansicht.</p>
-                <SimpleBoxScore onlyCourt={false} />
+                {SimpleBoxScore({ onlyCourt: false })}
                 {isAdmin && (
                   <button className="btn-secondary w-full" disabled={busy} onClick={reopen}>
                     Wieder öffnen
@@ -1876,19 +1874,19 @@ export function GameStatsTracker() {
 
         {lockState.kind === 'held' && game && (
           <>
-            <LayoutSwitcher />
+            {LayoutSwitcher()}
             {wide ? (
               <div className="flex flex-col gap-3">
-                <Header withEndButton wide />
-                <WideBody />
+                {Header({ withEndButton: true, wide: true })}
+                {WideBody()}
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                <Header withEndButton={false} wide={false} />
-                <TrackingBody wide={false} />
+                {Header({ withEndButton: false, wide: false })}
+                {TrackingBody({ wide: false })}
               </div>
             )}
-            <Sheets />
+            {Sheets()}
           </>
         )}
       </div>
