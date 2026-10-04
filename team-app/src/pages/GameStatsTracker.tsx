@@ -69,14 +69,16 @@ const SHOT_BUTTONS: { made: StatType; miss: StatType; label: string; sub: string
 ];
 
 // Für den Gegner wird laut Schema (Migration 0028) nur der Punktestand
-// getrackt — kein Fehlwurf, kein Box-Score. Nur diese drei Aktionen tauchen
-// deshalb in der eigenen "GEGNER TRIFFT"-Zeile auf (§6), keine
-// Spielerauswahl nötig.
-const OPPONENT_BUTTONS: { statType: StatType; label: string; pts: number }[] = [
-  { statType: 'ft_made', label: '+1', pts: 1 },
-  { statType: 'fg2_made', label: '+2', pts: 2 },
-  { statType: 'fg3_made', label: '+3', pts: 3 }
-];
+// getrackt — kein Fehlwurf, kein Box-Score. Die Gegner-Auswahl sitzt
+// deshalb als zusätzliche Kachel direkt in der "WER WAR ES?"-Auswahl der
+// drei Treffer-Aktionen (wie in der alten Live-App), nicht mehr in einer
+// eigenen Zeile — und nur dort, ein Fehlwurf lässt sich für den Gegner
+// gar nicht erst auswählen.
+const OPPONENT_POINTS: Partial<Record<StatType, number>> = {
+  ft_made: 1,
+  fg2_made: 2,
+  fg3_made: 3
+};
 
 type LockState =
   | { kind: 'loading' }
@@ -307,6 +309,21 @@ function CancelTile({ size, onClick }: { size: number; onClick: () => void }) {
     >
       <XMarkIcon size={22} />
       Abbrechen
+    </button>
+  );
+}
+
+function OpponentTile({ size, teamName, points, onClick }: { size: number; teamName: string; points: number; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ height: size }}
+      className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-to-lg border border-to-dangerFrame bg-to-dangerSoft px-2 text-center"
+    >
+      <span className="to-number text-[26px] leading-none text-to-dangerText">+{points}</span>
+      <span className="truncate text-xs font-semibold text-to-dangerText">{teamName}</span>
+      <span className="to-data text-[8px] tracking-[0.06em] text-to-dangerText">GEGNER TRIFFT</span>
     </button>
   );
 }
@@ -1072,20 +1089,6 @@ export function GameStatsTracker() {
           <PadButton label="Foul" danger height={actionHeight} onClick={() => handleAction('foul')} />
           <PadButton label="Wechseln" volt height={actionHeight} onClick={startSubstitution} />
         </div>
-        <div className="flex items-center gap-2.5 rounded-to-lg border border-to-dangerFrame bg-to-dangerSoft px-3.5" style={{ height: actionHeight }}>
-          <span className="to-data flex-1 text-[9px] tracking-[0.1em] text-to-dangerText">GEGNER TRIFFT</span>
-          {OPPONENT_BUTTONS.map((o) => (
-            <button
-              key={o.statType}
-              type="button"
-              disabled={busy}
-              onClick={() => addStat('opponent', o.statType, null)}
-              className="h-[42px] w-[58px] rounded-to-md border border-to-dangerFrame bg-to-dangerSoft text-[16px] font-bold text-to-dangerText"
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
       </div>
     );
   }
@@ -1111,7 +1114,7 @@ export function GameStatsTracker() {
 
   function WideKeypad() {
     return (
-      <div className="grid min-h-0 flex-1 grid-cols-4 grid-rows-[auto_repeat(4,minmax(56px,1fr))_auto] gap-2.5">
+      <div className="grid min-h-0 flex-1 grid-cols-4 grid-rows-[auto_repeat(4,minmax(56px,1fr))] gap-2.5">
         <span className="to-data col-span-4 pl-0.5 text-[9px] tracking-[0.1em] text-to-text3" style={{ gridRow: 1 }}>
           TB WÜLFRATH · WAS IST PASSIERT?
         </span>
@@ -1141,23 +1144,6 @@ export function GameStatsTracker() {
         ))}
         <PadButton label="Foul" danger height="stretch" onClick={() => handleAction('foul')} style={{ gridRow: 5, gridColumn: '1 / 3' }} />
         <PadButton label="Wechseln" volt height="stretch" onClick={startSubstitution} style={{ gridRow: 5, gridColumn: '3 / 5' }} />
-        <div
-          className="col-span-4 flex items-center gap-2.5 rounded-to-lg border border-to-dangerFrame bg-to-dangerSoft px-3.5"
-          style={{ gridRow: 6 }}
-        >
-          <span className="to-data flex-1 text-[9px] tracking-[0.1em] text-to-dangerText">GEGNER TRIFFT</span>
-          {OPPONENT_BUTTONS.map((o) => (
-            <button
-              key={o.statType}
-              type="button"
-              disabled={busy}
-              onClick={() => addStat('opponent', o.statType, null)}
-              className="h-[42px] w-[58px] rounded-to-md border border-to-dangerFrame bg-to-dangerSoft text-[16px] font-bold text-to-dangerText"
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
       </div>
     );
   }
@@ -1205,7 +1191,8 @@ export function GameStatsTracker() {
     onCancel,
     onPick,
     selectedId,
-    cols = 2
+    cols = 2,
+    opponent
   }: {
     label: string;
     list: Player[];
@@ -1216,14 +1203,19 @@ export function GameStatsTracker() {
     onPick: (id: string) => void;
     selectedId: string | null;
     cols?: number;
+    // Zusätzliche Kachel für "Gegner trifft" (wie in der alten Live-App):
+    // taucht nur in der "WER WAR ES?"-Auswahl der drei Treffer-Aktionen auf
+    // (siehe OPPONENT_POINTS), nicht bei Fehlwürfen oder der Wechsel-Auswahl.
+    opponent?: { points: number; onPick: () => void };
   }) {
-    // Zellen (Spieler + optional "Abbrechen") auf volle Zeilen auffüllen,
-    // damit auch bei "cols=3" (Querformat) die letzte Reihe sauber
-    // aufgeht statt krumm zu werden.
-    const cells: (Player | 'cancel' | null)[] = [...list];
+    // Zellen (Spieler + optional "Gegner" + optional "Abbrechen") auf volle
+    // Zeilen auffüllen, damit auch bei "cols=3" (Querformat) die letzte
+    // Reihe sauber aufgeht statt krumm zu werden.
+    const cells: (Player | 'cancel' | 'opponent' | null)[] = [...list];
+    if (opponent) cells.push('opponent');
     if (showCancel) cells.push('cancel');
     while (cells.length % cols !== 0) cells.push(null);
-    const rows: (Player | 'cancel' | null)[][] = [];
+    const rows: (Player | 'cancel' | 'opponent' | null)[][] = [];
     for (let i = 0; i < cells.length; i += cols) rows.push(cells.slice(i, i + cols));
     return (
       <div className="flex flex-col gap-2.5 rounded-to-xl border border-to-borderMatchday bg-to-surface p-3.5">
@@ -1233,6 +1225,14 @@ export function GameStatsTracker() {
             {row.map((cell, j) =>
               cell === 'cancel' ? (
                 <CancelTile key="cancel" size={tileSize} onClick={onCancel} />
+              ) : cell === 'opponent' ? (
+                <OpponentTile
+                  key="opponent"
+                  size={tileSize}
+                  teamName={game?.opponent ?? 'Gegner'}
+                  points={opponent!.points}
+                  onClick={opponent!.onPick}
+                />
               ) : cell === null ? (
                 <span key={j} className="flex-1" />
               ) : (
@@ -1671,7 +1671,10 @@ export function GameStatsTracker() {
             showCancel: true,
             onCancel: cancelPicker,
             onPick: (id) => addStat('us', pendingAction, id),
-            selectedId: pendingPlayer
+            selectedId: pendingPlayer,
+            opponent: OPPONENT_POINTS[pendingAction]
+              ? { points: OPPONENT_POINTS[pendingAction]!, onPick: () => addStat('opponent', pendingAction, null) }
+              : undefined
           })}
           {ConfirmBar()}
           <p className="px-1 text-xs leading-relaxed text-to-textDisabled">
@@ -1784,7 +1787,11 @@ export function GameStatsTracker() {
                 else if (pendingAction) addStat('us', pendingAction, id);
               },
               selectedId: subMode ? null : pendingPlayer,
-              cols: 3
+              cols: 3,
+              opponent:
+                !subMode && pendingAction && OPPONENT_POINTS[pendingAction]
+                  ? { points: OPPONENT_POINTS[pendingAction]!, onPick: () => addStat('opponent', pendingAction, null) }
+                  : undefined
             })
           ) : (
             <>
