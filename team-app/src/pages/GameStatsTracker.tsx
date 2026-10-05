@@ -795,21 +795,20 @@ export function GameStatsTracker() {
     }
   }
 
-  // Viertel beenden (§8, NEU): manuell über das Blatt, nie automatisch.
-  // "Push senden" ruft dieselbe bestehende announce_quarter_score()-RPC auf
-  // (Migration 0042/0053, broadcastet an ALLE mit aktivem Push — siehe
-  // api/notify.ts "quarter-score", unverändert übernommen) — bisher lief
-  // das automatisch bei jedem Viertelwechsel, jetzt nur noch auf Wunsch.
-  // current_quarter wird dabei serverseitig mit fortgeschrieben (Migration
-  // 0074), damit ein Reload/eine Übernahme nicht auf Q1 zurückspringt.
-  async function endQuarter(withPush: boolean) {
+  // Viertel beenden: manuell über das Blatt, nie automatisch — Push geht
+  // dabei immer raus (announce_quarter_score-RPC, Migration 0042/0053,
+  // broadcastet an ALLE mit aktivem Push, siehe api/notify.ts
+  // "quarter-score"), keine Nachfrage mehr dafür (auf Nutzerwunsch: die
+  // Wahl zwischen "mit"/"ohne Push" war unnötige Reibung, niemand wollte je
+  // ohne). current_quarter wird dabei serverseitig mit fortgeschrieben
+  // (Migration 0074), damit ein Reload/eine Übernahme nicht auf Q1
+  // zurückspringt.
+  async function endQuarter() {
     if (!gameId || busy || !game) return;
     setBusy(true);
     setError(null);
     try {
-      if (withPush) {
-        await supabase.rpc('announce_quarter_score', { p_game_id: gameId, p_quarter: quarter });
-      }
+      await supabase.rpc('announce_quarter_score', { p_game_id: gameId, p_quarter: quarter });
       const nextQuarter = Math.min(9, quarter + 1);
       const { error: quarterError } = await supabase.rpc('set_game_quarter', { p_game_id: gameId, p_quarter: nextQuarter });
       if (quarterError) throw quarterError;
@@ -1012,47 +1011,69 @@ export function GameStatsTracker() {
       </div>
     );
 
-    // Nur noch Anzeige, nicht mehr antippbar — Viertel wechseln geht
-    // ausschließlich über den "Viertel beenden"-Knopf/das Blatt unten,
-    // damit es nur einen einzigen Weg dafür gibt (auf Nutzerwunsch: zwei
-    // verschiedene Bestätigungsdialoge für dieselbe Aktion waren
-    // verwirrend).
+    // Viertel wechseln geht jetzt direkt über einen Tipp auf das nächste
+    // Viertel in der Leiste (ersetzt den separaten "Viertel beenden"-Knopf)
+    // — tappbar ist dabei ausschließlich das EINE Viertel direkt nach dem
+    // laufenden, nie ein bereits beendetes (sonst könnte man versehentlich
+    // zurückspringen) und auch kein späteres (Viertel lassen sich nicht
+    // überspringen).
     const quarters = (
       <div className="flex gap-1.5">
         {[1, 2, 3, 4].map((q) => {
           const qs = quarterScores.find((x) => x.quarter === q);
           const done = q < quarter;
           const live = q === quarter;
-          return (
-            <span
-              key={q}
-              className={`flex flex-1 flex-col items-center gap-0.5 rounded-to-md border ${headerWide ? 'py-1.5' : 'py-1'} ${
-                live
-                  ? 'flex-[1.4] border-to-accent bg-to-accent'
-                  : done
-                    ? 'border-to-border bg-to-surface2'
-                    : 'border-to-divider bg-transparent'
-              }`}
-            >
+          const isNext = q === quarter + 1;
+          const content = (
+            <>
               <span className={`to-data text-[11px] font-bold ${live ? 'text-to-onAccent' : done ? 'text-to-text2' : 'text-to-textDisabled'}`}>
                 Q{q}
               </span>
               <span className={`to-data text-[8px] ${live ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>
                 {live ? 'LÄUFT' : qs ? `${qs.us}:${qs.opponent}` : '–'}
               </span>
+            </>
+          );
+          const className = `flex flex-1 flex-col items-center gap-0.5 rounded-to-md border ${headerWide ? 'py-1.5' : 'py-1'} ${
+            live
+              ? 'flex-[1.4] border-to-accent bg-to-accent'
+              : done
+                ? 'border-to-border bg-to-surface2'
+                : isNext
+                  ? 'border-to-borderMatchday bg-to-accentWash'
+                  : 'border-to-divider bg-transparent'
+          }`;
+          return isNext ? (
+            <button key={q} type="button" onClick={() => setSheet('quarter')} className={className}>
+              {content}
+            </button>
+          ) : (
+            <span key={q} className={className}>
+              {content}
             </span>
           );
         })}
-        <span
-          className={`flex flex-col items-center gap-0.5 rounded-to-md border px-3 ${headerWide ? 'py-1.5' : 'py-1'} ${
-            quarter > 4 ? 'border-to-accent bg-to-accent' : 'border-to-divider bg-transparent'
-          }`}
-        >
-          <span className={`to-data text-[11px] font-bold ${quarter > 4 ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>
-            {quarter > 4 ? quarterLabel(quarter) : 'OT'}
-          </span>
-          <span className={`to-data text-[8px] ${quarter > 4 ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>{quarter > 4 ? 'LÄUFT' : '–'}</span>
-        </span>
+        {(() => {
+          const isNext = quarter >= 4;
+          const content = (
+            <>
+              <span className={`to-data text-[11px] font-bold ${quarter > 4 ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>
+                {quarter > 4 ? quarterLabel(quarter) : 'OT'}
+              </span>
+              <span className={`to-data text-[8px] ${quarter > 4 ? 'text-to-onAccent' : 'text-to-textDisabled'}`}>{quarter > 4 ? 'LÄUFT' : '–'}</span>
+            </>
+          );
+          const className = `flex flex-col items-center gap-0.5 rounded-to-md border px-3 ${headerWide ? 'py-1.5' : 'py-1'} ${
+            quarter > 4 ? 'border-to-accent bg-to-accent' : isNext ? 'border-to-borderMatchday bg-to-accentWash' : 'border-to-divider bg-transparent'
+          }`;
+          return isNext ? (
+            <button type="button" onClick={() => setSheet('quarter')} className={className}>
+              {content}
+            </button>
+          ) : (
+            <span className={className}>{content}</span>
+          );
+        })()}
       </div>
     );
 
@@ -1080,13 +1101,6 @@ export function GameStatsTracker() {
           </div>
           {withEndButton && (
             <div className="flex shrink-0 gap-2.5">
-              <button
-                type="button"
-                onClick={() => setSheet('quarter')}
-                className="h-11 shrink-0 rounded-to-pill border border-to-line px-[18px] text-sm font-semibold text-to-text2"
-              >
-                Viertel beenden
-              </button>
               <button
                 type="button"
                 onClick={() => setSheet('finish')}
@@ -1612,14 +1626,11 @@ export function GameStatsTracker() {
                 </span>
               </div>
               <p className="text-xs leading-relaxed text-to-textDisabled">
-                Danach läuft Viertel {quarter + 1}, die Teamfouls fangen wieder bei null an. Zurückspringen geht über die Viertel-Leiste.
+                Danach läuft Viertel {quarter + 1}, die Teamfouls fangen wieder bei null an.
               </p>
               <div className="flex flex-col gap-2">
-                <button type="button" disabled={busy} onClick={() => endQuarter(true)} className="btn-primary h-[46px] rounded-to-pill text-[15px] disabled:opacity-60">
-                  Viertel beenden und Push senden
-                </button>
-                <button type="button" disabled={busy} onClick={() => endQuarter(false)} className="btn-secondary h-[46px] rounded-to-pill text-[15px]">
-                  Beenden ohne Push
+                <button type="button" disabled={busy} onClick={endQuarter} className="btn-primary h-[46px] rounded-to-pill text-[15px] disabled:opacity-60">
+                  Viertel beenden
                 </button>
                 <button type="button" onClick={() => setSheet(null)} className="h-6 text-[13px] text-to-text3">
                   Abbrechen
@@ -2009,9 +2020,6 @@ export function GameStatsTracker() {
         {CourtRow()}
         {HistoryPanel({ limit: 3 })}
         {SimpleBoxScore({ onlyCourt: false })}
-        <button type="button" onClick={() => setSheet('quarter')} className="h-[52px] rounded-to-pill border border-to-line text-[15px] font-semibold text-to-text2">
-          Viertel beenden
-        </button>
         <button
           type="button"
           onClick={() => setSheet('finish')}
