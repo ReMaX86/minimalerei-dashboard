@@ -132,13 +132,6 @@ function foulTone(fouls: number): 'warn' | 'danger' | null {
 }
 
 // ---------- Icons (self-contained, wie in den übrigen Admin-Screens) ----------
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M5 13l4 4L19 7" />
-    </svg>
-  );
-}
 function XMarkIcon({ size = 16 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true">
@@ -1438,7 +1431,7 @@ export function GameStatsTracker() {
           <button
             type="button"
             onClick={() => setHistoryExpanded(true)}
-            className="to-data flex h-[42px] items-center justify-center border-t border-to-surface2 text-[9px] tracking-[0.08em] text-to-accent"
+            className="to-data flex h-[42px] w-full items-center justify-center border-t border-to-surface2 text-[9px] tracking-[0.08em] text-to-accent"
           >
             ALLE {logEntries.length} ANZEIGEN
           </button>
@@ -1605,24 +1598,15 @@ export function GameStatsTracker() {
             >
               <span className="mx-auto h-1 w-9 rounded-full bg-to-line" />
               <span className="to-display-sm text-to-text">Viertel {quarter} beenden?</span>
-              <div className="flex items-center gap-3.5 rounded-to-lg border border-to-divider bg-to-surface2 p-4">
-                <span className="flex flex-1 flex-col gap-0.5">
+              <div className="flex items-end justify-center gap-2.5 rounded-to-lg border border-to-divider bg-to-surface2 px-4 py-3.5">
+                <span className="flex max-w-[120px] flex-col items-end gap-0.5">
                   <span className="to-data text-[9px] tracking-[0.1em] text-to-accent">TB WÜLFRATH</span>
                   <span className="to-number text-[30px] leading-none text-to-text">{teamScore.us}</span>
                 </span>
-                <span className="to-number text-lg text-to-textDisabled">:</span>
-                <span className="flex flex-1 flex-col items-end gap-0.5">
-                  <span className="to-data text-[9px] tracking-[0.1em] text-to-text3">{game.opponent.toUpperCase()}</span>
+                <span className="to-number pb-0.5 text-lg text-to-textDisabled">:</span>
+                <span className="flex max-w-[120px] flex-col gap-0.5">
+                  <span className="to-data text-[9px] leading-tight tracking-[0.1em] text-to-text3">{game.opponent.toUpperCase()}</span>
                   <span className="to-number text-[30px] leading-none text-to-text2">{teamScore.opponent}</span>
-                </span>
-              </div>
-              <div className="flex items-start gap-2.5 rounded-to-lg border border-to-borderMatchday bg-to-accentWash p-3.5 text-xs leading-relaxed text-to-text2">
-                <CheckIcon />
-                <span>
-                  Alle im Team bekommen den Zwischenstand als Push:{' '}
-                  <strong className="text-to-text">
-                    Ende Q{quarter} · {teamScore.us}:{teamScore.opponent}
-                  </strong>
                 </span>
               </div>
               <p className="text-xs leading-relaxed text-to-textDisabled">
