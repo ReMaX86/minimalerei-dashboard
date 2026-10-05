@@ -1208,7 +1208,13 @@ export function GameStatsTracker() {
       <div className="flex flex-col gap-2.5 rounded-to-xl border border-to-borderMatchday bg-to-surface p-3.5">
         {label && <span className="to-data pl-1 text-[9px] tracking-[0.12em] text-to-accent">{label}</span>}
         {rows.map((row, i) => (
-          <div key={i} className="flex gap-2.5">
+          // Grid statt flex: bei einer ungeraden letzten Zeile (z. B. 5
+          // Spieler + leere Füllzelle) verteilt "flex: 1 1 0%" die Breite
+          // NICHT gleichmäßig, sobald ein Kind (PlayerTile: Border+Padding)
+          // und das andere (leere Füllzelle) unterschiedliche Border-/
+          // Padding-Breiten haben — eine bekannte Flexbox-Falle. Grid-
+          // Spalten (1fr) sind davon unabhängig und immer exakt gleich breit.
+          <div key={i} className="grid gap-2.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
             {row.map((cell, j) =>
               cell === 'opponent' ? (
                 <OpponentTile
@@ -1618,7 +1624,7 @@ export function GameStatsTracker() {
           </span>
           <div className="flex flex-col gap-2.5">
             {Array.from({ length: Math.ceil(trackablePlayers.length / 2) }).map((_, i) => (
-              <div key={i} className="flex gap-2.5">
+              <div key={i} className="grid grid-cols-2 gap-2.5">
                 {trackablePlayers.slice(i * 2, i * 2 + 2).map((p) => (
                   <PlayerTile
                     key={p.id}
