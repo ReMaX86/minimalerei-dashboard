@@ -272,7 +272,7 @@ function PlayerTile({
     <button
       type="button"
       onClick={onClick}
-      style={{ height: size }}
+      style={{ minHeight: size }}
       className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-to-lg border px-2.5 text-left ${
         selected
           ? 'border-to-accent bg-to-accentWash'
@@ -299,30 +299,16 @@ function PlayerTile({
   );
 }
 
-function CancelTile({ size, onClick }: { size: number; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{ height: size }}
-      className="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-to-lg border border-dashed border-to-dangerFrame text-[13px] font-semibold text-to-dangerText"
-    >
-      <XMarkIcon size={22} />
-      Abbrechen
-    </button>
-  );
-}
-
 function OpponentTile({ size, teamName, points, onClick }: { size: number; teamName: string; points: number; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      style={{ height: size }}
-      className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-to-lg border border-to-dangerFrame bg-to-dangerSoft px-2 text-center"
+      style={{ minHeight: size }}
+      className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-to-lg border border-to-dangerFrame bg-to-dangerSoft px-2 py-2 text-center"
     >
       <span className="to-number text-[26px] leading-none text-to-dangerText">+{points}</span>
-      <span className="truncate text-xs font-semibold text-to-dangerText">{teamName}</span>
+      <span className="w-full break-words text-xs font-semibold leading-tight text-to-dangerText">{teamName}</span>
       <span className="to-data text-[8px] tracking-[0.06em] text-to-dangerText">GEGNER TRIFFT</span>
     </button>
   );
@@ -1208,14 +1194,15 @@ export function GameStatsTracker() {
     // (siehe OPPONENT_POINTS), nicht bei Fehlwürfen oder der Wechsel-Auswahl.
     opponent?: { points: number; onPick: () => void };
   }) {
-    // Zellen (Spieler + optional "Gegner" + optional "Abbrechen") auf volle
-    // Zeilen auffüllen, damit auch bei "cols=3" (Querformat) die letzte
-    // Reihe sauber aufgeht statt krumm zu werden.
-    const cells: (Player | 'cancel' | 'opponent' | null)[] = [...list];
+    // Zellen (Spieler + optional "Gegner") auf volle Zeilen auffüllen, damit
+    // auch bei "cols=3" (Querformat) die letzte Reihe sauber aufgeht statt
+    // krumm zu werden. "Abbrechen" ist bewusst keine Gitterzelle mehr
+    // (Rückfrage): als schmale Leiste über die volle Breite unter dem
+    // Raster statt als quadratische Kachel mit Leerraum daneben.
+    const cells: (Player | 'opponent' | null)[] = [...list];
     if (opponent) cells.push('opponent');
-    if (showCancel) cells.push('cancel');
     while (cells.length % cols !== 0) cells.push(null);
-    const rows: (Player | 'cancel' | 'opponent' | null)[][] = [];
+    const rows: (Player | 'opponent' | null)[][] = [];
     for (let i = 0; i < cells.length; i += cols) rows.push(cells.slice(i, i + cols));
     return (
       <div className="flex flex-col gap-2.5 rounded-to-xl border border-to-borderMatchday bg-to-surface p-3.5">
@@ -1223,9 +1210,7 @@ export function GameStatsTracker() {
         {rows.map((row, i) => (
           <div key={i} className="flex gap-2.5">
             {row.map((cell, j) =>
-              cell === 'cancel' ? (
-                <CancelTile key="cancel" size={tileSize} onClick={onCancel} />
-              ) : cell === 'opponent' ? (
+              cell === 'opponent' ? (
                 <OpponentTile
                   key="opponent"
                   size={tileSize}
@@ -1250,6 +1235,16 @@ export function GameStatsTracker() {
             )}
           </div>
         ))}
+        {showCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex h-11 items-center justify-center gap-1.5 rounded-to-pill border border-dashed border-to-dangerFrame text-[13px] font-semibold text-to-dangerText"
+          >
+            <XMarkIcon size={16} />
+            Abbrechen
+          </button>
+        )}
       </div>
     );
   }
