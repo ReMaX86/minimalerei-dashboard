@@ -229,7 +229,11 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
 
   useEffect(() => {
     if (searchParams.get('kader') !== '1') return;
+    // Je nach Rolle ist nur einer der beiden Kaderblöcke sichtbar
+    // (Trainer: kaderOpen, reiner Spieler: squadViewOpen) — beide setzen
+    // ist harmlos, der jeweils ausgeblendete Zustand wirkt sich nicht aus.
     setSquadViewOpen(true);
+    setKaderOpen(true);
   }, [searchParams]);
 
   // Ersetzt die vorherige, an "Kader-Bearbeitung öffnen" gekoppelte Logik:
