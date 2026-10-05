@@ -1001,6 +1001,26 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
   );
 }
 
+// iOS Safari rendert das Innenleben eines nativen <input type="time">
+// (Platzhalter-Segmente + Uhr-Icon) in einem Shadow-Root, der die CSS-Breite
+// des Eingabefelds ignoriert — es kann über den Rand des Felds und sogar
+// über die Karte hinauslaufen, weder width/min-width noch overflow-hidden
+// auf dem Input selbst stoppen das (siehe DateTimeField.tsx für denselben
+// Fix). Darum hier: natives Input unsichtbar + absolut positioniert, der
+// sichtbare Wert kommt aus einer eigenen Fake-Anzeige darunter, die IMMER
+// die Feldbreite respektiert.
+function TreffpunktTimeField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="to-label">{label}</span>
+      <span className="relative block overflow-hidden rounded-to-md">
+        <input type="time" className="absolute inset-0 h-full w-full opacity-0" value={value} onChange={(e) => onChange(e.target.value)} />
+        <span className={`to-data input pointer-events-none block ${value ? '' : 'text-to-text3'}`}>{value ? fmtTime(value) : 'Uhrzeit wählen'}</span>
+      </span>
+    </label>
+  );
+}
+
 function MeetingSheet({
   isHome,
   value,
@@ -1032,15 +1052,11 @@ function MeetingSheet({
         <div className="mt-4 flex flex-col gap-3.5">
           {!isHome && (
             <>
-              <label className="flex flex-col gap-1.5">
-                <span className="to-label">FAHRGEMEINSCHAFT — ZEIT</span>
-                <input
-                  type="time"
-                  className="to-data input"
-                  value={value.meeting_time_carpool}
-                  onChange={(e) => onChange({ ...value, meeting_time_carpool: e.target.value })}
-                />
-              </label>
+              <TreffpunktTimeField
+                label="FAHRGEMEINSCHAFT — ZEIT"
+                value={value.meeting_time_carpool}
+                onChange={(v) => onChange({ ...value, meeting_time_carpool: v })}
+              />
               <label className="flex flex-col gap-1.5">
                 <span className="to-label">FAHRGEMEINSCHAFT — ORT</span>
                 <input
@@ -1053,15 +1069,11 @@ function MeetingSheet({
               </label>
             </>
           )}
-          <label className="flex flex-col gap-1.5">
-            <span className="to-label">{isHome ? 'AN DER HALLE — ZEIT' : 'DIREKT AN DER HALLE — ZEIT'}</span>
-            <input
-              type="time"
-              className="to-data input"
-              value={value.meeting_time_hall}
-              onChange={(e) => onChange({ ...value, meeting_time_hall: e.target.value })}
-            />
-          </label>
+          <TreffpunktTimeField
+            label={isHome ? 'AN DER HALLE — ZEIT' : 'DIREKT AN DER HALLE — ZEIT'}
+            value={value.meeting_time_hall}
+            onChange={(v) => onChange({ ...value, meeting_time_hall: v })}
+          />
         </div>
 
         <div className="mt-4 flex flex-col gap-2">
