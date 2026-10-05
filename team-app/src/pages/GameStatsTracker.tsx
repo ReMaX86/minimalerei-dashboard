@@ -36,23 +36,16 @@ import {
 // 24-tracking/tracking.html. Eine Datei, zwei Layouts (Handy-Stapel, Querformat
 // mit drei Spalten) — dieselben Unterkomponenten (Keypad/Bestätigung/
 // Spielerauswahl/Verlauf/Box-Score) werden in beiden Layouts wiederverwendet.
-// Welches Layout läuft, entscheidet ein JS-State (nicht mehr nur eine
-// min-[900px]:-Media-Query): "auto" zählt ab 900px Breite ODER ab 700px in
-// echter Querlage als Querformat (ein iPad hochkant bei 768–834px landet
-// sonst fälschlich im kompakten Layout), plus ein Umschalter oben rechts
-// (LayoutSwitcher) für "Kompakt"/"Querformat" fest, gemerkt pro Gerät in
-// localStorage. Siehe computeAutoWide() weiter unten.
-
+// Welches Layout läuft, entscheidet reine Fensterbreite/-lage
+// (computeAutoWide, "auto" zählt ab 900px Breite ODER ab 700px in echter
+// Querlage als Querformat — ein iPad hochkant bei 768–834px landet sonst
+// fälschlich im kompakten Layout) — kein manueller Umschalter mehr (Element
+// 26, auf Nutzerwunsch entfernt: dreht sich das Handy, soll sich die Ansicht
+// von selbst anpassen, ohne dass es dafür einen Knopf braucht).
 const COURT_SIZE = 5;
 const HEARTBEAT_MS = 15_000;
 
-// §1 (Update): reine Fensterbreite reicht nicht — ein iPad hochkant (768–834px)
-// landet sonst in der kompakten Ansicht, obwohl der Schirm groß ist. "auto"
-// zählt deshalb auch echte Querlage ab 700px als Querformat; zusätzlich kann
-// die Wahl über den Umschalter (LayoutSwitcher) fest auf "compact"/"wide"
-// gestellt werden — gemerkt pro Gerät in localStorage.
 type LayoutMode = 'auto' | 'compact' | 'wide';
-const LAYOUT_STORAGE_KEY = 'tipoff-tracking-layout';
 
 function computeAutoWide(): boolean {
   const w = window.innerWidth;
@@ -426,24 +419,15 @@ export function GameStatsTracker() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // ?layout=wide|compact erzwingt zum Testen einen Modus, ohne ihn dauerhaft
-  // zu merken (siehe Persistenz-Effekt unten, skipInitialPersist).
-  const [layoutFromQuery] = useState<LayoutMode | null>(() => {
+  // Kein manueller Umschalter mehr (auf Nutzerwunsch entfernt, Element 26
+  // Header-Feinschliff) — die Ansicht wechselt nur noch automatisch beim
+  // Drehen (computeAutoWide). "?layout=wide|compact" bleibt als interner
+  // Test-Hebel bestehen, ohne dass es dafür eine sichtbare Bedienung gibt.
+  const [layoutMode] = useState<LayoutMode>(() => {
     const forced = new URLSearchParams(window.location.search).get('layout');
-    return forced === 'wide' || forced === 'compact' ? forced : null;
-  });
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => {
-    if (layoutFromQuery) return layoutFromQuery;
-    try {
-      const saved = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
-      if (saved === 'auto' || saved === 'compact' || saved === 'wide') return saved;
-    } catch {
-      // localStorage kann blockiert sein (privates Fenster) — dann eben nicht merken.
-    }
-    return 'auto';
+    return forced === 'wide' || forced === 'compact' ? forced : 'auto';
   });
   const [wide, setWide] = useState<boolean>(() => (layoutMode === 'auto' ? computeAutoWide() : layoutMode === 'wide'));
-  const skipInitialPersist = useRef(layoutFromQuery !== null);
 
   useEffect(() => {
     function recompute() {
@@ -476,18 +460,6 @@ export function GameStatsTracker() {
       mq?.removeEventListener?.('change', onRotate);
       window.visualViewport?.removeEventListener('resize', onRotate);
     };
-  }, [layoutMode]);
-
-  useEffect(() => {
-    if (skipInitialPersist.current) {
-      skipInitialPersist.current = false;
-      return;
-    }
-    try {
-      window.localStorage.setItem(LAYOUT_STORAGE_KEY, layoutMode);
-    } catch {
-      // localStorage kann blockiert sein (privates Fenster) — dann eben nicht merken.
-    }
   }, [layoutMode]);
 
   // Erst Aktion, dann Spieler — oder umgekehrt (Querformat, §2): sobald
@@ -1020,51 +992,9 @@ export function GameStatsTracker() {
 
   if (error && !game) return <ErrorNote message={error} />;
 
-  // ============ Ansicht-Umschalter ============
-  const LAYOUT_OPTIONS: { value: LayoutMode; label: string }[] = [
-    { value: 'auto', label: 'Automatisch' },
-    { value: 'compact', label: 'Kompakt' },
-    { value: 'wide', label: 'Querformat' }
-  ];
-
-  function LayoutSwitcher() {
-    return (
-      <div className="flex items-center justify-end gap-2">
-        <span className="to-data text-[8px] tracking-[0.12em] text-to-textDisabled">ANSICHT</span>
-        <span className="flex gap-[3px] rounded-to-pill border border-to-divider bg-to-surface2 p-[3px]">
-          {LAYOUT_OPTIONS.map((opt) => {
-            const active = layoutMode === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                aria-pressed={active}
-                onClick={() => {
-                  setLayoutMode(opt.value);
-                  setPendingAction(null);
-                  setPendingPlayer(null);
-                }}
-                className={`h-[26px] rounded-to-pill px-[11px] text-[11px] font-semibold ${
-                  active ? 'bg-to-accent text-to-onAccent' : 'text-to-text3'
-                }`}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </span>
-      </div>
-    );
-  }
-
   // ============ Kopf ============
-  // "wide" statt einer reinen min-[900px]:-Media-Query, weil der Umschalter
-  // (LayoutSwitcher) das Layout auch unabhängig von der Fensterbreite fest
-  // auf "compact"/"wide" stellen kann (§1).
-  // "wide" statt einer reinen min-[900px]:-Media-Query, weil der Umschalter
-  // (LayoutSwitcher) das Layout auch unabhängig von der Fensterbreite fest
-  // auf "compact"/"wide" stellen kann (§1). Im Querformat (Element-24-
-  // Änderung §1) liegt der ganze Kopf jetzt in EINER Zeile statt gestapelt
+  // Im Querformat (Element-24-Änderung §1) liegt der ganze Kopf jetzt in
+  // EINER Zeile statt gestapelt
   // — Punktestand/Viertel-Leiste/Teamfouls werden dafür als eigene Blöcke
   // zusammengesetzt statt in einer gemeinsamen Spalte.
   function Header({ withEndButton, wide: headerWide }: { withEndButton: boolean; wide: boolean }) {
@@ -1096,7 +1026,7 @@ export function GameStatsTracker() {
           return (
             <span
               key={q}
-              className={`flex flex-1 flex-col items-center gap-0.5 rounded-to-md border ${headerWide ? 'py-1.5' : 'py-2'} ${
+              className={`flex flex-1 flex-col items-center gap-0.5 rounded-to-md border ${headerWide ? 'py-1.5' : 'py-1'} ${
                 live
                   ? 'flex-[1.4] border-to-accent bg-to-accent'
                   : done
@@ -1114,7 +1044,7 @@ export function GameStatsTracker() {
           );
         })}
         <span
-          className={`flex flex-col items-center gap-0.5 rounded-to-md border px-3 ${headerWide ? 'py-1.5' : 'py-2'} ${
+          className={`flex flex-col items-center gap-0.5 rounded-to-md border px-3 ${headerWide ? 'py-1.5' : 'py-1'} ${
             quarter > 4 ? 'border-to-accent bg-to-accent' : 'border-to-divider bg-transparent'
           }`}
         >
@@ -1268,39 +1198,37 @@ export function GameStatsTracker() {
   // ============ Bestätigung ============
   // Zuletzt-Zeile (§1, NEU): ersetzt die bisherige ConfirmBar/"Zurück".
   // Leer-Zustand (7-noch-nichts.png): gestrichelter Rahmen, kein Stift.
+  // Einzeilig und kompakt (auf Nutzerwunsch, angelehnt an die Live-App) —
+  // vorher zweizeilig mit eigener "ZULETZT GETRACKT"-Unterzeile.
   function LastTrackedRow() {
     if (!lastStatEvent) {
       return (
-        <div className="flex items-center gap-2.5 rounded-to-xl border border-dashed border-to-line bg-to-surface py-[7px] pl-3 pr-2">
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="truncate text-[13px] font-medium text-to-textDisabled">Noch nichts getrackt</span>
-            <span className="to-data text-[8px] tracking-[0.1em] text-to-textDisabled">HIER STEHT DIE LETZTE AKTION</span>
-          </span>
+        <div className="flex h-[38px] items-center gap-2 rounded-to-lg border border-dashed border-to-line bg-to-surface px-3">
+          <span className="to-data shrink-0 text-[9px] tracking-[0.08em] text-to-textDisabled">ZULETZT</span>
+          <span className="truncate text-[13px] text-to-textDisabled">Noch nichts getrackt</span>
         </div>
       );
     }
     const entry = describeEvent(lastStatEvent);
     return (
-      <div className="flex items-center gap-2.5 rounded-to-xl border border-to-border bg-to-surface py-[7px] pl-3 pr-2">
+      <div className="flex h-[38px] items-center gap-2 rounded-to-lg border border-to-border bg-to-surface pl-3 pr-1.5">
+        <span className="to-data shrink-0 text-[9px] tracking-[0.08em] text-to-textDisabled">ZULETZT</span>
         {entry.num && (
           <span className="to-data flex h-5 min-w-6 shrink-0 items-center justify-center rounded-to-sm bg-to-surface2 px-1.5 text-[10px] text-to-text2">
             {entry.num}
           </span>
         )}
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-[13px] font-semibold text-to-text">{entry.text}</span>
-          <span className="to-data text-[8px] tracking-[0.1em] text-to-textDisabled">ZULETZT GETRACKT</span>
-        </span>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-to-text">{entry.text}</span>
         {!!entry.pts && (
           <span className={`to-data shrink-0 text-xs font-bold ${entry.opp ? 'text-to-dangerText' : 'text-to-accent'}`}>+{entry.pts}</span>
         )}
         <button
           type="button"
           onClick={() => openEditSheet(lastStatEvent)}
-          className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full border border-to-line bg-to-surface2 text-to-accent"
+          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-to-line bg-to-surface2 text-to-accent"
           aria-label="Aktion ändern"
         >
-          <PencilIcon />
+          <PencilIcon size={13} />
         </button>
       </div>
     );
@@ -2200,13 +2128,12 @@ export function GameStatsTracker() {
 
   return (
     <div className="min-h-screen bg-to-bg pb-8">
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-to-divider bg-to-surface px-4 py-3">
-        <button type="button" onClick={goBack} className="flex items-center gap-1 text-sm font-semibold text-to-text2">
+      <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-to-divider bg-to-surface px-4 py-3">
+        <button type="button" onClick={goBack} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-to-text2">
           <BackChevronIcon />
           Zurück
         </button>
-        <p className="text-sm font-bold text-to-text">{game ? `vs. ${game.opponent}` : 'Spiel-Stats'}</p>
-        <span className="w-14" />
+        <p className="min-w-0 flex-1 truncate text-right text-sm font-bold text-to-text">{game ? `vs. ${game.opponent}` : 'Spiel-Stats'}</p>
       </div>
       {game && (
         <p className="pt-2 text-center text-xs text-to-text3">
@@ -2263,7 +2190,6 @@ export function GameStatsTracker() {
 
         {lockState.kind === 'held' && game && (
           <>
-            {LayoutSwitcher()}
             {wide ? (
               <div className="flex flex-col gap-3">
                 {Header({ withEndButton: true, wide: true })}
