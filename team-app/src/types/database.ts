@@ -245,6 +245,13 @@ export interface Game {
   final_score_us: number | null;
   final_score_opponent: number | null;
   stats_finalized_at: string | null;
+  // Zeitpunkt der letzten nachträglichen Änderung/Löschung eines
+  // game_stat_events-Eintrags (Migration 0079, Element 26 §4/§5) — gesetzt
+  // vom recalc_game_score()-Trigger, NICHT bei einer ganz normalen neuen
+  // Aktion (reines INSERT). Dashboard.tsx nutzt den Wechsel, um am
+  // Live-Ticker kurz "korrigiert" statt einfach still den neuen Stand zu
+  // zeigen.
+  stats_corrected_at: string | null;
   squad_decline_pending: boolean;
   // Ratchet für die Viertelwechsel-Push (Migration 0042) — 0 = noch kein
   // Viertel angesagt. Wird in GamesAdmin.tsx genutzt, um "Tracking

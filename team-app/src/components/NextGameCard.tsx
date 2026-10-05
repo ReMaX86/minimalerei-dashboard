@@ -116,6 +116,7 @@ export function NextGameCard({
   activeStatsHolder,
   liveScore,
   liveQuarter,
+  correctedBadge,
   refreshingLive,
   onRefreshLive,
   onResponded
@@ -131,6 +132,10 @@ export function NextGameCard({
   activeStatsHolder: string | null;
   liveScore: { us: number; opponent: number } | null;
   liveQuarter: number | null;
+  // Element 26 §5: kurzer Hinweis, wenn sich der Live-Stand gerade durch
+  // eine nachträgliche Korrektur geändert hat (nicht durch einen ganz
+  // normal neu getrackten Korb) — siehe Dashboard.tsx refreshLiveScore().
+  correctedBadge: boolean;
   refreshingLive: boolean;
   onRefreshLive: () => void;
   onResponded: () => void;
@@ -404,8 +409,11 @@ export function NextGameCard({
                     <span className="h-1.5 w-1.5 rounded-full bg-to-danger" />
                     LIVE
                   </span>
-                  {activeStatsHolder && (
+                  {activeStatsHolder && !correctedBadge && (
                     <span className="to-data text-[13px] text-to-text2">Q{liveQuarter ?? 1}</span>
+                  )}
+                  {activeStatsHolder && correctedBadge && (
+                    <span className="to-data text-[10px] tracking-wide text-to-vacation">KORRIGIERT</span>
                   )}
                 </span>
                 <span className="flex flex-col items-end gap-1">

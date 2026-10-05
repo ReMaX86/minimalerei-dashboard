@@ -80,6 +80,39 @@ const OPPONENT_POINTS: Partial<Record<StatType, number>> = {
   fg3_made: 3
 };
 
+// Aktion-ändern-Blatt (§4, NEU): "WAS"-Kacheln in fünf Zeilen. Treffer/
+// Fehlwurf/Foul sind rot bzw. volt getönt ("bad"/neutral je nach Auswahl,
+// siehe EditWasTile), die mittleren Reihen neutral.
+const EDIT_WAS_ROWS: { key: StatType; label: string; bad?: boolean }[][] = [
+  [
+    { key: 'fg2_made', label: '2er ✓' },
+    { key: 'fg3_made', label: '3er ✓' },
+    { key: 'ft_made', label: 'FW ✓' }
+  ],
+  [
+    { key: 'fg2_miss', label: '2er ✗', bad: true },
+    { key: 'fg3_miss', label: '3er ✗', bad: true },
+    { key: 'ft_miss', label: 'FW ✗', bad: true }
+  ],
+  [
+    { key: 'rebound_def', label: 'Reb DEF' },
+    { key: 'rebound_off', label: 'Reb OFF' },
+    { key: 'assist', label: 'Ast' }
+  ],
+  [
+    { key: 'steal', label: 'Stl' },
+    { key: 'block', label: 'Blk' },
+    { key: 'turnover', label: 'TO' }
+  ],
+  [{ key: 'foul', label: 'Foul', bad: true }]
+];
+
+// Für den Gegner werden laut Schema nur die drei wurfrelevanten Typen
+// akzeptiert (siehe game_stat_events_opponent_scoring_only, Migration 0028)
+// — dieselbe Einschränkung wie beim Erfassen gilt auch beim nachträglichen
+// Ändern.
+const OPPONENT_ONLY_TYPES: StatType[] = ['fg2_made', 'fg3_made', 'ft_made'];
+
 type LockState =
   | { kind: 'loading' }
   | { kind: 'readonly' }
@@ -127,13 +160,6 @@ function SwapIcon() {
     </svg>
   );
 }
-function UndoIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3" />
-    </svg>
-  );
-}
 function PersonIcon() {
   return (
     <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#7C8594" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -146,6 +172,20 @@ function BackChevronIcon() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M15 6l-6 6 6 6" />
+    </svg>
+  );
+}
+function PencilIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z" />
+    </svg>
+  );
+}
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13" />
     </svg>
   );
 }
@@ -174,6 +214,11 @@ function Photo({ player, size }: { player: Player; size: number }) {
   );
 }
 
+// Würfe (Element 26 §1): am Handy echte Kreise (114px, fester Durchmesser,
+// zentriert mit Lücke statt flex-1-Streckung) mit Leucht-Schein; im
+// Querformat (height="stretch", eigenes Grid-Layout bleibt bestehen) dieselbe
+// Farbgebung, aber als flächige Kachel statt Kreis — ein Kreis würde in einer
+// nicht-quadratischen Grid-Zelle zur Ellipse verzerrt.
 function ShotButton({
   label,
   sub,
@@ -189,41 +234,72 @@ function ShotButton({
   onClick: () => void;
   style?: CSSProperties;
 }) {
+  if (height === 'stretch') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        style={style}
+        className={`flex h-full flex-col items-center justify-center gap-0.5 rounded-to-lg border font-semibold ${
+          make ? 'border-to-borderMatchday bg-to-accentSoft text-to-accent' : 'border-to-dangerFrame bg-to-dangerSoft text-to-dangerText'
+        }`}
+      >
+        <span className="text-[19px] font-bold">{label}</span>
+        <span className="to-data text-[8px] tracking-[0.08em] opacity-70">{sub}</span>
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        width: height,
+        height,
+        boxShadow: make ? '0 0 28px rgba(200,255,46,.10)' : '0 0 28px rgba(255,90,103,.09)',
+        ...style
+      }}
+      className={`flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-full border-2 ${
+        make ? 'border-to-accent bg-to-accentSoft text-to-accent' : 'border-to-danger bg-to-dangerSoft text-to-dangerText'
+      }`}
+    >
+      <span className="text-[25px] font-bold">{label}</span>
+      <span className="to-data text-[8px] tracking-[0.1em] opacity-80">{sub}</span>
+    </button>
+  );
+}
+
+// "Übrige Aktionen" (Reb/Ast/Stl/Blk/TO, §1): Pillen statt Kacheln —
+// Radius = halbe Höhe, also eine Stadion-Form (rounded-to-pill reicht dafür,
+// unabhängig von der tatsächlichen Höhe).
+function StatPill({ label, sub, height, onClick, style }: { label: string; sub?: string; height: number | 'stretch'; onClick: () => void; style?: CSSProperties }) {
   return (
     <button
       type="button"
       onClick={onClick}
       style={height === 'stretch' ? style : { height, ...style }}
-      className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-to-lg border font-semibold ${
+      className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-to-pill border border-to-line bg-to-surface2 text-to-text ${
         height === 'stretch' ? 'h-full' : ''
-      } ${
-        make
-          ? 'border-to-borderMatchday bg-to-accentSoft text-to-accent'
-          : 'border-to-dangerFrame bg-to-dangerSoft text-to-dangerText'
       }`}
     >
-      <span className="flex items-center gap-1.5 text-[19px] font-bold">
-        {label}
-        {make ? <CheckIcon /> : <XMarkIcon />}
-      </span>
-      <span className="to-data text-[8px] tracking-[0.08em] opacity-70">{sub}</span>
+      <span className="text-[19px] font-semibold">{label}</span>
+      {sub && <span className="to-data text-[7px] tracking-[0.1em] text-to-textDisabled">{sub}</span>}
     </button>
   );
 }
 
-function PadButton({
+// Unterste Zeile (Foul/Wechseln, §1): schlichte Pillen, "Wechseln" bewusst
+// OHNE Volt/Icon (anders als vor Element 26) — der Wechseln-Weg mit Icon
+// sitzt jetzt zusätzlich in der "Auf dem Feld"-Karte (siehe CourtRow).
+function BottomPill({
   label,
-  sub,
   danger,
-  volt,
   height,
   onClick,
   style
 }: {
   label: string;
-  sub?: string;
   danger?: boolean;
-  volt?: boolean;
   height: number | 'stretch';
   onClick: () => void;
   style?: CSSProperties;
@@ -233,19 +309,11 @@ function PadButton({
       type="button"
       onClick={onClick}
       style={height === 'stretch' ? style : { height, ...style }}
-      className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-to-lg border text-[15px] font-semibold ${
+      className={`flex flex-1 items-center justify-center rounded-to-pill border text-[15px] font-semibold ${
         height === 'stretch' ? 'h-full' : ''
-      } ${
-        danger
-          ? 'border-to-dangerFrame bg-to-dangerSoft text-to-dangerText'
-          : volt
-            ? 'flex-row gap-2 border-to-borderMatchday bg-to-accentWash text-to-accent'
-            : 'border-to-line bg-to-surface2 text-to-text'
-      }`}
+      } ${danger ? 'border-to-dangerFrame bg-to-dangerSoft text-to-dangerText' : 'border-to-line bg-to-surface2 text-to-text'}`}
     >
-      {volt && <SwapIcon />}
       {label}
-      {sub && <span className="to-data text-[8px] tracking-[0.08em] text-to-textDisabled">{sub}</span>}
     </button>
   );
 }
@@ -278,15 +346,15 @@ function PlayerTile({
           ? 'border-to-accent bg-to-accentWash'
           : tone === 'danger'
             ? 'border-to-dangerFrame bg-to-surface2'
-            : 'border-to-line bg-to-surface2'
+            : 'border-to-border bg-to-surface2'
       }`}
     >
       <Photo player={player} size={photoSize} />
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className={`to-number text-[26px] leading-none ${tone === 'danger' ? 'text-to-dangerText' : 'text-to-text'}`}>
+        <span className={`to-number text-[19px] leading-none ${tone === 'danger' ? 'text-to-dangerText' : 'text-to-accent'}`}>
           {number ?? '–'}
         </span>
-        <span className="truncate text-xs font-semibold text-to-text">{shortPlayerName(player.name)}</span>
+        <span className="truncate text-[13px] font-semibold text-to-text">{shortPlayerName(player.name)}</span>
         <span
           className={`to-data text-[8px] tracking-[0.06em] ${
             tone === 'danger' ? 'text-to-dangerText' : tone === 'warn' ? 'text-to-vacation' : 'text-to-textDisabled'
@@ -314,24 +382,24 @@ function OpponentTile({ size, teamName, points, onClick }: { size: number; teamN
   );
 }
 
-function CourtChip({ player, number, fouls }: { player: Player; number?: number; fouls: number }) {
+// "Auf dem Feld" (§3): Foto mit Trikotnummer-Plakette statt Zahlen-Chip —
+// die Nummer sitzt als kleines volt Badge unten rechts überlappend auf dem
+// Foto, darunter Vorname + "PKT · FOULS".
+function CourtAvatar({ player, number, points, fouls }: { player: Player; number?: number; points: number; fouls: number }) {
   const tone = foulTone(fouls);
   return (
-    <span className="flex flex-1 flex-col items-center gap-1 rounded-to-md border border-to-border bg-to-surface2 py-2">
-      <span
-        className={`flex h-[34px] w-[34px] items-center justify-center rounded-to-sm ${
-          tone === 'danger' ? 'bg-to-dangerSoft text-to-dangerText' : 'bg-to-surface text-to-text'
-        }`}
-      >
-        <span className="to-number text-base leading-none">{number ?? '–'}</span>
+    <span className="flex flex-1 flex-col items-center gap-1.5">
+      <span className="relative flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full border border-to-line bg-to-surface2">
+        <Photo player={player} size={54} />
+        {number !== undefined && (
+          <span className="to-number absolute -bottom-[3px] -right-[3px] flex h-5 min-w-5 items-center justify-center rounded-to-sm bg-to-accent px-1 text-[12px] text-to-onAccent">
+            {number}
+          </span>
+        )}
       </span>
-      <span className="truncate text-[10px] text-to-text2">{player.name.split(' ')[0]}</span>
-      <span
-        className={`to-data text-[8px] ${
-          tone === 'danger' ? 'text-to-dangerText' : tone === 'warn' ? 'text-to-vacation' : 'text-to-textDisabled'
-        }`}
-      >
-        {fouls} F
+      <span className="max-w-[62px] truncate text-[10px] text-to-text2">{player.name.split(' ')[0]}</span>
+      <span className={`to-data text-[9px] ${tone === 'danger' ? 'text-to-dangerText' : tone === 'warn' ? 'text-to-vacation' : 'text-to-text3'}`}>
+        {points} · {fouls}
       </span>
     </span>
   );
@@ -430,12 +498,11 @@ export function GameStatsTracker() {
   const [pendingPlayer, setPendingPlayer] = useState<string | null>(null);
   const [subMode, setSubMode] = useState<'out' | 'in' | null>(null);
   const [outgoingId, setOutgoingId] = useState<string | null>(null);
-  const [showBox, setShowBox] = useState(false);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [foulOutPlayerId, setFoulOutPlayerId] = useState<string | null>(null);
 
   const quarter = game?.current_quarter ?? 1;
-  const insertedStack = useRef<string[]>([]);
   const heartbeatInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadPlayersAndEvents = useCallback(async () => {
@@ -627,7 +694,6 @@ export function GameStatsTracker() {
         .single();
       if (insertError) throw insertError;
       const row = data as GameStatEvent;
-      insertedStack.current.push(row.id);
       setEvents((prev) => [...prev, row]);
       setPendingAction(null);
       // Freiwurf-Serie (Rückfrage 6): denselben Spieler nach einem Freiwurf
@@ -662,26 +728,81 @@ export function GameStatsTracker() {
     setPendingPlayer(null);
   }
 
-  // "Zurück" (Rückfrage 3): beliebig viele Schritte, solange das Viertel
-  // läuft — nimmt immer den zuletzt gespeicherten Eintrag DES AKTUELLEN
-  // VIERTELS aus der Datenbank zurück statt nur aus einem lokalen Array,
-  // damit der Knopf auch nach einem Neuladen oder einer Übernahme des
-  // Trackings weiter funktioniert.
-  const quarterEvents = events.filter((e) => e.quarter === quarter);
-  const lastQuarterEvent = quarterEvents[quarterEvents.length - 1] ?? null;
+  // Bearbeiten/Löschen (Element 26 §4/§5, NEU): ersetzt das bisherige
+  // "Zurück nimmt den letzten Eintrag zurück" — über den Stift lässt sich
+  // jetzt JEDER Eintrag ändern oder löschen, nicht nur der letzte im
+  // aktuellen Viertel. Erreichbar nur innerhalb von lockState "held" (siehe
+  // ganz unten), also ausschließlich für die Person, die die Tracking-
+  // Sitzung gerade hält — "jeder der tracken darf" (Rückfrage 3) bedeutet
+  // hier: jeder, der es bis zu diesem Punkt geschafft hat, die Sitzung zu
+  // halten, nicht zusätzlich eine zweite Rechteprüfung pro Eintrag.
+  const [editTarget, setEditTarget] = useState<GameStatEvent | null>(null);
+  const [editWer, setEditWer] = useState<string | 'opponent' | null>(null);
+  const [editWas, setEditWas] = useState<StatType | null>(null);
+  const [editBankShown, setEditBankShown] = useState(false);
+  const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<GameStatEvent | null>(null);
 
-  async function undo() {
-    if (!lastQuarterEvent || busy) return;
+  function openEditSheet(ev: GameStatEvent) {
+    setEditTarget(ev);
+    setEditWer(ev.team === 'opponent' ? 'opponent' : ev.player_id);
+    setEditWas(ev.stat_type);
+    setEditBankShown(false);
+  }
+  function closeEditSheet() {
+    setEditTarget(null);
+    setEditWer(null);
+    setEditWas(null);
+    setEditBankShown(false);
+  }
+  function selectEditWer(id: string | 'opponent') {
+    setEditWer(id);
+    // Gegner lässt nur die drei Treffer-Typen zu — eine bisher gewählte
+    // andere Aktion (z. B. "Reb DEF") wäre dafür ungültig, also zurück auf
+    // "noch nichts gewählt" statt eine unzulässige Kombination stehen zu
+    // lassen.
+    if (id === 'opponent' && editWas && !OPPONENT_ONLY_TYPES.includes(editWas)) {
+      setEditWas(null);
+    }
+  }
+
+  async function saveEdit() {
+    if (!editTarget || !editWas || !editWer || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const { error: delError } = await supabase.from('game_stat_events').delete().eq('id', lastQuarterEvent.id);
-      if (delError) throw delError;
-      setEvents((prev) => prev.filter((e) => e.id !== lastQuarterEvent.id));
-      insertedStack.current = insertedStack.current.filter((id) => id !== lastQuarterEvent.id);
-      setPendingPlayer(null);
+      const patch = {
+        team: editWer === 'opponent' ? ('opponent' as const) : ('us' as const),
+        player_id: editWer === 'opponent' ? null : editWer,
+        stat_type: editWas
+      };
+      const { data, error: updateError } = await supabase.from('game_stat_events').update(patch).eq('id', editTarget.id).select().single();
+      if (updateError) throw updateError;
+      const row = data as GameStatEvent;
+      setEvents((prev) => prev.map((e) => (e.id === row.id ? row : e)));
+      closeEditSheet();
     } catch {
-      setError('Rückgängig machen fehlgeschlagen.');
+      setError('Änderung konnte nicht gespeichert werden.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function askDeleteEvent(ev: GameStatEvent) {
+    closeEditSheet();
+    setConfirmDeleteTarget(ev);
+  }
+
+  async function confirmDeleteEvent() {
+    if (!confirmDeleteTarget || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { error: delError } = await supabase.from('game_stat_events').delete().eq('id', confirmDeleteTarget.id);
+      if (delError) throw delError;
+      setEvents((prev) => prev.filter((e) => e.id !== confirmDeleteTarget.id));
+      setConfirmDeleteTarget(null);
+    } catch {
+      setError('Eintrag konnte nicht gelöscht werden.');
     } finally {
       setBusy(false);
     }
@@ -829,20 +950,29 @@ export function GameStatsTracker() {
 
   // Verlauf (Element 24 §7) — Stats-Events und Wechsel gemeinsam,
   // zeitlich sortiert, neueste zuerst.
-  const statLogEntries: (LogEntry & { created_at: string })[] = events.map((e) => ({
-    id: e.id,
-    quarter: e.quarter,
-    num: e.team === 'opponent' ? '' : e.player_id ? String(numbers[e.player_id] ?? '') : '',
-    text:
-      e.team === 'opponent'
-        ? `Gegner · ${STAT_TYPE_LABELS[e.stat_type]}`
-        : `${playersById[e.player_id ?? '']?.name ?? '?'} · ${STAT_TYPE_LABELS[e.stat_type]}${
-            e.stat_type === 'foul' && e.player_id ? ` (${countPlayerFouls(events.filter((x) => x.created_at <= e.created_at), e.player_id)}.)` : ''
-          }`,
-    pts: e.stat_type === 'fg2_made' ? 2 : e.stat_type === 'fg3_made' ? 3 : e.stat_type === 'ft_made' ? 1 : 0,
-    opp: e.team === 'opponent',
-    created_at: e.created_at
-  }));
+  // Gemeinsam für Verlauf, Zuletzt-Zeile und die "so steht der Eintrag
+  // gerade"-Anzeige im Bearbeiten-/Löschen-Blatt — ein einzelner Eintrag
+  // immer gleich beschrieben, egal an welcher Stelle er auftaucht.
+  function describeEvent(e: GameStatEvent): LogEntry & { created_at: string } {
+    return {
+      id: e.id,
+      quarter: e.quarter,
+      num: e.team === 'opponent' ? '' : e.player_id ? String(numbers[e.player_id] ?? '') : '',
+      text:
+        e.team === 'opponent'
+          ? `Gegner · ${STAT_TYPE_LABELS[e.stat_type]}`
+          : `${playersById[e.player_id ?? '']?.name ?? '?'} · ${STAT_TYPE_LABELS[e.stat_type]}${
+              e.stat_type === 'foul' && e.player_id
+                ? ` (${countPlayerFouls(events.filter((x) => x.created_at <= e.created_at), e.player_id)}.)`
+                : ''
+            }`,
+      pts: e.stat_type === 'fg2_made' ? 2 : e.stat_type === 'fg3_made' ? 3 : e.stat_type === 'ft_made' ? 1 : 0,
+      opp: e.team === 'opponent',
+      created_at: e.created_at
+    };
+  }
+
+  const statLogEntries: (LogEntry & { created_at: string })[] = events.map(describeEvent);
 
   const subLogEntries: (LogEntry & { created_at: string })[] = [];
   for (let i = 1; i < lineupLog.length; i++) {
@@ -868,6 +998,11 @@ export function GameStatsTracker() {
   const logEntries = [...statLogEntries, ...subLogEntries].sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   const lastLogEntry = logEntries[0] ?? null;
+  // Zuletzt-Zeile (§1, NEU) zeigt nur echte Stat-Events, keine Wechsel —
+  // "events" ist aufsteigend sortiert geladen und bleibt es (Insert hängt
+  // an, Update/Delete ändern die Reihenfolge nicht), das letzte Element ist
+  // also immer das zuletzt getrackte.
+  const lastStatEvent = events.length > 0 ? events[events.length - 1] : null;
 
   const screenKey =
     trackablePlayers.length === 0
@@ -880,9 +1015,7 @@ export function GameStatsTracker() {
             ? `sub-${subMode}`
             : pendingAction && !pendingPlayer
               ? `picker-${pendingAction}`
-              : showBox
-                ? 'box'
-                : 'idle';
+              : 'idle';
   useScrollResetOnChange(screenKey);
 
   if (error && !game) return <ErrorNote message={error} />;
@@ -939,12 +1072,12 @@ export function GameStatsTracker() {
       <div className="flex items-end justify-center gap-2.5">
         <span className="flex flex-col items-end gap-0.5">
           <span className="to-data text-[9px] tracking-[0.1em] text-to-accent">TBW</span>
-          <span className={`to-number leading-none text-to-text ${headerWide ? 'text-[44px]' : 'text-[64px]'}`}>{teamScore.us}</span>
+          <span className={`to-number leading-none text-to-text ${headerWide ? 'text-[44px]' : 'text-[34px]'}`}>{teamScore.us}</span>
         </span>
-        <span className={`to-number text-to-textDisabled ${headerWide ? 'pb-1 text-xl' : 'pb-2 text-2xl'}`}>:</span>
+        <span className={`to-number text-to-textDisabled ${headerWide ? 'pb-1 text-xl' : 'pb-1 text-base'}`}>:</span>
         <span className="flex flex-col gap-0.5">
           <span className="to-data text-[9px] tracking-[0.1em] text-to-text3">{game?.opponent?.slice(0, 3).toUpperCase() ?? 'GEG'}</span>
-          <span className={`to-number leading-none text-to-text2 ${headerWide ? 'text-[44px]' : 'text-[64px]'}`}>{teamScore.opponent}</span>
+          <span className={`to-number leading-none text-to-text2 ${headerWide ? 'text-[44px]' : 'text-[34px]'}`}>{teamScore.opponent}</span>
         </span>
       </div>
     );
@@ -1054,26 +1187,24 @@ export function GameStatsTracker() {
           {game?.opponent ? `TB WÜLFRATH · WAS IST PASSIERT?` : 'WAS IST PASSIERT?'}
         </span>
         {SHOT_BUTTONS.map(({ made, miss, label, sub }) => (
-          <div key={made} className="flex gap-2.5">
+          <div key={made} className="flex justify-center gap-[26px]">
             <ShotButton label={label} sub={sub} make height={shotHeight} onClick={() => handleAction(made)} />
-            <ShotButton label={label} sub="DANEBEN" make={false} height={shotHeight} onClick={() => handleAction(miss)} />
+            <ShotButton label={label} sub="FEHLWURF" make={false} height={shotHeight} onClick={() => handleAction(miss)} />
           </div>
         ))}
-        <div className="flex gap-2.5">
-          <PadButton label="Reb DEF" sub="DEFENSIV" height={actionHeight} onClick={() => handleAction('rebound_def')} />
-          <PadButton label="Reb OFF" sub="OFFENSIV" height={actionHeight} onClick={() => handleAction('rebound_off')} />
+        <div className="flex gap-[11px]">
+          <StatPill label="Reb" sub="DEFENSIV" height={actionHeight} onClick={() => handleAction('rebound_def')} />
+          <StatPill label="Reb" sub="OFFENSIV" height={actionHeight} onClick={() => handleAction('rebound_off')} />
+          <StatPill label="Ast" sub="ASSIST" height={actionHeight} onClick={() => handleAction('assist')} />
         </div>
-        <div className="flex gap-2.5">
-          <PadButton label="Assist" height={actionHeight} onClick={() => handleAction('assist')} />
-          <PadButton label="Steal" height={actionHeight} onClick={() => handleAction('steal')} />
+        <div className="flex gap-[11px]">
+          <StatPill label="Stl" sub="STEAL" height={actionHeight} onClick={() => handleAction('steal')} />
+          <StatPill label="Blk" sub="BLOCK" height={actionHeight} onClick={() => handleAction('block')} />
+          <StatPill label="TO" sub="TURNOVER" height={actionHeight} onClick={() => handleAction('turnover')} />
         </div>
-        <div className="flex gap-2.5">
-          <PadButton label="Block" height={actionHeight} onClick={() => handleAction('block')} />
-          <PadButton label="Turnover" height={actionHeight} onClick={() => handleAction('turnover')} />
-        </div>
-        <div className="flex gap-2.5">
-          <PadButton label="Foul" danger height={actionHeight} onClick={() => handleAction('foul')} />
-          <PadButton label="Wechseln" volt height={actionHeight} onClick={startSubstitution} />
+        <div className="flex gap-[11px]">
+          <BottomPill label="Foul" danger height={58} onClick={() => handleAction('foul')} />
+          <BottomPill label="Wechseln" height={58} onClick={startSubstitution} />
         </div>
       </div>
     );
@@ -1112,14 +1243,14 @@ export function GameStatsTracker() {
         ))}
         {OTHER_ACTION_ROWS.map((row, i) => (
           <Fragment key={row[0].key}>
-            <PadButton
+            <StatPill
               label={row[0].label}
               sub={row[0].sub}
               height="stretch"
               onClick={() => handleAction(row[0].key)}
               style={{ gridRow: i + 2, gridColumn: 3 }}
             />
-            <PadButton
+            <StatPill
               label={row[1].label}
               sub={row[1].sub}
               height="stretch"
@@ -1128,40 +1259,48 @@ export function GameStatsTracker() {
             />
           </Fragment>
         ))}
-        <PadButton label="Foul" danger height="stretch" onClick={() => handleAction('foul')} style={{ gridRow: 5, gridColumn: '1 / 3' }} />
-        <PadButton label="Wechseln" volt height="stretch" onClick={startSubstitution} style={{ gridRow: 5, gridColumn: '3 / 5' }} />
+        <BottomPill label="Foul" danger height="stretch" onClick={() => handleAction('foul')} style={{ gridRow: 5, gridColumn: '1 / 3' }} />
+        <BottomPill label="Wechseln" height="stretch" onClick={startSubstitution} style={{ gridRow: 5, gridColumn: '3 / 5' }} />
       </div>
     );
   }
 
   // ============ Bestätigung ============
-  function ConfirmBar() {
-    return (
-      <div className="flex items-center gap-2.5 rounded-to-lg border border-to-border bg-to-surface2 py-2.5 pl-3.5 pr-2.5">
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="to-data text-[8px] tracking-[0.12em] text-to-textDisabled">ZULETZT GETIPPT</span>
-          <span className="flex min-w-0 items-center gap-2">
-            {lastLogEntry?.num && (
-              <span className="to-data flex h-[22px] min-w-[26px] shrink-0 items-center justify-center rounded-to-sm bg-to-surface2 px-1.5 text-[11px] text-to-text2">
-                {lastLogEntry.num}
-              </span>
-            )}
-            <span className="truncate text-sm font-semibold text-to-text">{lastLogEntry ? lastLogEntry.text : 'Noch nichts getippt'}</span>
-            {!!lastLogEntry?.pts && (
-              <span className={`to-data shrink-0 text-xs font-bold ${lastLogEntry.opp ? 'text-to-dangerText' : 'text-to-accent'}`}>
-                +{lastLogEntry.pts}
-              </span>
-            )}
+  // Zuletzt-Zeile (§1, NEU): ersetzt die bisherige ConfirmBar/"Zurück".
+  // Leer-Zustand (7-noch-nichts.png): gestrichelter Rahmen, kein Stift.
+  function LastTrackedRow() {
+    if (!lastStatEvent) {
+      return (
+        <div className="flex items-center gap-2.5 rounded-to-xl border border-dashed border-to-line bg-to-surface py-[7px] pl-3 pr-2">
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate text-[13px] font-medium text-to-textDisabled">Noch nichts getrackt</span>
+            <span className="to-data text-[8px] tracking-[0.1em] text-to-textDisabled">HIER STEHT DIE LETZTE AKTION</span>
           </span>
+        </div>
+      );
+    }
+    const entry = describeEvent(lastStatEvent);
+    return (
+      <div className="flex items-center gap-2.5 rounded-to-xl border border-to-border bg-to-surface py-[7px] pl-3 pr-2">
+        {entry.num && (
+          <span className="to-data flex h-5 min-w-6 shrink-0 items-center justify-center rounded-to-sm bg-to-surface2 px-1.5 text-[10px] text-to-text2">
+            {entry.num}
+          </span>
+        )}
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate text-[13px] font-semibold text-to-text">{entry.text}</span>
+          <span className="to-data text-[8px] tracking-[0.1em] text-to-textDisabled">ZULETZT GETRACKT</span>
         </span>
+        {!!entry.pts && (
+          <span className={`to-data shrink-0 text-xs font-bold ${entry.opp ? 'text-to-dangerText' : 'text-to-accent'}`}>+{entry.pts}</span>
+        )}
         <button
           type="button"
-          disabled={!lastQuarterEvent || busy}
-          onClick={undo}
-          className="flex h-[46px] shrink-0 items-center gap-1.5 rounded-to-md border border-to-dangerFrame bg-to-dangerSoft px-4 text-sm font-semibold text-to-dangerText disabled:opacity-40"
+          onClick={() => openEditSheet(lastStatEvent)}
+          className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full border border-to-line bg-to-surface2 text-to-accent"
+          aria-label="Aktion ändern"
         >
-          <UndoIcon />
-          Zurück
+          <PencilIcon />
         </button>
       </div>
     );
@@ -1170,6 +1309,7 @@ export function GameStatsTracker() {
   // ============ Spielerauswahl ============
   function RosterGrid({
     label,
+    rightLabel,
     list,
     tileSize,
     photoSize,
@@ -1181,6 +1321,10 @@ export function GameStatsTracker() {
     opponent
   }: {
     label: string;
+    // "2 PUNKTE" / "OHNE PUNKTE" rechts neben dem Label (tracking.html
+    // .pickhead .r) — nur bei der Treffer-/Aktions-Auswahl gesetzt, nicht
+    // bei der Wechsel-Auswahl.
+    rightLabel?: string;
     list: Player[];
     tileSize: number;
     photoSize: number;
@@ -1206,7 +1350,12 @@ export function GameStatsTracker() {
     for (let i = 0; i < cells.length; i += cols) rows.push(cells.slice(i, i + cols));
     return (
       <div className="flex flex-col gap-2.5 rounded-to-xl border border-to-borderMatchday bg-to-surface p-3.5">
-        {label && <span className="to-data pl-1 text-[9px] tracking-[0.12em] text-to-accent">{label}</span>}
+        {label && (
+          <span className="flex items-center gap-1.5 pl-1">
+            <span className="to-data text-[9px] tracking-[0.12em] text-to-accent">{label}</span>
+            {rightLabel && <span className="to-data ml-auto text-[8px] tracking-[0.08em] text-to-textDisabled">{rightLabel}</span>}
+          </span>
+        )}
         {rows.map((row, i) => (
           // Grid statt flex: bei einer ungeraden letzten Zeile (z. B. 5
           // Spieler + leere Füllzelle) verteilt "flex: 1 1 0%" die Breite
@@ -1258,13 +1407,35 @@ export function GameStatsTracker() {
   // ============ Auf dem Feld (Handy) ============
   function CourtRow() {
     return (
-      <div className="flex flex-col gap-2.5 rounded-to-xl border border-to-border bg-to-surface p-3">
-        <span className="to-data pl-0.5 text-[9px] tracking-[0.1em] text-to-text3">AUF DEM FELD</span>
-        <div className="flex gap-1.5">
+      <div className="flex flex-col gap-3 rounded-to-xl border border-to-border bg-to-surface p-3.5">
+        <span className="flex items-center gap-2">
+          <span className="to-data text-[9px] tracking-[0.1em] text-to-text3">AUF DEM FELD</span>
+          <span className="to-data flex h-[17px] items-center rounded-to-sm bg-to-accentSoft px-1.5 text-[9px] font-bold text-to-accent">
+            {onCourtPlayers.length}
+          </span>
+          <span className="to-data ml-auto text-[8px] tracking-[0.08em] text-to-textDisabled">PKT · FOULS</span>
+        </span>
+        <div className="flex gap-2">
           {onCourtPlayers.map((p) => (
-            <CourtChip key={p.id} player={p} number={numbers[p.id]} fouls={countPlayerFouls(events, p.id)} />
+            <CourtAvatar
+              key={p.id}
+              player={p}
+              number={numbers[p.id]}
+              points={boxScore.find((b) => b.playerId === p.id)?.points ?? 0}
+              fouls={countPlayerFouls(events, p.id)}
+            />
           ))}
         </div>
+        <button
+          type="button"
+          onClick={startSubstitution}
+          className="flex h-12 items-center justify-center gap-2 rounded-to-pill border border-to-line bg-to-surface2 text-[15px] font-semibold text-to-text"
+        >
+          <span className="text-to-accent">
+            <SwapIcon />
+          </span>
+          Wechseln
+        </button>
       </div>
     );
   }
@@ -1274,28 +1445,62 @@ export function GameStatsTracker() {
   // Spalte, statt wie am Handy nur so hoch wie nötig zu sein — der
   // Box-Score darunter behält seine natürliche Höhe.
   function HistoryPanel({ limit, grow }: { limit: number; grow?: boolean }) {
-    const rows = logEntries.slice(0, limit);
+    const effectiveLimit = historyExpanded ? logEntries.length : limit;
+    const rows = logEntries.slice(0, effectiveLimit);
     return (
       <div className={`overflow-hidden rounded-to-xl border border-to-border bg-to-surface ${grow ? 'flex flex-1 flex-col' : ''}`}>
-        <span className="to-data block px-3.5 pb-2 pt-2.5 text-[9px] tracking-[0.1em] text-to-text3">VERLAUF</span>
+        <span className="flex items-center gap-2 px-3.5 pb-2 pt-2.5">
+          <span className="to-data text-[9px] tracking-[0.1em] text-to-text3">VERLAUF</span>
+          <span className="to-data ml-auto text-[8px] tracking-[0.08em] text-to-textDisabled">STIFT = ÄNDERN</span>
+        </span>
         <div className={grow ? 'flex-1 overflow-y-auto' : ''}>
           {rows.length === 0 ? (
             <p className="border-t border-to-surface2 px-3.5 py-2.5 text-[13px] text-to-text2">Noch keine Aktionen.</p>
           ) : (
-            rows.map((l) => (
-              <div key={l.id} className="flex items-center gap-2.5 border-t border-to-surface2 px-3.5 py-2.5">
-                <span className="to-data w-6 shrink-0 text-[9px] text-to-textDisabled">{l.quarter > 0 ? `Q${l.quarter}` : ''}</span>
-                <span className="to-data flex h-5 min-w-6 shrink-0 items-center justify-center rounded-to-sm bg-to-surface2 px-1.5 text-[10px] text-to-text3">
-                  {l.num || '–'}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[13px] text-to-text2">{l.text}</span>
-                <span className={`to-data shrink-0 text-[11px] font-bold ${l.pts ? (l.opp ? 'text-to-dangerText' : 'text-to-accent') : 'text-to-textDisabled'}`}>
-                  {l.pts ? `+${l.pts}` : ''}
-                </span>
-              </div>
-            ))
+            rows.map((l) => {
+              const isLast = l.id === lastStatEvent?.id;
+              const sourceEvent = l.sub ? null : events.find((e) => e.id === l.id) ?? null;
+              return (
+                <div
+                  key={l.id}
+                  className={`flex items-center gap-2.5 border-t border-to-surface2 py-2.5 pl-3.5 pr-2.5 ${isLast ? 'bg-to-accentWash' : ''}`}
+                >
+                  <span className="to-data w-6 shrink-0 text-[9px] text-to-textDisabled">{l.quarter > 0 ? `Q${l.quarter}` : ''}</span>
+                  <span className="to-data flex h-5 min-w-6 shrink-0 items-center justify-center rounded-to-sm bg-to-surface2 px-1.5 text-[10px] text-to-text2">
+                    {l.num || '–'}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-to-text2">{l.text}</span>
+                  <span
+                    className={`to-data shrink-0 text-[11px] font-bold ${l.pts ? (l.opp ? 'text-to-dangerText' : 'text-to-accent') : 'text-to-textDisabled'}`}
+                  >
+                    {l.pts ? `+${l.pts}` : ''}
+                  </span>
+                  {sourceEvent && (
+                    <button
+                      type="button"
+                      onClick={() => openEditSheet(sourceEvent)}
+                      aria-label="Eintrag ändern"
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
+                        isLast ? 'border-to-borderMatchday bg-to-accentSoft text-to-accent' : 'border-to-line bg-to-surface2 text-to-text3'
+                      }`}
+                    >
+                      <PencilIcon size={13} />
+                    </button>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
+        {!historyExpanded && logEntries.length > limit && (
+          <button
+            type="button"
+            onClick={() => setHistoryExpanded(true)}
+            className="to-data flex h-[42px] items-center justify-center border-t border-to-surface2 text-[9px] tracking-[0.08em] text-to-accent"
+          >
+            ALLE {logEntries.length} ANZEIGEN
+          </button>
+        )}
       </div>
     );
   }
@@ -1560,6 +1765,192 @@ export function GameStatsTracker() {
             </div>
           </div>
         )}
+
+        {editTarget &&
+          (() => {
+            const cur = describeEvent(editTarget);
+            const werList = editBankShown ? trackablePlayers : onCourtPlayers;
+            const canShowBank = !editBankShown && benchPlayers.length > 0;
+            return (
+              <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 sm:items-center" onClick={closeEditSheet}>
+                <div
+                  className="flex max-h-[92vh] w-full max-w-lg flex-col gap-3.5 overflow-y-auto rounded-t-[24px] border border-to-border bg-to-surface p-5 sm:rounded-b-[24px]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="mx-auto h-1 w-9 rounded-full bg-to-line" />
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={closeEditSheet}
+                      aria-label="Schließen"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-to-line text-to-text2"
+                    >
+                      <XMarkIcon size={14} />
+                    </button>
+                    <span className="flex-1 text-[17px] font-semibold text-to-text">Aktion ändern</span>
+                    <button
+                      type="button"
+                      disabled={!editWer || !editWas || busy}
+                      onClick={saveEdit}
+                      className="flex h-9 items-center rounded-to-pill bg-to-accent px-4 text-sm font-semibold text-to-onAccent disabled:opacity-40"
+                    >
+                      Sichern
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2.5 rounded-to-lg border border-to-border bg-to-surface2 px-3 py-2.5">
+                    <span className="to-data text-[9px] text-to-textDisabled">{cur.quarter > 0 ? `Q${cur.quarter}` : ''}</span>
+                    {cur.num && (
+                      <span className="to-data flex h-5 min-w-6 items-center justify-center rounded-to-sm bg-to-surface2 px-1.5 text-[10px] text-to-text2">
+                        {cur.num}
+                      </span>
+                    )}
+                    <span className="flex-1 text-[13px] font-semibold text-to-text">{cur.text}</span>
+                    <span className="to-data text-[11px] font-bold text-to-accent">{cur.pts ? `+${cur.pts}` : ''}</span>
+                  </div>
+
+                  <span className="to-data text-[9px] tracking-[0.12em] text-to-text3">WER</span>
+                  <div className="flex flex-col gap-2.5">
+                    {Array.from({ length: Math.ceil((werList.length + 1) / 3) }).map((_, i) => {
+                      const cells: (Player | 'opponent')[] = [...werList, 'opponent' as const].slice(i * 3, i * 3 + 3);
+                      return (
+                        <div key={i} className="grid grid-cols-3 gap-2.5">
+                          {cells.map((cell) =>
+                            cell === 'opponent' ? (
+                              <button
+                                key="opponent"
+                                type="button"
+                                onClick={() => selectEditWer('opponent')}
+                                className={`flex h-[54px] flex-col items-center justify-center gap-0.5 rounded-[14px] border ${
+                                  editWer === 'opponent' ? 'border-to-accent bg-to-accentWash' : 'border-to-dangerFrame bg-to-dangerSoft'
+                                }`}
+                              >
+                                <span className={`to-number text-[15px] leading-none ${editWer === 'opponent' ? 'text-to-accent' : 'text-to-dangerText'}`}>
+                                  {editWas && OPPONENT_POINTS[editWas] ? `+${OPPONENT_POINTS[editWas]}` : '+2'}
+                                </span>
+                                <span className={`text-[11px] ${editWer === 'opponent' ? 'text-to-text' : 'text-to-dangerText'}`}>Gegner</span>
+                              </button>
+                            ) : (
+                              <button
+                                key={cell.id}
+                                type="button"
+                                onClick={() => selectEditWer(cell.id)}
+                                className={`flex h-[54px] flex-col items-center justify-center gap-0.5 rounded-[14px] border ${
+                                  editWer === cell.id ? 'border-to-accent bg-to-accentWash' : 'border-to-border bg-to-surface2'
+                                }`}
+                              >
+                                <span className={`to-number text-[15px] leading-none ${editWer === cell.id ? 'text-to-accent' : 'text-to-text3'}`}>
+                                  {numbers[cell.id] ?? '–'}
+                                </span>
+                                <span className={`text-[11px] ${editWer === cell.id ? 'text-to-text' : 'text-to-text2'}`}>
+                                  {cell.name.split(' ')[0]}
+                                </span>
+                              </button>
+                            )
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {canShowBank && (
+                    <button
+                      type="button"
+                      onClick={() => setEditBankShown(true)}
+                      className="to-data text-center text-[9px] tracking-[0.08em] text-to-accent"
+                    >
+                      BANK ZEIGEN
+                    </button>
+                  )}
+
+                  <span className="to-data text-[9px] tracking-[0.12em] text-to-text3">WAS</span>
+                  <div className="flex flex-col gap-2">
+                    {EDIT_WAS_ROWS.map((row, i) => (
+                      <div key={i} className="flex gap-2.5">
+                        {row.map((a) => {
+                          const disabled = editWer === 'opponent' && !OPPONENT_ONLY_TYPES.includes(a.key);
+                          const selected = editWas === a.key;
+                          return (
+                            <button
+                              key={a.key}
+                              type="button"
+                              disabled={disabled}
+                              onClick={() => setEditWas(a.key)}
+                              className={`flex h-11 flex-1 items-center justify-center rounded-to-md border text-[13px] font-semibold disabled:opacity-30 ${
+                                selected
+                                  ? 'border-to-accent bg-to-accentWash text-to-accent'
+                                  : a.bad
+                                    ? 'border-to-dangerFrame bg-to-dangerSoft text-to-dangerText'
+                                    : 'border-to-border bg-to-surface2 text-to-text2'
+                              }`}
+                            >
+                              {a.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+
+                  <span className="h-px bg-to-divider" />
+                  <button
+                    type="button"
+                    onClick={() => askDeleteEvent(editTarget)}
+                    className="flex h-[50px] items-center justify-center gap-2 rounded-to-pill border border-to-dangerFrame text-[15px] font-semibold text-to-dangerText"
+                  >
+                    <TrashIcon />
+                    Eintrag löschen
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
+        {confirmDeleteTarget &&
+          (() => {
+            const cur = describeEvent(confirmDeleteTarget);
+            return (
+              <div
+                className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 sm:items-center"
+                onClick={() => setConfirmDeleteTarget(null)}
+              >
+                <div
+                  className="flex w-full max-w-lg flex-col gap-3.5 rounded-t-[24px] border border-to-border bg-to-surface p-5 sm:rounded-b-[24px]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="mx-auto h-1 w-9 rounded-full bg-to-line" />
+                  <span className="text-[17px] font-semibold text-to-text">Eintrag löschen?</span>
+                  <div className="flex items-center gap-2.5 rounded-to-lg border border-to-border bg-to-surface2 px-3 py-2.5">
+                    <span className="to-data text-[9px] text-to-textDisabled">{cur.quarter > 0 ? `Q${cur.quarter}` : ''}</span>
+                    {cur.num && (
+                      <span className="to-data flex h-5 min-w-6 items-center justify-center rounded-to-sm bg-to-surface2 px-1.5 text-[10px] text-to-text2">
+                        {cur.num}
+                      </span>
+                    )}
+                    <span className="flex-1 text-[13px] font-semibold text-to-text">{cur.text}</span>
+                    <span className="to-data text-[11px] font-bold text-to-accent">{cur.pts ? `+${cur.pts}` : ''}</span>
+                  </div>
+                  <div className="flex items-start gap-2.5 rounded-to-lg border border-to-dangerFrame bg-to-dangerSoft p-3.5 text-xs leading-relaxed text-to-text2">
+                    <TrashIcon />
+                    <span>Der Eintrag verschwindet aus dem Verlauf. Punktestand und Boxscore rechnen sich neu – auch der Live-Ticker.</span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={confirmDeleteEvent}
+                    className="flex h-[52px] items-center justify-center rounded-to-pill bg-to-danger text-[15px] font-semibold text-[#120507] disabled:opacity-60"
+                  >
+                    Löschen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteTarget(null)}
+                    className="flex h-[50px] items-center justify-center rounded-to-pill border border-to-line text-[15px] font-semibold text-to-text2"
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
       </>
     );
   }
@@ -1664,10 +2055,12 @@ export function GameStatsTracker() {
     if (pendingAction && !wide) {
       return (
         <div className="flex flex-col gap-2">
+          {LastTrackedRow()}
           {RosterGrid({
             label: `WER WAR ES? · ${STAT_TYPE_LABELS[pendingAction].toUpperCase()}`,
+            rightLabel: OPPONENT_POINTS[pendingAction] ? `${OPPONENT_POINTS[pendingAction]} PUNKTE` : 'OHNE PUNKTE',
             list: pickablePlayers,
-            tileSize: 116,
+            tileSize: 102,
             photoSize: 56,
             showCancel: true,
             onCancel: cancelPicker,
@@ -1677,34 +2070,17 @@ export function GameStatsTracker() {
               ? { points: OPPONENT_POINTS[pendingAction]!, onPick: () => addStat('opponent', pendingAction, null) }
               : undefined
           })}
-          {ConfirmBar()}
-          <p className="px-1 text-xs leading-relaxed text-to-textDisabled">
-            Die Auswahl steht an der Stelle des Tastenfelds – kein Scrollen, kein Suchen. Nach dem Tipp ist das Tastenfeld sofort wieder da.
-          </p>
-        </div>
-      );
-    }
-
-    if (showBox && !wide) {
-      return (
-        <div className="flex flex-col gap-3">
-          {SimpleBoxScore({ onlyCourt: false })}
-          <button type="button" onClick={() => setShowBox(false)} className="h-[52px] rounded-to-pill border border-to-line text-[15px] font-semibold text-to-text2">
-            Zurück zum Tracking
-          </button>
         </div>
       );
     }
 
     return (
       <div className="flex flex-col gap-2.5">
-        {Keypad({ shotHeight: 62, actionHeight: 58 })}
-        {ConfirmBar()}
+        {LastTrackedRow()}
+        {Keypad({ shotHeight: 114, actionHeight: 112 })}
         {CourtRow()}
         {HistoryPanel({ limit: 3 })}
-        <button type="button" onClick={() => setShowBox(true)} className="h-[52px] rounded-to-pill border border-to-line text-[15px] font-semibold text-to-text2">
-          Box-Score ansehen
-        </button>
+        {SimpleBoxScore({ onlyCourt: false })}
         <button type="button" onClick={() => setSheet('quarter')} className="h-[52px] rounded-to-pill border border-to-line text-[15px] font-semibold text-to-text2">
           Viertel beenden
         </button>
@@ -1715,9 +2091,7 @@ export function GameStatsTracker() {
         >
           Spiel beenden
         </button>
-        <p className="px-1 text-xs leading-relaxed text-to-textDisabled">
-          Keine Spieluhr. Erst die Aktion, dann der Spieler – „Zurück" nimmt den letzten Eintrag sofort wieder raus.
-        </p>
+        <p className="px-1 text-xs leading-relaxed text-to-textDisabled">Keine Spieluhr. Erst die Aktion, dann der Spieler.</p>
       </div>
     );
   }
@@ -1777,6 +2151,7 @@ export function GameStatsTracker() {
           ) : picking ? (
             RosterGrid({
               label: pickTitle,
+              rightLabel: !subMode && pendingAction ? (OPPONENT_POINTS[pendingAction] ? `${OPPONENT_POINTS[pendingAction]} PUNKTE` : 'OHNE PUNKTE') : undefined,
               list: pickList,
               tileSize: 124,
               photoSize: 48,
@@ -1801,13 +2176,19 @@ export function GameStatsTracker() {
                 <span className="to-data pl-0.5 text-[9px] tracking-[0.1em] text-to-text3">AUF DEM FELD</span>
                 <div className="flex gap-1.5">
                   {onCourtPlayers.map((p) => (
-                    <CourtChip key={p.id} player={p} number={numbers[p.id]} fouls={countPlayerFouls(events, p.id)} />
+                    <CourtAvatar
+                      key={p.id}
+                      player={p}
+                      number={numbers[p.id]}
+                      points={boxScore.find((b) => b.playerId === p.id)?.points ?? 0}
+                      fouls={countPlayerFouls(events, p.id)}
+                    />
                   ))}
                 </div>
               </div>
             </>
           )}
-          <div className="mt-auto">{ConfirmBar()}</div>
+          <div className="mt-auto">{LastTrackedRow()}</div>
         </div>
         <div className="flex w-[300px] shrink-0 flex-col gap-3 max-[1000px]:w-[236px]">
           {HistoryPanel({ limit: 9, grow: true })}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -637,13 +637,22 @@ export function Dashboard() {
   const today = localTodayIso();
   const nextGameIsLive = !!(data?.nextGame && flags.stats && !data.nextGame.stats_finalized_at && data.nextGame.game_date <= today);
   const [refreshingLive, setRefreshingLive] = useState(false);
+  // "Korrigiert"-Hinweis am Live-Ticker (Element 26 §5, Rückfrage 5): ein
+  // nachträglich geänderter/gelöschter Eintrag setzt games.stats_corrected_at
+  // (Migration 0079) — ein neu erfasster Treffer (reines INSERT) NICHT. Der
+  // erste Poll initialisiert nur den Vergleichswert, zeigt aber noch keinen
+  // Hinweis (sonst würde ein alter, längst bekannter Korrektur-Zeitstempel
+  // beim Öffnen der Seite fälschlich aufblitzen).
+  const [correctedBadge, setCorrectedBadge] = useState(false);
+  const lastSeenCorrectedAtRef = useRef<string | null | undefined>(undefined);
+  const correctedBadgeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refreshLiveScore = useCallback(async () => {
     if (!nextGameIsLive || !data?.nextGame) return;
     const gameId = data.nextGame.id;
     setRefreshingLive(true);
     const [gameRes, sessionRes, lastScoreRes] = await Promise.all([
-      supabase.from('games').select('final_score_us, final_score_opponent, stats_finalized_at').eq('id', gameId).maybeSingle(),
+      supabase.from('games').select('final_score_us, final_score_opponent, stats_finalized_at, stats_corrected_at').eq('id', gameId).maybeSingle(),
       supabase.from('game_stat_sessions').select('holder_name, last_heartbeat').eq('game_id', gameId).maybeSingle(),
       supabase
         .from('game_stat_events')
@@ -682,6 +691,18 @@ export function Dashboard() {
       });
       liveScore = totals;
     }
+
+    const correctedAt = gameRes.data?.stats_corrected_at ?? null;
+    if (lastSeenCorrectedAtRef.current === undefined) {
+      // Erster Poll: nur merken, noch nicht anzeigen (siehe Kommentar oben).
+      lastSeenCorrectedAtRef.current = correctedAt;
+    } else if (correctedAt && correctedAt !== lastSeenCorrectedAtRef.current) {
+      lastSeenCorrectedAtRef.current = correctedAt;
+      setCorrectedBadge(true);
+      if (correctedBadgeTimer.current) clearTimeout(correctedBadgeTimer.current);
+      correctedBadgeTimer.current = setTimeout(() => setCorrectedBadge(false), 6_000);
+    }
+
     setData((prev) =>
       prev && prev.nextGame && prev.nextGame.id === gameId
         ? {
@@ -690,7 +711,8 @@ export function Dashboard() {
               ...prev.nextGame,
               final_score_us: gameRes.data?.final_score_us ?? prev.nextGame.final_score_us,
               final_score_opponent: gameRes.data?.final_score_opponent ?? prev.nextGame.final_score_opponent,
-              stats_finalized_at: gameRes.data?.stats_finalized_at ?? prev.nextGame.stats_finalized_at
+              stats_finalized_at: gameRes.data?.stats_finalized_at ?? prev.nextGame.stats_finalized_at,
+              stats_corrected_at: correctedAt ?? prev.nextGame.stats_corrected_at
             },
             activeStatsHolder: holder,
             lastScoreEvent,
@@ -701,6 +723,10 @@ export function Dashboard() {
     );
     setRefreshingLive(false);
   }, [nextGameIsLive, data?.nextGame]);
+
+  useEffect(() => () => {
+    if (correctedBadgeTimer.current) clearTimeout(correctedBadgeTimer.current);
+  }, []);
 
   useEffect(() => {
     if (!nextGameIsLive) return;
@@ -870,6 +896,7 @@ export function Dashboard() {
           activeStatsHolder={data.activeStatsHolder}
           liveScore={data.liveScore}
           liveQuarter={data.liveQuarter}
+          correctedBadge={correctedBadge}
           refreshingLive={refreshingLive}
           onRefreshLive={refreshLiveScore}
           onResponded={() => setSquadResponseVersion((v) => v + 1)}
