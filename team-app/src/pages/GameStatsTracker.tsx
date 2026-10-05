@@ -1598,13 +1598,13 @@ export function GameStatsTracker() {
             >
               <span className="mx-auto h-1 w-9 rounded-full bg-to-line" />
               <span className="to-display-sm text-to-text">Viertel {quarter} beenden?</span>
-              <div className="flex items-end justify-center gap-2.5 rounded-to-lg border border-to-divider bg-to-surface2 px-4 py-3.5">
-                <span className="flex max-w-[120px] flex-col items-end gap-0.5">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2.5 rounded-to-lg border border-to-divider bg-to-surface2 px-4 py-3.5">
+                <span className="flex flex-col items-end justify-self-end gap-0.5">
                   <span className="to-data text-[9px] tracking-[0.1em] text-to-accent">TB WÜLFRATH</span>
                   <span className="to-number text-[30px] leading-none text-to-text">{teamScore.us}</span>
                 </span>
                 <span className="to-number pb-0.5 text-lg text-to-textDisabled">:</span>
-                <span className="flex max-w-[120px] flex-col gap-0.5">
+                <span className="flex flex-col justify-self-start gap-0.5">
                   <span className="to-data text-[9px] leading-tight tracking-[0.1em] text-to-text3">{game.opponent.toUpperCase()}</span>
                   <span className="to-number text-[30px] leading-none text-to-text2">{teamScore.opponent}</span>
                 </span>
