@@ -840,6 +840,16 @@ betroffene Mitfahrer-IDs aus den schon geladenen Daten) und löscht die Fahrt da
 selbst, wie bisher schon bei "Angebot zurückziehen". Der Trigger unten hängt nur am Einfügen
 dieses Protokolls, kein zweites `delete` im Spiel.
 
+Jeder `net.http_post`-Aufruf unten steckt in einem eigenen `begin ... exception when others
+then null; end`-Block. Grund: beim ersten Testen auf Staging fehlte dort die `pg_net`-Extension
+("schema \"net\" does not exist") — ohne diesen Schutz brach das den kompletten Trigger mit
+einer Exception ab, und damit auch das eigentliche INSERT/DELETE, das den Trigger ausgelöst hat
+(sichtbar als generischer 400-Fehler im Frontend, z. B. "Fahrt konnte nicht gespeichert werden"
+beim Anbieten und beim Aussteigen). Eine fehlschlagende Benachrichtigung darf eine Mitfahrt-
+Aktion grundsätzlich nie verhindern, deshalb der Schutz bei allen vier neu — nicht nur, falls
+`pg_net` fehlt, sondern auch für den Fall, dass der Webhook-Aufruf selbst später einmal aus
+anderen Gründen fehlschlägt.
+
 ```sql
 -- Jemand ist bei dir eingestiegen (echter Spieler, nicht nur eine vom
 -- Fahrer eingetragene Begleitperson — die hat keinen Account und würde
@@ -852,11 +862,15 @@ set search_path = public
 as $$
 begin
   if new.player_id is not null then
-    perform net.http_post(
-      url := 'https://<deine-vercel-domain>/api/notify?kind=carpool-joined',
-      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
-      body := jsonb_build_object('record', jsonb_build_object('offer_id', new.offer_id, 'player_id', new.player_id))
-    );
+    begin
+      perform net.http_post(
+        url := 'https://<deine-vercel-domain>/api/notify?kind=carpool-joined',
+        headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+        body := jsonb_build_object('record', jsonb_build_object('offer_id', new.offer_id, 'player_id', new.player_id))
+      );
+    exception when others then
+      null;
+    end;
   end if;
   return new;
 end;
@@ -881,17 +895,21 @@ set search_path = public
 as $$
 begin
   if old.player_id is not null then
-    perform net.http_post(
-      url := 'https://<deine-vercel-domain>/api/notify?kind=carpool-left',
-      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
-      body := jsonb_build_object(
-        'record', jsonb_build_object(
-          'offer_id', old.offer_id,
-          'player_id', old.player_id,
-          'offer_still_exists', exists (select 1 from public.carpool_offers where id = old.offer_id)
+    begin
+      perform net.http_post(
+        url := 'https://<deine-vercel-domain>/api/notify?kind=carpool-left',
+        headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+        body := jsonb_build_object(
+          'record', jsonb_build_object(
+            'offer_id', old.offer_id,
+            'player_id', old.player_id,
+            'offer_still_exists', exists (select 1 from public.carpool_offers where id = old.offer_id)
+          )
         )
-      )
-    );
+      );
+    exception when others then
+      null;
+    end;
   end if;
   return old;
 end;
@@ -911,17 +929,21 @@ security definer
 set search_path = public
 as $$
 begin
-  perform net.http_post(
-    url := 'https://<deine-vercel-domain>/api/notify?kind=carpool-offer-deleted',
-    headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
-    body := jsonb_build_object(
-      'record', jsonb_build_object(
-        'game_id', new.game_id,
-        'driver_player_id', new.driver_player_id,
-        'passenger_player_ids', new.passenger_player_ids
+  begin
+    perform net.http_post(
+      url := 'https://<deine-vercel-domain>/api/notify?kind=carpool-offer-deleted',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+      body := jsonb_build_object(
+        'record', jsonb_build_object(
+          'game_id', new.game_id,
+          'driver_player_id', new.driver_player_id,
+          'passenger_player_ids', new.passenger_player_ids
+        )
       )
-    )
-  );
+    );
+  exception when others then
+    null;
+  end;
   return new;
 end;
 $$;
@@ -943,13 +965,17 @@ security definer
 set search_path = public
 as $$
 begin
-  perform net.http_post(
-    url := 'https://<deine-vercel-domain>/api/notify?kind=carpool-seeker-match',
-    headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
-    body := jsonb_build_object(
-      'record', jsonb_build_object('offer_id', new.id, 'game_id', new.game_id, 'driver_player_id', new.driver_player_id, 'seats', new.seats)
-    )
-  );
+  begin
+    perform net.http_post(
+      url := 'https://<deine-vercel-domain>/api/notify?kind=carpool-seeker-match',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+      body := jsonb_build_object(
+        'record', jsonb_build_object('offer_id', new.id, 'game_id', new.game_id, 'driver_player_id', new.driver_player_id, 'seats', new.seats)
+      )
+    );
+  exception when others then
+    null;
+  end;
   return new;
 end;
 $$;
@@ -963,7 +989,9 @@ Keine zusätzlichen `service_role`-Rechte nötig — alle vier Mitfahrt-Tabellen
 `players`, `player_auth_links` und `push_subscriptions` waren bereits berechtigt (Supabase
 vergibt `service_role` standardmäßig volle Rechte auf neue Tabellen). Wie bei allen anderen
 Triggern hier: nur auf Produktion mit echten Werten für `<deine-vercel-domain>` und
-`<PUSH_WEBHOOK_SECRET-Wert>` anwenden, nicht als Migration getrackt.
+`<PUSH_WEBHOOK_SECRET-Wert>` anwenden, nicht als Migration getrackt. `pg_net` ist auf Produktion
+bereits aktiv (wird von den neun übrigen Triggern genutzt) — die `create extension`-Prüfung von
+Staging ist dort nicht nötig.
 
 ### 8. Liga-Tabelle (DBB-Sync)
 
