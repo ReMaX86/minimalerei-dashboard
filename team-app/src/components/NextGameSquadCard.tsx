@@ -7,11 +7,10 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { fmtDateBadge, fmtDateShort, fmtTime, mapsUrl } from '../lib/format';
 import { EMPTY_MEETING_POINT, type MeetingPointFormValue } from './MeetingPointFields';
 import { SquadDeclineSheet } from './SquadResponseSheets';
+import { MitfahrtCard } from './MitfahrtCard';
 import {
   meetingPoints,
   playerAbsenceOn,
-  type CarpoolClaim,
-  type CarpoolOffer,
   type DeclineReason,
   type Game,
   type GameSquadRow,
@@ -96,28 +95,11 @@ function WarnIcon() {
     </svg>
   );
 }
-function MinusIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-      <path d="M6 12h12" />
-    </svg>
-  );
-}
-function PlusIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-      <path d="M12 6v12" />
-      <path d="M6 12h12" />
-    </svg>
-  );
-}
 
 interface State {
   squad: GameSquadRow[];
   players: Player[];
   absences: PlayerAbsence[];
-  offers: CarpoolOffer[];
-  claims: CarpoolClaim[];
 }
 
 type Tone = 'ok' | 'idle' | 'bad' | 'away';
@@ -165,10 +147,6 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [responding, setResponding] = useState(false);
   const [selfDeclineSheetOpen, setSelfDeclineSheetOpen] = useState(false);
-  const [rideOfferOpen, setRideOfferOpen] = useState(false);
-  const [rideSeats, setRideSeats] = useState(3);
-  const [rideNote, setRideNote] = useState('');
-  const [ridesBusyKey, setRidesBusyKey] = useState<string | null>(null);
   const [kaderOpen, setKaderOpen] = useState(false);
   // Wer zuletzt veröffentlicht war, damit "Kader aktualisieren" ausgegraut
   // bleibt, solange sich an der Kader-Zusammensetzung seit der letzten
@@ -188,31 +166,23 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
 
   const load = useCallback(async () => {
     setError(null);
-    const [squadRes, playersRes, absencesRes, offersRes, claimsRes] = await Promise.all([
+    const [squadRes, playersRes, absencesRes] = await Promise.all([
       supabase.from('game_squad').select('*').eq('game_id', game.id),
       supabase.from('players').select('*').eq('is_active', true),
       flags.absences
         ? supabase.from('player_absences').select('*').lte('start_date', game.game_date).gte('end_date', game.game_date)
-        : Promise.resolve({ data: [] as PlayerAbsence[], error: null }),
-      showCarpool
-        ? supabase.from('carpool_offers').select('*').eq('game_id', game.id)
-        : Promise.resolve({ data: [] as CarpoolOffer[], error: null }),
-      showCarpool
-        ? supabase.from('carpool_claims').select('*').eq('game_id', game.id)
-        : Promise.resolve({ data: [] as CarpoolClaim[], error: null })
+        : Promise.resolve({ data: [] as PlayerAbsence[], error: null })
     ]);
-    if (squadRes.error || playersRes.error || absencesRes.error || offersRes.error || claimsRes.error) {
+    if (squadRes.error || playersRes.error || absencesRes.error) {
       setError('Fehler beim Laden des Kaders.');
       return;
     }
     setState({
       squad: (squadRes.data as GameSquadRow[]) ?? [],
       players: ((playersRes.data as Player[]) ?? []).sort((a, b) => a.name.localeCompare(b.name, 'de')),
-      absences: (absencesRes.data as PlayerAbsence[]) ?? [],
-      offers: (offersRes.data as CarpoolOffer[]) ?? [],
-      claims: (claimsRes.data as CarpoolClaim[]) ?? []
+      absences: (absencesRes.data as PlayerAbsence[]) ?? []
     });
-  }, [game.id, game.game_date, flags.absences, showCarpool]);
+  }, [game.id, game.game_date, flags.absences]);
 
   useEffect(() => {
     load().catch(() => setError('Fehler beim Laden des Kaders.'));
@@ -371,77 +341,6 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
     }
   }
 
-  async function createRideOffer(e: FormEvent) {
-    e.preventDefault();
-    if (!player) return;
-    setRidesBusyKey('new-offer');
-    setError(null);
-    try {
-      const { error: insertError } = await supabase
-        .from('carpool_offers')
-        .insert({ game_id: game.id, driver_player_id: player.id, seats: rideSeats, note: rideNote.trim() || null });
-      if (insertError) throw insertError;
-      setRideOfferOpen(false);
-      setRideSeats(3);
-      setRideNote('');
-      await load();
-    } catch {
-      setError('Angebot konnte nicht gespeichert werden.');
-    } finally {
-      setRidesBusyKey(null);
-    }
-  }
-
-  async function cancelRideOffer(offerId: string) {
-    setRidesBusyKey(offerId);
-    setError(null);
-    try {
-      const { error: delError } = await supabase.from('carpool_offers').delete().eq('id', offerId);
-      if (delError) throw delError;
-      await load();
-    } catch {
-      setError('Angebot konnte nicht zurückgezogen werden.');
-    } finally {
-      setRidesBusyKey(null);
-    }
-  }
-
-  async function claimRideSeat(offer: CarpoolOffer) {
-    if (!player) return;
-    setRidesBusyKey(offer.id);
-    setError(null);
-    try {
-      const { error: insertError } = await supabase
-        .from('carpool_claims')
-        .insert({ offer_id: offer.id, game_id: game.id, player_id: player.id });
-      if (insertError) throw insertError;
-      await load();
-    } catch {
-      setError('Platz konnte nicht reserviert werden.');
-    } finally {
-      setRidesBusyKey(null);
-    }
-  }
-
-  async function cancelRideClaim(offerId: string) {
-    if (!player) return;
-    setRidesBusyKey(offerId);
-    setError(null);
-    try {
-      const { error: delError } = await supabase
-        .from('carpool_claims')
-        .delete()
-        .eq('offer_id', offerId)
-        .eq('player_id', player.id);
-      if (delError) throw delError;
-      await load();
-    } catch {
-      setError('Absage konnte nicht gespeichert werden.');
-    } finally {
-      setRidesBusyKey(null);
-    }
-  }
-
   // Reihenfolge PROMPT.md "Kader": zuerst im Kader, dann verfügbar ohne
   // Antwort, dann abgesagt (ohne Kaderplatz — durch die neue
   // respond_to_squad()-Logik praktisch nicht mehr erreichbar, da eine
@@ -471,10 +370,6 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
 
   const squadFaces = selectedIds.slice(0, 3).map((id) => initialsOf(playersById[id]?.name ?? '?'));
   const squadFaceExtra = selectedCount - squadFaces.length;
-
-  const seatFree = state.offers.reduce((sum, o) => sum + (o.seats - state.claims.filter((c) => c.offer_id === o.id).length), 0);
-  const myOffer = player ? state.offers.find((o) => o.driver_player_id === player.id) : undefined;
-  const myClaim = player ? state.claims.find((c) => c.player_id === player.id) : undefined;
 
   return (
     <section className="card overflow-hidden !p-0">
@@ -850,101 +745,7 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
       )}
 
       {/* Mitfahrgelegenheit */}
-      {showCarpool && (
-        <div className="flex flex-col gap-3 border-t border-to-divider px-5 pb-5 pt-4">
-          <div className="flex items-center gap-2.5">
-            <span className="to-label flex-1">MITFAHRGELEGENHEIT</span>
-            {state.offers.length > 0 && (
-              <span className="to-data text-[11px] text-to-text3">{seatFree === 1 ? '1 PLATZ FREI' : `${seatFree} PLÄTZE FREI`}</span>
-            )}
-          </div>
-
-          {state.offers.length === 0 ? (
-            <p className="text-[14px] text-to-text2">Noch keine Fahrer eingetragen.</p>
-          ) : (
-            <div className="flex flex-col gap-2.5">
-              {state.offers.map((o) => {
-                const takenBy = state.claims.filter((c) => c.offer_id === o.id);
-                const free = o.seats - takenBy.length;
-                const isMyOffer = o.driver_player_id === player?.id;
-                const isMyClaim = myClaim?.offer_id === o.id;
-                return (
-                  <div key={o.id} className="flex flex-col gap-2">
-                    <div className={`flex flex-col gap-2.5 rounded-to-lg p-3.5 ${isMyOffer ? 'bg-to-accentSoft' : 'bg-to-surface2'}`}>
-                      <div className="flex items-center gap-3">
-                        <span className="to-data flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-to-surface text-[11px] text-to-text2">
-                          {initialsOf(playersById[o.driver_player_id]?.name ?? '?')}
-                        </span>
-                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span className="truncate text-[15px] font-semibold -tracking-[0.01em] text-to-text">
-                            {playersById[o.driver_player_id]?.name ?? '?'}
-                          </span>
-                          {o.note && <span className="truncate text-xs text-to-text3">{o.note}</span>}
-                        </span>
-                        {!isMyOffer &&
-                          (isMyClaim ? (
-                            <button
-                              type="button"
-                              disabled={ridesBusyKey === o.id}
-                              onClick={() => cancelRideClaim(o.id)}
-                              className="h-[34px] shrink-0 rounded-to-pill border border-to-line px-3.5 text-[13px] font-semibold text-to-text disabled:opacity-40"
-                            >
-                              Aussteigen
-                            </button>
-                          ) : free > 0 ? (
-                            <button
-                              type="button"
-                              disabled={ridesBusyKey === o.id || (!!myClaim && myClaim.offer_id !== o.id) || !!myOffer}
-                              onClick={() => claimRideSeat(o)}
-                              className="h-[34px] shrink-0 rounded-to-pill border border-to-line px-3.5 text-[13px] font-semibold text-to-text disabled:opacity-40"
-                            >
-                              {free} frei
-                            </button>
-                          ) : (
-                            <span className="h-[34px] shrink-0 rounded-to-pill border border-to-line px-3.5 text-[13px] font-semibold leading-[34px] text-to-text opacity-45">
-                              Voll
-                            </span>
-                          ))}
-                      </div>
-                      {/* "Angebot zurückziehen" ist als Text zu breit, um bei
-                          390px neben Name/Notiz in eine Zeile zu passen —
-                          anders als "frei"/"Voll"/"Aussteigen" (kurz genug)
-                          bekommt der Knopf für das eigene Angebot deshalb
-                          eine eigene, volle Zeile statt wie in der
-                          Vorlage-Struktur inline zu stehen. */}
-                      {isMyOffer && (
-                        <button
-                          type="button"
-                          disabled={ridesBusyKey === o.id}
-                          onClick={() => cancelRideOffer(o.id)}
-                          className="h-[38px] w-full rounded-to-pill bg-to-accent text-[13px] font-semibold text-to-onAccent disabled:opacity-40"
-                        >
-                          Angebot zurückziehen
-                        </button>
-                      )}
-                    </div>
-                    {takenBy.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 pl-11">
-                        {takenBy.map((c) => (
-                          <span key={c.player_id} className="inline-flex h-[26px] items-center rounded-to-pill bg-to-surface px-2.5 text-xs text-to-text2">
-                            {playersById[c.player_id]?.name ?? '?'}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {player && !myOffer && (
-            <button type="button" className="btn-secondary !h-[46px] w-full text-sm" onClick={() => setRideOfferOpen(true)}>
-              Ich biete Plätze an
-            </button>
-          )}
-        </div>
-      )}
+      {showCarpool && <MitfahrtCard game={g} player={player} playersById={playersById} />}
 
       {error && <p className="border-t border-to-divider px-5 py-3 text-xs text-to-dangerText">{error}</p>}
 
@@ -956,18 +757,6 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
           busy={savingMeeting}
           onSave={saveMeetingPoint}
           onCancel={() => setMeetingSheetOpen(false)}
-        />
-      )}
-
-      {rideOfferOpen && (
-        <RideOfferSheet
-          seats={rideSeats}
-          onSeatsChange={setRideSeats}
-          note={rideNote}
-          onNoteChange={setRideNote}
-          busy={ridesBusyKey === 'new-offer'}
-          onSubmit={createRideOffer}
-          onCancel={() => setRideOfferOpen(false)}
         />
       )}
 
@@ -1073,81 +862,3 @@ function MeetingSheet({
   );
 }
 
-function RideOfferSheet({
-  seats,
-  onSeatsChange,
-  note,
-  onNoteChange,
-  busy,
-  onSubmit,
-  onCancel
-}: {
-  seats: number;
-  onSeatsChange: (n: number) => void;
-  note: string;
-  onNoteChange: (n: string) => void;
-  busy: boolean;
-  onSubmit: (e: FormEvent) => void;
-  onCancel: () => void;
-}) {
-  return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 sm:items-center" onClick={onCancel}>
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-lg rounded-t-[24px] border border-to-line bg-to-surface2 p-5 sm:rounded-b-[24px]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex flex-col gap-1">
-          <h2 className="to-display-sm text-to-text">Plätze anbieten</h2>
-          <p className="text-[13px] text-to-text3">Du fährst und nimmst andere mit.</p>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-1.5">
-          <span className="to-label">FREIE PLÄTZE</span>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              disabled={seats <= 1}
-              onClick={() => onSeatsChange(Math.max(1, seats - 1))}
-              className="flex h-11 w-11 items-center justify-center rounded-to-lg border border-to-line text-to-text disabled:opacity-40"
-              aria-label="Weniger"
-            >
-              <MinusIcon />
-            </button>
-            <span className="to-number min-w-11 text-center text-2xl text-to-text">{seats}</span>
-            <button
-              type="button"
-              disabled={seats >= 8}
-              onClick={() => onSeatsChange(Math.min(8, seats + 1))}
-              className="flex h-11 w-11 items-center justify-center rounded-to-lg border border-to-line text-to-text disabled:opacity-40"
-              aria-label="Mehr"
-            >
-              <PlusIcon />
-            </button>
-          </div>
-        </div>
-
-        <label className="mt-3.5 flex flex-col gap-1.5">
-          <span className="to-label">ABFAHRT (OPTIONAL)</span>
-          <input
-            type="text"
-            placeholder="z. B. 18:30 ab Bahnhof Wülfrath"
-            className="input"
-            value={note}
-            onChange={(e) => onNoteChange(e.target.value)}
-          />
-        </label>
-
-        <div className="mt-4 flex flex-col gap-2">
-          <button type="submit" disabled={busy} className="btn-primary !h-[52px] text-[15px]">
-            {busy ? 'Speichere…' : 'Plätze anbieten'}
-          </button>
-          <button type="button" disabled={busy} onClick={onCancel} className="h-11 text-sm font-medium text-to-text2">
-            Abbrechen
-          </button>
-        </div>
-      </form>
-    </div>,
-    document.body
-  );
-}

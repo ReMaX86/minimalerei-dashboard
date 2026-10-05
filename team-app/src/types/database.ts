@@ -169,11 +169,22 @@ export interface CarpoolOffer {
   driver_player_id: string;
   seats: number;
   note: string | null;
+  meeting_point: string | null;
+  departure_time: string | null;
+  return_trip: boolean;
   created_at: string;
 }
 
 export interface CarpoolClaim {
+  id: string;
   offer_id: string;
+  game_id: string;
+  player_id: string | null;
+  companion_name: string | null;
+  created_at: string;
+}
+
+export interface CarpoolSeeker {
   game_id: string;
   player_id: string;
   created_at: string;

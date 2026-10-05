@@ -1297,6 +1297,357 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
+    // Element 27 "Mitfahrgelegenheit": vier neue Arten, alle hinter dem
+    // bestehenden Feature-Flag "carpool" (wie officiating-reminders, das
+    // "reminders" UND "officiating" prüft — hier reicht ein Flag, da die
+    // Mitfahrt-Tabellen ohne aktives Flag ohnehin leer bleiben, ein alter
+    // Trigger auf historischen Zeilen soll trotzdem nicht mehr feuern).
+    case 'carpool-joined': {
+      const offerId = record.offer_id as string | undefined;
+      const playerId = record.player_id as string | undefined;
+      if (!offerId || !playerId) {
+        res.status(400).json({ error: 'Kein offer_id/player_id im Webhook-Payload.' });
+        return;
+      }
+
+      const [flagRes, offerRes, playerRes] = await Promise.all([
+        withRetry(() => supabase.from('feature_flags').select('enabled').eq('key', 'carpool').maybeSingle()),
+        withRetry(() => supabase.from('carpool_offers').select('driver_player_id, game_id').eq('id', offerId).maybeSingle()),
+        withRetry(() => supabase.from('players').select('name').eq('id', playerId).maybeSingle())
+      ]);
+      const queryError = flagRes.error ?? offerRes.error ?? playerRes.error;
+      if (queryError) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-joined] query error', queryError);
+        res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: queryError.message, code: queryError.code });
+        return;
+      }
+      if (!flagRes.data?.enabled) {
+        res.status(200).json({ skipped: 'carpool_disabled' });
+        return;
+      }
+
+      const driverPlayerId = offerRes.data?.driver_player_id as string | undefined;
+      const gameId = offerRes.data?.game_id as string | undefined;
+      const playerName = playerRes.data?.name;
+      if (!driverPlayerId || !gameId || !playerName) {
+        res.status(200).json({ skipped: 'offer_or_player_not_found' });
+        return;
+      }
+
+      const gameRes = await withRetry(() => supabase.from('games').select('opponent, game_date').eq('id', gameId).maybeSingle());
+      if (gameRes.error) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-joined] query error', gameRes.error);
+        res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: gameRes.error.message, code: gameRes.error.code });
+        return;
+      }
+      const opponent = gameRes.data?.opponent;
+      const gameDate = gameRes.data?.game_date;
+      if (!opponent || !gameDate) {
+        res.status(200).json({ skipped: 'game_not_found' });
+        return;
+      }
+
+      const linksRes = await withRetry(() => supabase.from('player_auth_links').select('auth_user_id').eq('player_id', driverPlayerId));
+      if (linksRes.error) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-joined] query error', linksRes.error);
+        res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: linksRes.error.message, code: linksRes.error.code });
+        return;
+      }
+      const authUserIds = ((linksRes.data as { auth_user_id: string }[] | null) ?? []).map((r) => r.auth_user_id);
+      if (authUserIds.length === 0) {
+        res.status(200).json({ sent: 0, reason: 'driver_not_linked' });
+        return;
+      }
+
+      const { data: subs, error: loadError } = await supabase
+        .from('push_subscriptions')
+        .select('id, user_id, endpoint, p256dh, auth_key')
+        .in('user_id', authUserIds);
+      if (loadError) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-joined] load error', loadError);
+        res.status(500).json({ error: 'push_subscriptions konnten nicht geladen werden.', details: loadError.message, code: loadError.code });
+        return;
+      }
+
+      const payload = JSON.stringify({
+        title: 'Mitfahrgelegenheit',
+        body: `${playerName} fährt bei dir mit – Spiel gegen ${opponent} am ${fmtDateDe(gameDate)}.`,
+        url: '/spiele'
+      });
+      const { sent, staleIds } = await broadcastPush((subs as PushSubRow[]) ?? [], payload);
+      await cleanupStale(supabase, staleIds);
+      res.status(200).json({ sent, removed: staleIds.length, total: (subs ?? []).length });
+      return;
+    }
+
+    // Feuert sowohl beim freiwilligen "Aussteigen" als auch, wenn ein
+    // Mitfahrer seine Spielzusage zurückzieht (carpool_leave_on_squad_decline
+    // entfernt ihn dafür automatisch, siehe Migration 0078) — in beiden
+    // Fällen ist "der Fahrer informieren" die richtige Reaktion. Nicht aber,
+    // wenn der FAHRER selbst seine ganze Fahrt löscht: dort sind die
+    // Mitfahrer-Zeilen durch denselben DELETE-Trigger-Mechanismus weg, aber
+    // das würde den Fahrer über seine eigene Aktion "informieren" — die
+    // EXISTS-Prüfung unten erkennt genau das (Angebot existiert dann nicht
+    // mehr) und überspringt die Meldung; "carpool-offer-deleted" übernimmt
+    // stattdessen die Mitfahrer-Meldung für diesen Fall.
+    case 'carpool-left': {
+      const offerId = record.offer_id as string | undefined;
+      const playerId = record.player_id as string | undefined;
+      const offerStillExists = record.offer_still_exists as boolean | undefined;
+      if (!offerId || !playerId) {
+        res.status(400).json({ error: 'Kein offer_id/player_id im Webhook-Payload.' });
+        return;
+      }
+      if (!offerStillExists) {
+        res.status(200).json({ skipped: 'offer_deleted_together' });
+        return;
+      }
+
+      const [flagRes, offerRes, playerRes] = await Promise.all([
+        withRetry(() => supabase.from('feature_flags').select('enabled').eq('key', 'carpool').maybeSingle()),
+        withRetry(() => supabase.from('carpool_offers').select('driver_player_id, game_id').eq('id', offerId).maybeSingle()),
+        withRetry(() => supabase.from('players').select('name').eq('id', playerId).maybeSingle())
+      ]);
+      const queryError = flagRes.error ?? offerRes.error ?? playerRes.error;
+      if (queryError) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-left] query error', queryError);
+        res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: queryError.message, code: queryError.code });
+        return;
+      }
+      if (!flagRes.data?.enabled) {
+        res.status(200).json({ skipped: 'carpool_disabled' });
+        return;
+      }
+
+      const driverPlayerId = offerRes.data?.driver_player_id as string | undefined;
+      const gameId = offerRes.data?.game_id as string | undefined;
+      const playerName = playerRes.data?.name;
+      if (!driverPlayerId || !gameId || !playerName) {
+        res.status(200).json({ skipped: 'offer_or_player_not_found' });
+        return;
+      }
+
+      const gameRes = await withRetry(() => supabase.from('games').select('opponent, game_date').eq('id', gameId).maybeSingle());
+      if (gameRes.error) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-left] query error', gameRes.error);
+        res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: gameRes.error.message, code: gameRes.error.code });
+        return;
+      }
+      const opponent = gameRes.data?.opponent;
+      const gameDate = gameRes.data?.game_date;
+      if (!opponent || !gameDate) {
+        res.status(200).json({ skipped: 'game_not_found' });
+        return;
+      }
+
+      const linksRes = await withRetry(() => supabase.from('player_auth_links').select('auth_user_id').eq('player_id', driverPlayerId));
+      if (linksRes.error) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-left] query error', linksRes.error);
+        res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: linksRes.error.message, code: linksRes.error.code });
+        return;
+      }
+      const authUserIds = ((linksRes.data as { auth_user_id: string }[] | null) ?? []).map((r) => r.auth_user_id);
+      if (authUserIds.length === 0) {
+        res.status(200).json({ sent: 0, reason: 'driver_not_linked' });
+        return;
+      }
+
+      const { data: subs, error: loadError } = await supabase
+        .from('push_subscriptions')
+        .select('id, user_id, endpoint, p256dh, auth_key')
+        .in('user_id', authUserIds);
+      if (loadError) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-left] load error', loadError);
+        res.status(500).json({ error: 'push_subscriptions konnten nicht geladen werden.', details: loadError.message, code: loadError.code });
+        return;
+      }
+
+      const payload = JSON.stringify({
+        title: 'Mitfahrgelegenheit',
+        body: `${playerName} ist bei dir ausgestiegen – Spiel gegen ${opponent} am ${fmtDateDe(gameDate)}.`,
+        url: '/spiele'
+      });
+      const { sent, staleIds } = await broadcastPush((subs as PushSubRow[]) ?? [], payload);
+      await cleanupStale(supabase, staleIds);
+      res.status(200).json({ sent, removed: staleIds.length, total: (subs ?? []).length });
+      return;
+    }
+
+    // Fahrer hat seine ganze Fahrt gelöscht, während Mitfahrer drin saßen
+    // (Rückfrage 4) — Payload kommt aus carpool_offer_cancellations, vom
+    // Client selbst VOR dem eigentlichen Löschen eingetragen (siehe
+    // Migration 0078: ein zweites DELETE in derselben Funktion hing in
+    // dieser Umgebung zuverlässig, deshalb kein serverseitiges "lies Kader
+    // vor dem Löschen aus").
+    case 'carpool-offer-deleted': {
+      const gameId = record.game_id as string | undefined;
+      const driverPlayerId = record.driver_player_id as string | undefined;
+      const passengerPlayerIds = (record.passenger_player_ids as string[] | undefined) ?? [];
+      if (!gameId || !driverPlayerId) {
+        res.status(400).json({ error: 'Kein game_id/driver_player_id im Webhook-Payload.' });
+        return;
+      }
+      if (passengerPlayerIds.length === 0) {
+        res.status(200).json({ skipped: 'no_passengers' });
+        return;
+      }
+
+      const [flagRes, gameRes, driverRes] = await Promise.all([
+        withRetry(() => supabase.from('feature_flags').select('enabled').eq('key', 'carpool').maybeSingle()),
+        withRetry(() => supabase.from('games').select('opponent, game_date').eq('id', gameId).maybeSingle()),
+        withRetry(() => supabase.from('players').select('name').eq('id', driverPlayerId).maybeSingle())
+      ]);
+      const queryError = flagRes.error ?? gameRes.error ?? driverRes.error;
+      if (queryError) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-offer-deleted] query error', queryError);
+        res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: queryError.message, code: queryError.code });
+        return;
+      }
+      if (!flagRes.data?.enabled) {
+        res.status(200).json({ skipped: 'carpool_disabled' });
+        return;
+      }
+
+      const opponent = gameRes.data?.opponent;
+      const gameDate = gameRes.data?.game_date;
+      const driverName = driverRes.data?.name;
+      if (!opponent || !gameDate || !driverName) {
+        res.status(200).json({ skipped: 'game_or_driver_not_found' });
+        return;
+      }
+
+      const linksRes = await withRetry(() =>
+        supabase.from('player_auth_links').select('auth_user_id').in('player_id', passengerPlayerIds)
+      );
+      if (linksRes.error) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-offer-deleted] query error', linksRes.error);
+        res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: linksRes.error.message, code: linksRes.error.code });
+        return;
+      }
+      const authUserIds = ((linksRes.data as { auth_user_id: string }[] | null) ?? []).map((r) => r.auth_user_id);
+      if (authUserIds.length === 0) {
+        res.status(200).json({ sent: 0, reason: 'no_linked_passengers' });
+        return;
+      }
+
+      const { data: subs, error: loadError } = await supabase
+        .from('push_subscriptions')
+        .select('id, user_id, endpoint, p256dh, auth_key')
+        .in('user_id', authUserIds);
+      if (loadError) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-offer-deleted] load error', loadError);
+        res.status(500).json({ error: 'push_subscriptions konnten nicht geladen werden.', details: loadError.message, code: loadError.code });
+        return;
+      }
+
+      const payload = JSON.stringify({
+        title: 'Mitfahrgelegenheit',
+        body: `${driverName} hat die Fahrt zum Spiel gegen ${opponent} am ${fmtDateDe(gameDate)} abgesagt.`,
+        url: '/spiele'
+      });
+      const { sent, staleIds } = await broadcastPush((subs as PushSubRow[]) ?? [], payload);
+      await cleanupStale(supabase, staleIds);
+      res.status(200).json({ sent, removed: staleIds.length, total: (subs ?? []).length });
+      return;
+    }
+
+    // Neue Fahrt mit freien Plätzen eingetragen → alle, die für dieses Spiel
+    // noch einen Platz suchen (carpool_seekers), bekommen eine Meldung
+    // (Element 27 §4).
+    case 'carpool-seeker-match': {
+      const offerId = record.offer_id as string | undefined;
+      const gameId = record.game_id as string | undefined;
+      const driverPlayerId = record.driver_player_id as string | undefined;
+      const seats = record.seats as number | undefined;
+      if (!offerId || !gameId || !driverPlayerId) {
+        res.status(400).json({ error: 'Kein offer_id/game_id/driver_player_id im Webhook-Payload.' });
+        return;
+      }
+      // carpool_offers.seats zählt nur die angebotenen Beifahrerplätze
+      // (Fahrersitz kommt beim Anzeigen separat dazu, siehe PROMPT.md §5:
+      // "Fahrersitz + gewählte Zahl") — bei einer frisch eingetragenen
+      // Fahrt (noch niemand eingestiegen) ist seats damit schon die Anzahl
+      // freier Plätze.
+      if (!seats || seats <= 0) {
+        res.status(200).json({ skipped: 'no_free_seats' });
+        return;
+      }
+
+      const [flagRes, gameRes, driverRes, seekersRes] = await Promise.all([
+        withRetry(() => supabase.from('feature_flags').select('enabled').eq('key', 'carpool').maybeSingle()),
+        withRetry(() => supabase.from('games').select('opponent, game_date').eq('id', gameId).maybeSingle()),
+        withRetry(() => supabase.from('players').select('name').eq('id', driverPlayerId).maybeSingle()),
+        withRetry(() => supabase.from('carpool_seekers').select('player_id').eq('game_id', gameId))
+      ]);
+      const queryError = flagRes.error ?? gameRes.error ?? driverRes.error ?? seekersRes.error;
+      if (queryError) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-seeker-match] query error', queryError);
+        res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: queryError.message, code: queryError.code });
+        return;
+      }
+      if (!flagRes.data?.enabled) {
+        res.status(200).json({ skipped: 'carpool_disabled' });
+        return;
+      }
+
+      const opponent = gameRes.data?.opponent;
+      const gameDate = gameRes.data?.game_date;
+      const driverName = driverRes.data?.name;
+      const seekerPlayerIds = ((seekersRes.data as { player_id: string }[] | null) ?? []).map((r) => r.player_id);
+      if (!opponent || !gameDate || !driverName || seekerPlayerIds.length === 0) {
+        res.status(200).json({ skipped: 'game_driver_or_seekers_not_found' });
+        return;
+      }
+
+      const linksRes = await withRetry(() =>
+        supabase.from('player_auth_links').select('auth_user_id').in('player_id', seekerPlayerIds)
+      );
+      if (linksRes.error) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-seeker-match] query error', linksRes.error);
+        res.status(500).json({ error: 'Daten konnten nicht geladen werden.', details: linksRes.error.message, code: linksRes.error.code });
+        return;
+      }
+      const authUserIds = ((linksRes.data as { auth_user_id: string }[] | null) ?? []).map((r) => r.auth_user_id);
+      if (authUserIds.length === 0) {
+        res.status(200).json({ sent: 0, reason: 'no_linked_seekers' });
+        return;
+      }
+
+      const { data: subs, error: loadError } = await supabase
+        .from('push_subscriptions')
+        .select('id, user_id, endpoint, p256dh, auth_key')
+        .in('user_id', authUserIds);
+      if (loadError) {
+        // eslint-disable-next-line no-console
+        console.error('notify[carpool-seeker-match] load error', loadError);
+        res.status(500).json({ error: 'push_subscriptions konnten nicht geladen werden.', details: loadError.message, code: loadError.code });
+        return;
+      }
+
+      const payload = JSON.stringify({
+        title: 'Mitfahrgelegenheit',
+        body: `${driverName} bietet Plätze an – Spiel gegen ${opponent} am ${fmtDateDe(gameDate)}.`,
+        url: '/spiele'
+      });
+      const { sent, staleIds } = await broadcastPush((subs as PushSubRow[]) ?? [], payload);
+      await cleanupStale(supabase, staleIds);
+      res.status(200).json({ sent, removed: staleIds.length, total: (subs ?? []).length });
+      return;
+    }
+
     default:
       res.status(400).json({ error: `Unbekannter Notification-Typ: ${kind ?? '(keiner)'}` });
       return;

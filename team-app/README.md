@@ -827,6 +827,144 @@ Per Playwright verifiziert: Formular öffnen, Werte eintragen, Speichern → kor
 `PATCH`-Request, "Endstand: 55:48 · Sieg · Stats abgeschlossen" erscheint, Button wechselt zu
 "Tracking zurücksetzen".
 
+**Zehnte bis dreizehnte Benachrichtigungsart: Mitfahrgelegenheit** (Element 27 Neudesign,
+Migration `0078`). Vier neue Fälle in `api/notify.ts` (`carpool-joined`, `carpool-left`,
+`carpool-offer-deleted`, `carpool-seeker-match`), alle hinter dem bestehenden Feature-Flag
+`carpool`. Anders als die bisherigen Trigger braucht "Fahrt löschen, obwohl Mitfahrer drin
+sitzen" (Rückfrage 4) keinen eigenen Trigger auf `carpool_offers` — ein erster Versuch, Lesen
+der Mitfahrer + Löschen in einer einzigen `security definer`-Funktion zu bündeln, hing in dieser
+Umgebung über die Supabase-MCP-Tools zuverlässig, sobald eine Funktion mehr als ein `delete`
+enthielt (siehe PR-Notizen zu Migration `0078`). Der Client schreibt stattdessen VOR dem
+Löschen einen reinen Protokolleintrag in `carpool_offer_cancellations` (Fahrer, Spiel,
+betroffene Mitfahrer-IDs aus den schon geladenen Daten) und löscht die Fahrt danach ganz normal
+selbst, wie bisher schon bei "Angebot zurückziehen". Der Trigger unten hängt nur am Einfügen
+dieses Protokolls, kein zweites `delete` im Spiel.
+
+```sql
+-- Jemand ist bei dir eingestiegen (echter Spieler, nicht nur eine vom
+-- Fahrer eingetragene Begleitperson — die hat keinen Account und würde
+-- sonst den Fahrer über seine eigene Aktion "informieren").
+create or replace function public.notify_carpool_joined()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.player_id is not null then
+    perform net.http_post(
+      url := 'https://<deine-vercel-domain>/api/notify?kind=carpool-joined',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+      body := jsonb_build_object('record', jsonb_build_object('offer_id', new.offer_id, 'player_id', new.player_id))
+    );
+  end if;
+  return new;
+end;
+$$;
+
+create trigger carpool_claims_notify_joined
+after insert on public.carpool_claims
+for each row execute function public.notify_carpool_joined();
+
+-- Jemand ist ausgestiegen — freiwillig ODER weil carpool_leave_on_squad_
+-- decline() (Migration 0078) ihn wegen einer Spiel-Absage automatisch
+-- entfernt hat, beides soll den Fahrer informieren. NICHT aber, wenn der
+-- FAHRER selbst seine ganze Fahrt löscht (dann ist das Angebot zu diesem
+-- Zeitpunkt schon weg, "offer_still_exists" im Payload unterscheidet das —
+-- api/notify.ts überspringt die Meldung in dem Fall, carpool-offer-deleted
+-- übernimmt dort stattdessen die Mitfahrer-Meldung).
+create or replace function public.notify_carpool_left()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if old.player_id is not null then
+    perform net.http_post(
+      url := 'https://<deine-vercel-domain>/api/notify?kind=carpool-left',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+      body := jsonb_build_object(
+        'record', jsonb_build_object(
+          'offer_id', old.offer_id,
+          'player_id', old.player_id,
+          'offer_still_exists', exists (select 1 from public.carpool_offers where id = old.offer_id)
+        )
+      )
+    );
+  end if;
+  return old;
+end;
+$$;
+
+create trigger carpool_claims_notify_left
+after delete on public.carpool_claims
+for each row execute function public.notify_carpool_left();
+
+-- Fahrer hat seine ganze Fahrt gelöscht, während Mitfahrer drin saßen —
+-- der Client trägt die Mitfahrer-IDs hier ein, BEVOR er die Fahrt selbst
+-- löscht (siehe Absatz oben, warum nicht als ein gebündelter Server-Schritt).
+create or replace function public.notify_carpool_offer_deleted()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform net.http_post(
+    url := 'https://<deine-vercel-domain>/api/notify?kind=carpool-offer-deleted',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+    body := jsonb_build_object(
+      'record', jsonb_build_object(
+        'game_id', new.game_id,
+        'driver_player_id', new.driver_player_id,
+        'passenger_player_ids', new.passenger_player_ids
+      )
+    )
+  );
+  return new;
+end;
+$$;
+
+create trigger carpool_offer_cancellations_notify
+after insert on public.carpool_offer_cancellations
+for each row execute function public.notify_carpool_offer_deleted();
+
+-- Neue Fahrt mit freien Plätzen eingetragen → alle, die für dieses Spiel
+-- noch einen Platz suchen (carpool_seekers), bekommen eine Meldung. "seats"
+-- zählt nur die angebotenen Beifahrerplätze (Fahrersitz kommt beim
+-- Anzeigen separat dazu), bei einer frisch eingetragenen Fahrt ist das
+-- schon die Zahl freier Plätze — api/notify.ts prüft seats > 0 und bricht
+-- sonst ohne Versand ab.
+create or replace function public.notify_carpool_seeker_match()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform net.http_post(
+    url := 'https://<deine-vercel-domain>/api/notify?kind=carpool-seeker-match',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', '<PUSH_WEBHOOK_SECRET-Wert>'),
+    body := jsonb_build_object(
+      'record', jsonb_build_object('offer_id', new.id, 'game_id', new.game_id, 'driver_player_id', new.driver_player_id, 'seats', new.seats)
+    )
+  );
+  return new;
+end;
+$$;
+
+create trigger carpool_offers_notify_seeker_match
+after insert on public.carpool_offers
+for each row execute function public.notify_carpool_seeker_match();
+```
+
+Keine zusätzlichen `service_role`-Rechte nötig — alle vier Mitfahrt-Tabellen sowie `games`,
+`players`, `player_auth_links` und `push_subscriptions` waren bereits berechtigt (Supabase
+vergibt `service_role` standardmäßig volle Rechte auf neue Tabellen). Wie bei allen anderen
+Triggern hier: nur auf Produktion mit echten Werten für `<deine-vercel-domain>` und
+`<PUSH_WEBHOOK_SECRET-Wert>` anwenden, nicht als Migration getrackt.
+
 ### 8. Liga-Tabelle (DBB-Sync)
 
 Optionale Zusatzfunktion (Feature-Flag `standings`, siehe Admin -> Funktionen), auf
