@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { fmtDateBadge, fmtDateShort, fmtTime, mapsUrl } from '../lib/format';
 import { EMPTY_MEETING_POINT, type MeetingPointFormValue } from './MeetingPointFields';
-import { SquadDeclineSheet, SquadReconfirmSheet } from './SquadResponseSheets';
+import { SquadDeclineSheet } from './SquadResponseSheets';
 import {
   meetingPoints,
   playerAbsenceOn,
@@ -165,7 +165,6 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [responding, setResponding] = useState(false);
   const [selfDeclineSheetOpen, setSelfDeclineSheetOpen] = useState(false);
-  const [selfReconfirmSheetOpen, setSelfReconfirmSheetOpen] = useState(false);
   const [rideOfferOpen, setRideOfferOpen] = useState(false);
   const [rideSeats, setRideSeats] = useState(3);
   const [rideNote, setRideNote] = useState('');
@@ -319,7 +318,6 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
       });
       if (rpcError) throw rpcError;
       setSelfDeclineSheetOpen(false);
-      setSelfReconfirmSheetOpen(false);
       await load();
     } catch {
       setError('Rückmeldung konnte nicht gespeichert werden.');
@@ -644,15 +642,8 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
                       </div>
                     )}
                     {isMe && myConfirmation === 'declined' && (
-                      <div className="mb-2 flex items-center gap-2 pl-[44px]">
-                        <button
-                          type="button"
-                          onClick={() => setSelfReconfirmSheetOpen(true)}
-                          className="inline-flex h-[34px] items-center gap-1.5 rounded-to-pill border border-to-borderMatchday px-3.5 text-[13px] font-semibold text-to-accent"
-                        >
-                          <CheckIcon className="h-[13px] w-[13px]" />
-                          Doch dabei
-                        </button>
+                      <div className="mb-2 pl-[44px]">
+                        <p className="text-xs text-to-text3">Melde dich beim Trainer, falls du doch kannst.</p>
                       </div>
                     )}
                     {isMe && selected && myConfirmation === 'pending' && (
@@ -742,35 +733,35 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
                 {myConfirmation === 'confirmed'
                   ? 'Du hast zugesagt.'
                   : myConfirmation === 'declined'
-                  ? 'Du hast abgesagt. Der Trainer ist informiert.'
+                  ? 'Du hast abgesagt. Der Trainer ist informiert und kümmert sich um Ersatz.'
                   : 'Sag kurz Bescheid, ob du dabei bist.'}
               </span>
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  disabled={responding}
-                  onClick={() => respond(true)}
-                  className={
-                    myConfirmation === 'confirmed'
-                      ? 'btn-primary !h-[50px] text-[15px]'
-                      : 'btn-secondary !h-[50px] text-[15px]'
-                  }
-                >
-                  {myConfirmation === 'confirmed' ? 'Dabei' : 'Bin dabei'}
-                </button>
-                <button
-                  type="button"
-                  disabled={responding}
-                  onClick={() => respond(false)}
-                  className={
-                    myConfirmation === 'declined'
-                      ? 'inline-flex h-[50px] items-center justify-center rounded-to-md bg-to-dangerSoft text-[15px] font-medium text-to-dangerText'
-                      : 'btn-secondary !h-[50px] text-[15px]'
-                  }
-                >
-                  Kann nicht
-                </button>
-              </div>
+              {myConfirmation === 'declined' ? (
+                <>
+                  <span className="inline-flex h-[50px] items-center justify-center rounded-to-md bg-to-dangerSoft text-[15px] font-medium text-to-dangerText">
+                    Kann nicht
+                  </span>
+                  <p className="text-xs text-to-text3">Melde dich beim Trainer, falls du doch kannst.</p>
+                </>
+              ) : (
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    disabled={responding}
+                    onClick={() => respond(true)}
+                    className={
+                      myConfirmation === 'confirmed'
+                        ? 'btn-primary !h-[50px] text-[15px]'
+                        : 'btn-secondary !h-[50px] text-[15px]'
+                    }
+                  >
+                    {myConfirmation === 'confirmed' ? 'Dabei' : 'Bin dabei'}
+                  </button>
+                  <button type="button" disabled={responding} onClick={() => respond(false)} className="btn-secondary !h-[50px] text-[15px]">
+                    Kann nicht
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -987,14 +978,6 @@ export function NextGameSquadCard({ game, label = 'NÄCHSTER SPIELTAG' }: { game
           published={g.squad_published}
           onCancel={() => setSelfDeclineSheetOpen(false)}
           onSend={(reason, note) => respond(false, reason, note)}
-        />
-      )}
-      {selfReconfirmSheetOpen && (
-        <SquadReconfirmSheet
-          busy={responding}
-          error={error}
-          onCancel={() => setSelfReconfirmSheetOpen(false)}
-          onConfirm={() => respond(true)}
         />
       )}
     </section>

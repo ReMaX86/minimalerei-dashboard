@@ -53,7 +53,8 @@ export function SquadDeclineSheet({
           </div>
         ) : (
           <p className="mt-1 text-sm text-to-text2">
-            Dein Trainer bekommt sofort eine Meldung. Solange der Kader offen ist, kannst du danach wieder zusagen.
+            Dein Trainer bekommt sofort eine Meldung und kümmert sich um Ersatz. Melde dich bei ihm, falls sich das
+            noch ändert.
           </p>
         )}
 
@@ -93,45 +94,6 @@ export function SquadDeclineSheet({
           </button>
           <button type="button" disabled={busy} className="btn-secondary !h-[48px] text-[15px]" onClick={onCancel}>
             Doch, ich bin dabei
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-}
-
-export function SquadReconfirmSheet({
-  busy,
-  error,
-  onCancel,
-  onConfirm
-}: {
-  busy: boolean;
-  error: string | null;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 sm:items-center" onClick={onCancel}>
-      <div
-        className="w-full max-w-lg rounded-t-[24px] border border-to-line bg-to-surface2 p-5 sm:rounded-b-[24px]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-[19px] font-semibold -tracking-[0.01em] text-to-text">Doch wieder dabei?</h2>
-        <p className="mt-1 text-sm text-to-text2">
-          Du stehst danach wieder als zugesagt in der Liste, dein Trainer wird informiert. Ob du im Kader landest,
-          entscheidet weiterhin er.
-        </p>
-
-        {error && <p className="mt-3 text-xs text-to-dangerText">{error}</p>}
-
-        <div className="mt-4 grid grid-cols-2 gap-2.5">
-          <button type="button" disabled={busy} className="btn-primary !h-[48px] text-[15px]" onClick={onConfirm}>
-            {busy ? 'Sende…' : 'Wieder zusagen'}
-          </button>
-          <button type="button" disabled={busy} className="btn-secondary !h-[48px] text-[15px]" onClick={onCancel}>
-            Abbrechen
           </button>
         </div>
       </div>

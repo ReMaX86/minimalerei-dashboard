@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { fmtDateBadge, fmtTime, hasKickedOff, mapsUrl } from '../lib/format';
 import { DECLINE_REASON_LABELS, benoetigterSatz, meetingPoints, type DeclineReason, type Game, type SquadConfirmation } from '../types/database';
-import { SquadDeclineSheet, SquadReconfirmSheet } from './SquadResponseSheets';
+import { SquadDeclineSheet } from './SquadResponseSheets';
 
 const MAX_SQUAD_SIZE = 12;
 
@@ -136,7 +136,6 @@ export function NextGameCard({
   onResponded: () => void;
 }) {
   const [declineSheetOpen, setDeclineSheetOpen] = useState(false);
-  const [reconfirmSheetOpen, setReconfirmSheetOpen] = useState(false);
   const [responding, setResponding] = useState(false);
   const [respondError, setRespondError] = useState<string | null>(null);
 
@@ -179,7 +178,6 @@ export function NextGameCard({
       });
       if (error) throw error;
       setDeclineSheetOpen(false);
-      setReconfirmSheetOpen(false);
       onResponded();
     } catch {
       setRespondError('Konnte nicht gespeichert werden. Bitte nochmal versuchen.');
@@ -263,8 +261,8 @@ export function NextGameCard({
           <div className="flex items-start gap-2.5 rounded-to-lg border border-to-dangerFrame bg-to-dangerSoft px-3.5 py-3 text-[12px] leading-relaxed text-to-text2">
             <SmallCrossIcon />
             <span>
-              <strong className="text-to-text">Du bist abgesagt.</strong> Dein Trainer wurde informiert. Solange der
-              Kader noch offen ist, kannst du jederzeit wieder zusagen.
+              <strong className="text-to-text">Du bist abgesagt.</strong> Dein Trainer wurde informiert und kümmert
+              sich um Ersatz. Melde dich bei ihm, falls du doch wieder kannst.
             </span>
           </div>
         )}
@@ -345,21 +343,13 @@ export function NextGameCard({
           )}
 
           {!live && isDeclined && (
-            <>
-              <div className="flex items-center justify-between gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setReconfirmSheetOpen(true)}
-                  className="inline-flex h-[46px] items-center gap-2 rounded-to-pill border border-to-dangerFrame bg-to-dangerSoft px-4 text-sm font-semibold text-to-dangerText"
-                >
-                  <SmallCrossIcon />
-                  Abgesagt{myDeclineReason ? ` · ${DECLINE_REASON_LABELS[myDeclineReason]}` : ''}
-                  <span className="to-data ml-0.5 text-[8px] tracking-[0.1em] text-to-text3">DOCH DABEI?</span>
-                </button>
-                <KaderAnsehenLink />
-              </div>
-              {respondError && <p className="text-xs text-to-dangerText">{respondError}</p>}
-            </>
+            <div className="flex items-center justify-between gap-2.5">
+              <span className="inline-flex h-[46px] items-center gap-2 rounded-to-pill border border-to-dangerFrame bg-to-dangerSoft px-4 text-sm font-semibold text-to-dangerText">
+                <SmallCrossIcon />
+                Abgesagt{myDeclineReason ? ` · ${DECLINE_REASON_LABELS[myDeclineReason]}` : ''}
+              </span>
+              <KaderAnsehenLink />
+            </div>
           )}
 
           {!live && role !== 'player' && (
@@ -454,14 +444,6 @@ export function NextGameCard({
           published={game.squad_published}
           onCancel={() => setDeclineSheetOpen(false)}
           onSend={(reason, note) => respond(false, reason, note)}
-        />
-      )}
-      {reconfirmSheetOpen && (
-        <SquadReconfirmSheet
-          busy={responding}
-          error={respondError}
-          onCancel={() => setReconfirmSheetOpen(false)}
-          onConfirm={() => respond(true)}
         />
       )}
     </section>
